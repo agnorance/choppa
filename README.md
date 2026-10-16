@@ -71,6 +71,9 @@ twice as much.
 
 ## Develop
 
+Full Windows setup (Godot, Git, tests, local Windows/Android builds, Blender asset
+scripts): [docs/SETUP_WINDOWS.md](docs/SETUP_WINDOWS.md).
+
 1. Install Godot 4.7.2 (standard build, not .NET).
 2. Open `project.godot` in Godot and press F5.
 

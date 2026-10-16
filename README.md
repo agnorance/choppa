@@ -53,7 +53,7 @@ Esc (or the Android back button) returns to the menu.
 | Machine gun | Ctrl or left mouse | RT | FIRE (also auto-fires when locked on) |
 | Trick (+ direction) | F | A | TRICK |
 | Use item | R | X | ITEM |
-| Camera | V | Y | CAM |
+| Camera: chase view / cockpit | V | Y | CAM |
 | Respawn (race: at your last gate; not in battle) | Backspace | Back/Select | |
 
 The machine gun snaps onto targets in a narrow cone ahead (white ring) and overheats

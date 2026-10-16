@@ -33,6 +33,8 @@ func _process(delta: float) -> void:
 	var speed_ratio := clampf(target.velocity.length() / target.boost_speed, 0.0, 1.2)
 	fov = lerpf(fov, base_fov + speed_fov * speed_ratio, 1.0 - exp(-4.0 * delta))
 
+	if target.model.cockpit_view:
+		target.model.cockpit_view.visible = first_person
 	if first_person:
 		# Rigidly mounted: you feel every roll and flip.
 		cull_mask = ~ChoppaModel.OWN_LAYER & 0xFFFFF

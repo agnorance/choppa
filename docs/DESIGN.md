@@ -21,8 +21,14 @@ twist, heavy atmosphere, strong lighting and post-processing.
   terrain. Android gets a reduced MEDIUM preset on the Mobile renderer.
 - Materials are tileable PBR textures generated in Blender (`tools/blender/`), terrain is
   splatted by slope and height in `shaders/terrain.gdshader`.
-- Next: sculpted rock formations instead of boxes, a detailed dieselpunk helicopter
-  model, dense grass and proper trees, better water and effects.
+- Done: sculpted rock formations (`make_rocks.py`), dieselpunk helicopter with hull
+  shader (`make_choppa.py`), golden-hour sky and snowy backdrop.
+- Cockpit view (first draft, `make_cockpit.py` + `scripts/cockpit.gd`): mostly window,
+  a compact panel with live needle gauges, amber radar, nixie kill counter, hull lamp
+  bar, ordnance plate, warning lamps, missile beacon, and a reflector gunsight with a
+  green reticle. The 2D HUD steps back in this view. To refine: instrument faces,
+  panel placement, radar not hidden by the sight post.
+- Next: proper trees, dense grass, water, effects polish.
 
 ## Game feel (decided)
 

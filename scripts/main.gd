@@ -75,8 +75,7 @@ func _show_menu() -> void:
 
 func _start() -> void:
 	var slot := RACE_GRID_SLOT if mode == "race" else 0
-	choppa = _new_choppa("You", Color(0.95, 0.5, 0.1), map.spawn_points[slot])
-	choppa.local_player = true
+	choppa = _new_choppa("You", Color(0.95, 0.5, 0.1), map.spawn_points[slot], true)
 	if mode == "free" and _args.has("spawn"):
 		choppa.respawn(_spawn_arg())
 
@@ -122,8 +121,9 @@ func _start() -> void:
 		add_child(pilot)
 
 
-func _new_choppa(pilot_name: String, color: Color, at: Transform3D) -> Choppa:
+func _new_choppa(pilot_name: String, color: Color, at: Transform3D, local := false) -> Choppa:
 	var c := Choppa.new()
+	c.local_player = local  # Must be set before _ready: it decides the cockpit and layers.
 	c.pilot_name = pilot_name
 	c.team_color = color
 	c.max_altitude = map.ceiling
@@ -173,6 +173,8 @@ func _start_battle() -> void:
 	battle = Battle.new()
 	add_child(battle)
 	battle.setup(field, map.spawn_points, int(_args.get("kills", "8")))
+	if choppa.model.cockpit_view:
+		choppa.model.cockpit_view.kills_source = func() -> int: return battle.kills_of(choppa)
 	for n in range(1, field.size()):
 		_add_fighter_bot(field[n], RIVALS[n - 1][2])
 

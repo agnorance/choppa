@@ -17,6 +17,8 @@ var _heat: ProgressBar
 var _health: ProgressBar
 var _health_fill: StyleBoxFlat
 var _vignette: TextureRect
+var _boost_label: Label
+var _hp_label: Label
 var _smoke: ColorRect
 var _warning: Label
 var _effects: Label
@@ -61,8 +63,8 @@ func _ready() -> void:
 	_boost.add_theme_stylebox_override("fill", fill)
 	_boost.add_theme_stylebox_override("background", back)
 	root.add_child(_boost)
-	var boost_label := _label(root, 16, Vector2(0.5, 1), Vector2(0, -52))
-	boost_label.text = "BOOST"
+	_boost_label = _label(root, 16, Vector2(0.5, 1), Vector2(0, -52))
+	_boost_label.text = "BOOST"
 
 	_heat = ProgressBar.new()
 	_heat.max_value = 1.0
@@ -75,8 +77,8 @@ func _ready() -> void:
 	_heat.add_theme_stylebox_override("background", back)
 	root.add_child(_heat)
 
-	var hp_label := _label(root, 16, Vector2(0, 1), Vector2(24, -50))
-	hp_label.text = "HP"
+	_hp_label = _label(root, 16, Vector2(0, 1), Vector2(24, -50))
+	_hp_label.text = "HP"
 	_health = ProgressBar.new()
 	_health.max_value = Choppa.MAX_HEALTH
 	_health.show_percentage = false
@@ -161,6 +163,10 @@ func toggle_help() -> void:
 
 
 func _process(delta: float) -> void:
+	# In the cockpit the instruments show all this; keep the screen clean.
+	var cockpit := camera is ChaseCamera and (camera as ChaseCamera).first_person
+	for control: Control in [_speed, _altitude, _boost, _heat, _health, _item, _effects, _boost_label, _hp_label, _help]:
+		control.visible = not cockpit
 	_speed.text = "%d km/h" % roundi(choppa.velocity.length() * 3.6)
 	_altitude.text = "ALT %d m" % roundi(maxf(choppa.altitude, 0.0))
 	_fps.text = "%d fps" % Engine.get_frames_per_second()
@@ -200,6 +206,8 @@ func _draw_crosshair() -> void:
 			_crosshair.draw_arc(at, 34.0, 0.0, TAU, 32, color, 3.0)
 			_crosshair.draw_arc(at, 40.0, 0.0, TAU, 32, Color(color, 0.4), 2.0)
 		return
+	if camera is ChaseCamera and (camera as ChaseCamera).first_person:
+		return  # The gunsight in the cockpit is the crosshair.
 	var ahead := choppa.global_position + choppa.facing() * Vector3(0.0, -0.5, -80.0)
 	if camera.is_position_behind(ahead):
 		return

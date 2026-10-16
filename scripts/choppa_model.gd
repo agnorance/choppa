@@ -9,7 +9,9 @@ const OWN_LAYER := 1 << 1
 
 var color := Color(0.95, 0.5, 0.1)
 var own := false  ## Set before adding to the tree to put meshes on OWN_LAYER.
+var pilot: Choppa  ## The choppa this model shows; feeds the cockpit instruments.
 var cockpit: Marker3D  ## First-person camera mount.
+var cockpit_view: Cockpit  ## Instrumented interior, local player only.
 
 var _parts: Node3D  ## All meshes, so the spawn shield can blink them.
 var _rotor: Node3D
@@ -31,7 +33,7 @@ func _ready() -> void:
 	add_child(_parts)
 	var model: Node3D = _scene().instantiate()
 	_parts.add_child(model)
-	var materials := _materials()
+	var materials := part_materials(color.lerp(Color(0.36, 0.38, 0.3), 0.42))
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D"):
 		for k in mesh.mesh.get_surface_count():
 			var source := mesh.mesh.surface_get_material(k)
@@ -57,6 +59,12 @@ func _ready() -> void:
 	cockpit = Marker3D.new()
 	cockpit.position = Vector3(0.0, 0.55, -1.15)
 	add_child(cockpit)
+	if own:
+		cockpit_view = Cockpit.new()
+		cockpit_view.choppa = pilot
+		cockpit_view.position = cockpit.position
+		cockpit_view.visible = false
+		add_child(cockpit_view)
 
 	var flash_mesh := SphereMesh.new()
 	flash_mesh.radius = 0.35
@@ -214,13 +222,12 @@ static func _scene() -> PackedScene:
 	return _cached_scene
 
 
-## Materials by the names the Blender script gives them. The paint is the team colour,
-## muted toward military olive.
-func _materials() -> Dictionary:
+## Materials by the names the Blender scripts give them; `paint` uses the hull shader.
+static func part_materials(paint: Color, panel_size := Vector2(1.35, 0.75)) -> Dictionary:
 	var hull := ShaderMaterial.new()
 	hull.shader = load("res://shaders/hull.gdshader")
-	var muted := color.lerp(Color(0.36, 0.38, 0.3), 0.42)
-	hull.set_shader_parameter("paint", muted)
+	hull.set_shader_parameter("paint", paint)
+	hull.set_shader_parameter("panel_size", panel_size)
 	var glass := StandardMaterial3D.new()
 	glass.albedo_color = Color(0.25, 0.32, 0.35, 0.35)
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -246,7 +253,7 @@ func _materials() -> Dictionary:
 	}
 
 
-func _material(albedo: Color, metallic: float, roughness: float) -> StandardMaterial3D:
+static func _material(albedo: Color, metallic: float, roughness: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = albedo
 	material.metallic = metallic

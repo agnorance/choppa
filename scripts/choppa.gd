@@ -121,6 +121,7 @@ func _ready() -> void:
 	model = ChoppaModel.new()
 	model.color = team_color
 	model.own = local_player
+	model.pilot = self
 	add_child(model)
 
 

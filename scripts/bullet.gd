@@ -22,10 +22,10 @@ var _age := 0.0
 func _ready() -> void:
 	if _mesh == null:
 		_mesh = BoxMesh.new()
-		_mesh.size = Vector3(0.1, 0.1, 2.6)
+		_mesh.size = Vector3(0.07, 0.07, 3.0)
 		_material = StandardMaterial3D.new()
 		_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_material.albedo_color = Color(1.0, 0.85, 0.35)
+		_material.albedo_color = Color(4.0, 2.6, 1.0)  # Above 1: the glow pass makes it a streak of light.
 	var tracer := MeshInstance3D.new()
 	tracer.mesh = _mesh
 	tracer.material_override = _material
@@ -53,38 +53,19 @@ func _physics_process(delta: float) -> void:
 	if target and target.take_hit(direction * KNOCKBACK, shooter, damage) and is_instance_valid(shooter):
 		shooter.scored_hit.emit(target)
 	if target == null or not target.trick == "BARREL ROLL":
-		_spark(hit.position)
+		_impact(hit)
 		queue_free()
 	else:
 		global_position = to  # Dodged: fly on through.
 
 
-func _spark(at: Vector3) -> void:
-	var spark := Spark.new()
-	get_parent().add_child(spark)
-	spark.global_position = at
-
-
-class Spark extends MeshInstance3D:
-	var _t := 0.0
-
-	func _ready() -> void:
-		var sphere := SphereMesh.new()
-		sphere.radius = 0.5
-		sphere.height = 1.0
-		sphere.radial_segments = 6
-		sphere.rings = 3
-		mesh = sphere
-		var m := StandardMaterial3D.new()
-		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		m.albedo_color = Color(1.0, 0.75, 0.3)
-		material_override = m
-		cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-
-	func _process(delta: float) -> void:
-		_t += delta
-		scale = Vector3.ONE * (0.4 + _t * 6.0)
-		(material_override as StandardMaterial3D).albedo_color.a = 1.0 - _t / 0.15
-		if _t >= 0.15:
-			queue_free()
+func _impact(hit: Dictionary) -> void:
+	var impact := Effects.Impact.new()
+	var collider := hit.collider as Node
+	if collider is Choppa:
+		impact.kind = Effects.Impact.Kind.METAL
+	elif collider.is_in_group("water"):
+		impact.kind = Effects.Impact.Kind.WATER
+	impact.normal = hit.normal
+	get_parent().add_child(impact)
+	impact.global_position = hit.position

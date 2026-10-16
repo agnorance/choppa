@@ -14,12 +14,36 @@ extends Camera3D
 @export var speed_fov := 18.0  ## Extra FOV at boost speed.
 
 var _ready_to_follow := false
+var _trauma := 0.0  ## Camera shake, 0..1; decays. Felt as its square.
+var _shake_noise := FastNoiseLite.new()
+var _shake_time := 0.0
 
 
 func _ready() -> void:
 	near = 0.1
 	far = 8000.0  # The mountain backdrop is kilometres away.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+	add_to_group("shake_cameras")
+	_shake_noise.frequency = 2.0
+	if target:
+		target.damaged.connect(func(amount: float, _attacker: Choppa) -> void: _trauma += amount * 0.025)
+
+
+## An explosion of the given size went off at `at`: shake if it's close.
+func shake_from(at: Vector3, size: float) -> void:
+	var near_ratio := 1.0 - global_position.distance_to(at) / (70.0 * size)
+	_trauma = minf(1.0, _trauma + clampf(near_ratio, 0.0, 1.0) * 0.9 * size)
+
+
+func _apply_shake(delta: float) -> void:
+	_trauma = maxf(0.0, _trauma - delta * 1.4)
+	if _trauma <= 0.0:
+		return
+	_shake_time += delta * 30.0
+	var amount := _trauma * _trauma
+	rotate_object_local(Vector3.RIGHT, _shake_noise.get_noise_1d(_shake_time) * 0.06 * amount)
+	rotate_object_local(Vector3.UP, _shake_noise.get_noise_1d(_shake_time + 100.0) * 0.06 * amount)
+	rotate_object_local(Vector3.BACK, _shake_noise.get_noise_1d(_shake_time + 200.0) * 0.08 * amount)
 
 
 func toggle_mode() -> void:
@@ -39,6 +63,7 @@ func _process(delta: float) -> void:
 		# Rigidly mounted: you feel every roll and flip.
 		cull_mask = ~ChoppaModel.OWN_LAYER & 0xFFFFF
 		global_transform = target.model.cockpit.get_global_transform_interpolated()
+		_apply_shake(delta)
 		return
 
 	cull_mask = 0xFFFFF
@@ -46,6 +71,7 @@ func _process(delta: float) -> void:
 	if showcase:
 		global_position = body.origin + body.basis * Vector3(7.0, 1.2, -8.0)
 		look_at(body.origin + Vector3.UP * 0.5, Vector3.UP)
+		_apply_shake(delta)
 		return
 	var back := body.basis * Vector3(0.0, height, distance + 3.0 * speed_ratio)
 	var desired := body.origin + back
@@ -58,6 +84,7 @@ func _process(delta: float) -> void:
 	var focus := body.origin + body.basis * Vector3(0.0, 1.0, -look_ahead)
 	if not global_position.is_equal_approx(focus):
 		look_at(focus, Vector3.UP)
+	_apply_shake(delta)
 
 
 func _avoid_walls(from: Vector3, to: Vector3) -> Vector3:

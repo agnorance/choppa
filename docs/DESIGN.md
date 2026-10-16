@@ -47,7 +47,10 @@ twist, heavy atmosphere, strong lighting and post-processing.
   swell, refraction of the lake bed, colour by depth, sky sheen at grazing angles, shore
   foam, and rings plus churned foam under a low choppa (with spray instead of dust).
   The Compatibility renderer gets a plain waving surface.
-- Next: explosions and hit effects.
+- Explosions: fireball, lingering smoke column, glowing embers, debris, a flash, a
+  shock wave of bent air, a light, a scorch mark on the ground, and camera shake.
+  Bullet hits spark off metal, kick up dust and chips from the ground, splash on water.
+  Tracers glow.
 
 ## Game feel (decided)
 
@@ -189,6 +192,9 @@ Low-poly, flat-shaded look with strong colours.
    CHOPPA, with scoreboard-weighted odds; bots use them.
 4. **Feel pass:** tune on real hardware (Windows + Android), audio, camera shake, hit
    markers.
+   **UI overhaul (owner's request, to do):** menus, HUD, scoreboard and touch controls
+   are still placeholder Godot controls; restyle them to match the PVKK-like look
+   (stencil type, worn metal panels, amber/cream instruments).
 5. **LAN multiplayer:** host/join, discovery, prediction and interpolation.
 6. **More arenas** and battle variants.
 7. **Internet play**, choppa colours and customization.

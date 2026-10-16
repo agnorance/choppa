@@ -157,63 +157,300 @@ static func _draw_line(image: Image, a: Vector2, b: Vector2, alpha: float) -> vo
 				image.set_pixelv(q, Color(1, 1, 1, maxf(image.get_pixelv(q).a, weight)))
 
 
-## Fireball, smoke, flying debris and a flash of light. Cleans itself up.
-class Explosion extends Node3D:
-	var size := 1.0  ## Scales the fireball, debris and flash.
+## Streaks of glowing metal or embers: thin bars stretched along their flight.
+static func sparks(amount: int, lifetime: float, speed: Vector2, color: Color, length := 0.3) -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	var bar := BoxMesh.new()
+	bar.size = Vector3(0.03, length, 0.03)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = color  # Above 1: glows.
+	m.disable_receive_shadows = true
+	bar.material = m
+	p.mesh = bar
+	p.amount = amount
+	p.lifetime = lifetime
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.local_coords = false
+	p.particle_flag_align_y = true
+	p.initial_velocity_min = speed.x
+	p.initial_velocity_max = speed.y
+	p.gravity = Vector3(0.0, -14.0, 0.0)
+	var fade := Curve.new()
+	fade.add_point(Vector2(0.0, 1.0))
+	fade.add_point(Vector2(1.0, 0.0))
+	p.scale_amount_curve = fade
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return p
+
+
+## Small chips of dirt, rock or metal tumbling away under gravity.
+static func chips(amount: int, color: Color, size: float, speed: Vector2) -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	var chunk := BoxMesh.new()
+	chunk.size = Vector3(1.0, 0.6, 0.8) * size
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	m.roughness = 0.9
+	chunk.material = m
+	p.mesh = chunk
+	p.amount = amount
+	p.lifetime = 1.4
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.local_coords = false
+	p.initial_velocity_min = speed.x
+	p.initial_velocity_max = speed.y
+	p.angular_velocity_min = -540.0
+	p.angular_velocity_max = 540.0
+	p.particle_flag_rotate_y = true
+	p.gravity = Vector3(0.0, -20.0, 0.0)
+	p.scale_amount_min = 0.5
+	p.scale_amount_max = 1.3
+	return p
+
+
+## A bright star that pops up and fades: the first frames of a blast or a hit.
+static func flash(size: float, color: Color) -> MeshInstance3D:
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE * size
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.albedo_texture = star_texture()
+	m.albedo_color = color
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.no_depth_test = false
+	var mesh := MeshInstance3D.new()
+	mesh.mesh = quad
+	mesh.material_override = m
+	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mesh
+
+
+static var _scorch: Texture2D
+
+
+## Burnt ground: a dark, ragged blot fading out at the edge.
+static func scorch_texture() -> Texture2D:
+	if _scorch:
+		return _scorch
+	var size := 128
+	var noise := FastNoiseLite.new()
+	noise.seed = 21
+	noise.frequency = 0.06
+	noise.fractal_octaves = 4
+	var image := Image.create(size, size, true, Image.FORMAT_RGBA8)
+	for y in size:
+		for x in size:
+			var p := (Vector2(x, y) - Vector2.ONE * size * 0.5) / (size * 0.5)
+			var n := noise.get_noise_2d(x, y) * 0.5 + 0.5
+			var a := clampf((1.0 - smoothstep(0.35, 1.0, p.length() + (n - 0.5) * 0.5)) * 1.2, 0.0, 0.92)
+			var c := lerpf(0.03, 0.12, n)
+			image.set_pixel(x, y, Color(c, c * 0.9, c * 0.8, a))
+	image.generate_mipmaps()
+	_scorch = ImageTexture.create_from_image(image)
+	return _scorch
+
+
+## A bullet striking something: sparks off metal, a dust puff and chips off the ground,
+## a splash on water. Cleans itself up.
+class Impact extends Node3D:
+	enum Kind { METAL, GROUND, WATER }
+	var kind := Kind.GROUND
+	var normal := Vector3.UP
 	var _t := 0.0
 	var _light: OmniLight3D
 
 	func _ready() -> void:
+		var out := normal.normalized()
+		match kind:
+			Kind.METAL:
+				var s := Effects.sparks(14, 0.35, Vector2(8.0, 20.0), Color(4.0, 2.2, 0.7), 0.25)
+				_emit(s, out, 70.0)
+				var f := Effects.flash(1.2, Color(1.0, 0.8, 0.5))
+				add_child(f)
+				_light = OmniLight3D.new()
+				_light.light_color = Color(1.0, 0.7, 0.3)
+				_light.light_energy = 2.0
+				_light.omni_range = 4.0
+				add_child(_light)
+				var smoke := Effects.puffs(Effects.gradient([Color(0.3, 0.3, 0.3, 0.5), Color(0.25, 0.25, 0.25, 0.0)]), 3, 0.8)
+				smoke.scale_amount_min = 0.6
+				smoke.scale_amount_max = 1.0
+				_emit(smoke, out, 30.0, Vector2(1.0, 2.0))
+			Kind.GROUND:
+				var dust := Effects.puffs(Effects.gradient([
+					Color(0.66, 0.58, 0.46, 0.7), Color(0.62, 0.55, 0.45, 0.4), Color(0.6, 0.55, 0.47, 0.0)]), 5, 1.2)
+				dust.scale_amount_min = 0.8
+				dust.scale_amount_max = 1.6
+				dust.damping_min = 4.0
+				dust.damping_max = 6.0
+				_emit(dust, out, 35.0, Vector2(2.0, 5.0))
+				_emit(Effects.chips(6, Color(0.3, 0.25, 0.2), 0.08, Vector2(4.0, 9.0)), out, 40.0)
+				_emit(Effects.sparks(4, 0.2, Vector2(6.0, 12.0), Color(3.0, 1.8, 0.6), 0.18), out, 60.0)
+			Kind.WATER:
+				var spray := Effects.puffs(Effects.gradient([
+					Color(0.95, 0.97, 1.0, 0.8), Color(0.9, 0.95, 1.0, 0.4), Color(0.9, 0.95, 1.0, 0.0)]), 7, 0.9)
+				spray.gravity = Vector3(0.0, -9.0, 0.0)
+				spray.scale_amount_min = 0.4
+				spray.scale_amount_max = 0.9
+				_emit(spray, Vector3.UP, 12.0, Vector2(4.0, 8.0))
+				var drops := Effects.chips(8, Color(0.85, 0.92, 1.0), 0.07, Vector2(3.0, 7.0))
+				drops.gravity = Vector3(0.0, -14.0, 0.0)
+				_emit(drops, Vector3.UP, 30.0)
+
+	func _emit(p: CPUParticles3D, direction: Vector3, spread: float, speed := Vector2.ZERO) -> void:
+		p.direction = direction
+		p.spread = spread
+		p.one_shot = true
+		p.explosiveness = 1.0
+		if speed != Vector2.ZERO:
+			p.initial_velocity_min = speed.x
+			p.initial_velocity_max = speed.y
+		add_child(p)
+		p.emitting = true
+
+	func _process(delta: float) -> void:
+		_t += delta
+		if _light:
+			_light.light_energy = maxf(0.0, 2.0 * (1.0 - _t / 0.08))
+		for child in get_children():
+			if child is MeshInstance3D:
+				(child as MeshInstance3D).visible = _t < 0.06
+		if _t > 1.6:
+			queue_free()
+
+
+## Burnt ground left by a blast; fades away after a while.
+class Scorch extends Decal:
+	var _t := 0.0
+
+	func _ready() -> void:
+		texture_albedo = Effects.scorch_texture()
+		upper_fade = 0.3
+		lower_fade = 0.3
+		rotation.y = randf() * TAU
+
+	func _process(delta: float) -> void:
+		_t += delta
+		modulate.a = 1.0 - smoothstep(20.0, 30.0, _t)
+		if _t > 30.0:
+			queue_free()
+
+
+## Fireball, smoke column, embers, flying debris, a shock wave, a flash of light and a
+## scorch mark on the ground. Shakes nearby cameras. Cleans itself up.
+class Explosion extends Node3D:
+	var size := 1.0  ## Scales the fireball, debris and flash.
+	var _t := 0.0
+	var _light: OmniLight3D
+	var _flash: MeshInstance3D
+	var _wave: MeshInstance3D
+	var _wave_material: ShaderMaterial
+
+	func _ready() -> void:
 		var fire := Effects.puffs(Effects.gradient([
-			Color(1.0, 0.95, 0.6, 1.0), Color(1.0, 0.5, 0.1, 0.9),
-			Color(0.3, 0.25, 0.2, 0.6), Color(0.15, 0.15, 0.15, 0.0),
-		]), 40, 1.4)
+			Color(1.6, 1.4, 0.9, 1.0), Color(1.4, 0.6, 0.15, 0.95), Color(0.5, 0.22, 0.08, 0.8),
+			Color(0.12, 0.1, 0.09, 0.5), Color(0.1, 0.1, 0.1, 0.0),
+		]), 46, 1.5)
 		fire.one_shot = true
-		fire.explosiveness = 0.9
+		fire.explosiveness = 0.92
 		fire.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
 		fire.direction = Vector3.UP
 		fire.spread = 180.0
 		fire.initial_velocity_min = 4.0
-		fire.initial_velocity_max = 12.0
+		fire.initial_velocity_max = 13.0
 		fire.damping_min = 6.0
 		fire.damping_max = 10.0
-		fire.gravity = Vector3(0.0, 2.0, 0.0)
+		fire.gravity = Vector3(0.0, 2.5, 0.0)
 		fire.scale_amount_min = 3.0 * size
-		fire.scale_amount_max = 6.0 * size
+		fire.scale_amount_max = 6.5 * size
 		fire.emission_sphere_radius = 1.5 * size
 		add_child(fire)
 		fire.emitting = true
 
-		var debris := CPUParticles3D.new()
-		var chunk := BoxMesh.new()
-		chunk.size = Vector3(0.4, 0.25, 0.5)
-		var m := StandardMaterial3D.new()
-		m.albedo_color = Color(0.2, 0.2, 0.22)
-		chunk.material = m
-		debris.mesh = chunk
-		debris.amount = 16
-		debris.lifetime = 2.0
-		debris.one_shot = true
-		debris.explosiveness = 1.0
-		debris.local_coords = false
+		# A column of black smoke that lingers after the fire is gone.
+		var smoke := Effects.puffs(Effects.gradient([
+			Color(0.1, 0.09, 0.08, 0.0), Color(0.1, 0.09, 0.08, 0.75), Color(0.16, 0.15, 0.14, 0.45),
+			Color(0.22, 0.21, 0.2, 0.0),
+		]), 18, 4.0)
+		smoke.one_shot = true
+		smoke.explosiveness = 0.7
+		smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		smoke.emission_sphere_radius = 1.8 * size
+		smoke.direction = Vector3.UP
+		smoke.spread = 35.0
+		smoke.initial_velocity_min = 2.0
+		smoke.initial_velocity_max = 5.0
+		smoke.damping_min = 1.0
+		smoke.damping_max = 2.0
+		smoke.gravity = Vector3(0.0, 1.5, 0.0)
+		smoke.scale_amount_min = 4.0 * size
+		smoke.scale_amount_max = 8.0 * size
+		add_child(smoke)
+		smoke.emitting = true
+
+		var embers := Effects.sparks(int(36 * size), 1.3, Vector2(14.0, 34.0) * sqrt(size), Color(4.0, 1.8, 0.5),
+			0.5 * size)
+		embers.direction = Vector3.UP
+		embers.spread = 180.0
+		add_child(embers)
+		embers.emitting = true
+
+		var debris := Effects.chips(16, Color(0.14, 0.14, 0.15), 0.45 * size, Vector2(10.0, 22.0) * size)
 		debris.direction = Vector3.UP
 		debris.spread = 120.0
-		debris.initial_velocity_min = 10.0 * size
-		debris.initial_velocity_max = 22.0 * size
-		debris.angular_velocity_min = -360.0
-		debris.angular_velocity_max = 360.0
-		debris.gravity = Vector3(0.0, -20.0, 0.0)
+		debris.lifetime = 2.2
 		add_child(debris)
 		debris.emitting = true
 
+		_flash = Effects.flash(10.0 * size, Color(1.6, 1.3, 0.9))
+		add_child(_flash)
+
+		# Shock wave: a disc of bent air racing outward.
+		var quad := QuadMesh.new()
+		quad.size = Vector2.ONE
+		_wave_material = ShaderMaterial.new()
+		_wave_material.shader = preload("res://shaders/heat_haze.gdshader")
+		quad.material = _wave_material
+		_wave = MeshInstance3D.new()
+		_wave.mesh = quad
+		_wave.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_wave)
+
 		_light = OmniLight3D.new()
 		_light.light_color = Color(1.0, 0.6, 0.25)
-		_light.light_energy = 6.0
-		_light.omni_range = 30.0 * size
+		_light.light_energy = 8.0
+		_light.omni_range = 35.0 * size
+		_light.shadow_enabled = Graphics.at_least(Graphics.Quality.HIGH)
 		add_child(_light)
+
+		_scorch_ground.call_deferred()
+		get_tree().call_group("shake_cameras", "shake_from", global_position, size)
+
+	func _scorch_ground() -> void:
+		if not is_inside_tree():
+			return
+		var query := PhysicsRayQueryParameters3D.create(global_position, global_position + Vector3.DOWN * 8.0 * size)
+		var hit := get_world_3d().direct_space_state.intersect_ray(query)
+		if hit.is_empty() or hit.collider is Choppa or (hit.collider as Node).is_in_group("water"):
+			return
+		var scorch := Scorch.new()
+		scorch.size = Vector3(9.0, 4.0, 9.0) * size
+		get_parent().add_child(scorch)
+		scorch.global_position = hit.position
 
 	func _process(delta: float) -> void:
 		_t += delta
-		_light.light_energy = maxf(0.0, 6.0 * (1.0 - _t / 0.4))
-		if _t > 2.5:
+		_light.light_energy = maxf(0.0, 8.0 * (1.0 - _t / 0.45))
+		_flash.visible = _t < 0.12
+		_flash.scale = Vector3.ONE * (0.6 + _t * 5.0)
+		var w := clampf(_t / 0.4, 0.0, 1.0)
+		_wave.visible = w < 1.0
+		_wave.scale = Vector3.ONE * (2.0 + w * 26.0 * size)
+		_wave_material.set_shader_parameter("strength", 0.04 * (1.0 - w))
+		if _t > 4.5:
 			queue_free()

@@ -21,7 +21,8 @@ Done: flight model, tricks, boost, battle/free/race modes, items, bots, Mesa Bas
 Little Bird style choppa with cockpit view, effects, pines, grass, water, explosions,
 synthesized sound effects. PR #1 (`godot-foundation` -> `main`) waits for the owner to
 merge it on GitHub (merging is the owner's call).
-Noted for later (ask before starting): flight physics feel pass (DESIGN.md, "Physics
+Next up: load times (DESIGN.md, Milestones 4: grass on threads or baked, bake the
+procedural textures). Noted for later (ask before starting): flight physics feel pass (DESIGN.md, "Physics
 ideas"), UI overhaul (DESIGN.md, Milestones), choppa colours/customization, LAN
 multiplayer. Each session: check `git log` and the roadmap, then confirm the next step.
 

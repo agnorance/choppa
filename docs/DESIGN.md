@@ -217,14 +217,25 @@ Low-poly, flat-shaded look with strong colours.
    rotor dust, boost flame, muzzle flash, damage smoke).
 3. **Items** *(done)*: missile, mine, fake box, smoke, scrambler, shield, GET TO THE
    CHOPPA, with scoreboard-weighted odds; bots use them.
-4. **Feel pass:** tune on real hardware (Windows + Android): physics (see Physics
+4. **Load times (next):** Python stays for the offline tools (Blender's API is Python
+   only; they run once), GDScript stays for the game (the C++ engine does the heavy
+   work). Two fixes, mainly for phones:
+   - Grass: the map build takes ~2.5 s on desktop, mostly placing ~220k tufts in
+     GDScript. Place them on worker threads (`WorkerThreadPool`) or bake the
+     placement once into a file shipped with the map.
+   - Procedural textures (gauge dials, canopy cracks, muzzle star, scorch, puff dot,
+     water ripples) are drawn pixel by pixel at every start. Bake them into PNGs like
+     the Blender textures (VRAM-compressed imports).
+   - Only if profiling ever shows a hot spot (bots, netcode): a GDExtension in C++.
+     Not C#: it complicates the Android export.
+5. **Feel pass:** tune on real hardware (Windows + Android): physics (see Physics
    ideas), sound mix, camera shake, hit markers. Music is still missing.
    **UI overhaul (owner's request, to do):** menus, HUD, scoreboard and touch controls
    are still placeholder Godot controls; restyle them to match the PVKK-like look
    (stencil type, worn metal panels, amber/cream instruments).
-5. **LAN multiplayer:** host/join, discovery, prediction and interpolation.
-6. **More arenas** and battle variants.
-7. **Internet play**, choppa colours and customization.
+6. **LAN multiplayer:** host/join, discovery, prediction and interpolation.
+7. **More arenas** and battle variants.
+8. **Internet play**, choppa colours and customization.
 
 ## Decided after the first build
 

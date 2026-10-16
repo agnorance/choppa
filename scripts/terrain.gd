@@ -15,6 +15,7 @@ var _step := 0.0
 
 
 func _ready() -> void:
+	var started := Time.get_ticks_msec()
 	var n := resolution + 1
 	_step = size / resolution
 	var half := size * 0.5
@@ -75,6 +76,13 @@ func _ready() -> void:
 	collision.shape = shape
 	collision.scale = Vector3.ONE * _step
 	add_child(collision)
+	GameMap.report("terrain: %d x %d cells" % [resolution, resolution], started)
+
+
+## The height grid: (resolution + 1) squared values, row by row from (-size/2, -size/2)
+## in steps of size / resolution. For worker threads, which must not call into this node.
+func height_data() -> PackedFloat32Array:
+	return _heights
 
 
 ## Height of the rendered surface at (x, z), matching the mesh triangles exactly.

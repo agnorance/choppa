@@ -7,6 +7,8 @@ extends Node3D
 
 const CHUNK := 24.0  ## Metres per side.
 const TUFT_HEIGHT := 0.55
+const FLOATS_PER_TUFT := 12  ## A 3x4 transform in MultiMesh.buffer.
+const PATCH_STEP := 4.0  ## Metres between samples of the patch noise.
 
 var terrain: Terrain
 var radius := 260.0  ## Grows within this distance of `center`...
@@ -19,6 +21,10 @@ var max_slope := 0.16  ## 1 - normal.y; matches where the terrain shader paints 
 var patches: FastNoiseLite  ## Optional: grass only where this noise is above zero.
 
 var _material: ShaderMaterial
+## The patch noise sampled on a grid before the threads start (see _place).
+var _patch_values := PackedFloat32Array()
+var _patch_origin := Vector2.ZERO
+var _patch_n := 0
 
 
 func _ready() -> void:
@@ -29,71 +35,141 @@ func _ready() -> void:
 	var mesh := tuft_mesh()
 	mesh.surface_set_material(0, _material)
 	var started := Time.get_ticks_msec()
-	var total := 0
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 77
-	var per_chunk := int(CHUNK * CHUNK * density)
+
+	# Chunks within the radius; each is placed on its own worker thread (the terrain
+	# and the noise are only read), then uploaded to the GPU as one buffer.
 	var cells := ceili(radius * 2.0 / CHUNK)
+	var origins: Array[Vector3] = []
 	for cj in cells:
 		for ci in cells:
 			var origin := center + Vector3(-radius + ci * CHUNK, 0.0, -radius + cj * CHUNK)
 			var middle := origin + Vector3(CHUNK, 0.0, CHUNK) * 0.5
-			if Vector2(middle.x - center.x, middle.z - center.z).length() > radius + CHUNK:
-				continue
-			var transforms: Array[Transform3D] = []
-			for k in per_chunk:
-				var x := origin.x + rng.randf() * CHUNK
-				var z := origin.z + rng.randf() * CHUNK
-				var r := Vector2(x - center.x, z - center.z).length()
-				if r > radius or r < inner_radius:
-					continue
-				var y := terrain.height_at(x, z)
-				if y < water_level + 1.8:
-					continue
-				if patches and patches.get_noise_2d(x, z) < -0.15:
-					continue
-				var slope := 1.0 - _normal(x, y, z).y
-				if slope > max_slope:
-					continue
-				var s := rng.randf_range(0.7, 1.3) * (1.0 - slope / max_slope * 0.4)
-				var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.8, 1.2), s))
-				transforms.append(Transform3D(basis, Vector3(x, y - 0.05, z)))
-			if transforms.is_empty():
-				continue
-			var multimesh := MultiMesh.new()
-			multimesh.transform_format = MultiMesh.TRANSFORM_3D
-			multimesh.mesh = mesh
-			multimesh.instance_count = transforms.size()
-			for k in transforms.size():
-				multimesh.set_instance_transform(k, transforms[k])
-			total += transforms.size()
-			var chunk := MultiMeshInstance3D.new()
-			chunk.multimesh = multimesh
-			chunk.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			chunk.visibility_range_end = view_distance
-			chunk.visibility_range_end_margin = 25.0
-			chunk.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
-			add_child(chunk)
-	print_verbose("grass: %d tufts in %d ms" % [total, Time.get_ticks_msec() - started])
+			if Vector2(middle.x - center.x, middle.z - center.z).length() <= radius + CHUNK:
+				origins.append(origin)
+	if patches:
+		var reach := radius + CHUNK
+		_patch_origin = Vector2(center.x, center.z) - Vector2.ONE * reach
+		_patch_n = ceili(reach * 2.0 / PATCH_STEP) + 2
+		_patch_values.resize(_patch_n * _patch_n)
+		for j in _patch_n:
+			for i in _patch_n:
+				_patch_values[j * _patch_n + i] = patches.get_noise_2d(
+					_patch_origin.x + i * PATCH_STEP, _patch_origin.y + j * PATCH_STEP)
+	var buffers: Array[PackedFloat32Array] = []
+	buffers.resize(origins.size())
+	var lock := Mutex.new()
+	var group := WorkerThreadPool.add_group_task(func(k: int) -> void:
+		var buffer := _place(origins[k], k)
+		lock.lock()
+		buffers[k] = buffer
+		lock.unlock(), origins.size(), -1, true, "grass")
+	WorkerThreadPool.wait_for_group_task_completion(group)
 
-
-func _process(_delta: float) -> void:
-	if _material == null:
-		return
-	var wash: Array[Vector4] = [Vector4.ZERO, Vector4.ZERO, Vector4.ZERO, Vector4.ZERO]
-	var k := 0
-	for node in get_tree().get_nodes_in_group("choppas"):
-		var c := node as Choppa
-		if k >= 4 or not c.alive or c.altitude > 16.0 or c.over_water:
+	var total := 0
+	for buffer in buffers:
+		if buffer.is_empty():
 			continue
-		var ground := c.global_position + Vector3.DOWN * (c.altitude + Choppa.GROUND_CLEARANCE)
-		wash[k] = Vector4(ground.x, ground.y, ground.z, 1.0 - c.altitude / 16.0)
-		k += 1
-	_material.set_shader_parameter("wash", wash)
+		var multimesh := MultiMesh.new()
+		multimesh.transform_format = MultiMesh.TRANSFORM_3D
+		multimesh.mesh = mesh
+		multimesh.instance_count = buffer.size() / FLOATS_PER_TUFT
+		multimesh.buffer = buffer
+		total += multimesh.instance_count
+		var chunk := MultiMeshInstance3D.new()
+		chunk.multimesh = multimesh
+		chunk.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		chunk.visibility_range_end = view_distance
+		chunk.visibility_range_end_margin = 25.0
+		chunk.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+		add_child(chunk)
+	GameMap.report("grass: %d tufts in %d chunks" % [total, origins.size()], started)
 
 
-func _normal(x: float, y: float, z: float) -> Vector3:
-	return Vector3(y - terrain.height_at(x + 1.0, z), 1.0, y - terrain.height_at(x, z + 1.0)).normalized()
+## Tuft transforms for one chunk, packed the way MultiMesh.buffer wants them (the three
+## rows of the 3x4 transform). Deterministic per chunk, so the lawn is the same every
+## game and on every machine. Runs on a worker thread, so it only reads plain arrays
+## and samples them inline: every call on an object from a worker (the terrain, the
+## noise, even a RandomNumberGenerator) goes through a shared lock and eats the
+## speed-up, so the terrain's height grid and the patch noise come pre-sampled.
+func _place(origin: Vector3, index: int) -> PackedFloat32Array:
+	var heights := terrain.height_data()
+	var patch_values := _patch_values
+	var patch_n := _patch_n
+	var patch_origin := _patch_origin
+	var resolution := terrain.resolution
+	var n := resolution + 1
+	var half := terrain.size * 0.5
+	var step := terrain.size / resolution
+	var state := (77 + index * 7919) & 0x7FFFFFFF  # A plain LCG, see above.
+	var per_chunk := int(CHUNK * CHUNK * density)
+	var buffer := PackedFloat32Array()
+	buffer.resize(per_chunk * FLOATS_PER_TUFT)
+	var w := 0
+	for k in per_chunk:
+		state = (state * 1103515245 + 12345) & 0x7FFFFFFF
+		var x := origin.x + state * (CHUNK / 2147483648.0)
+		state = (state * 1103515245 + 12345) & 0x7FFFFFFF
+		var z := origin.z + state * (CHUNK / 2147483648.0)
+		var r := Vector2(x - center.x, z - center.z).length()
+		if r > radius or r < inner_radius:
+			continue
+		# Terrain.height_at, inlined, plus the slope of the triangle we landed on.
+		var gx := clampf((x + half) / step, 0.0, resolution - 0.001)
+		var gz := clampf((z + half) / step, 0.0, resolution - 0.001)
+		var i := int(gx)
+		var j := int(gz)
+		var fx := gx - i
+		var fz := gz - j
+		var a := heights[j * n + i]
+		var b := heights[j * n + i + 1]
+		var c := heights[(j + 1) * n + i]
+		var d := heights[(j + 1) * n + i + 1]
+		var y: float
+		var rise: Vector2  # Height gained per metre in x and z.
+		if fx + fz <= 1.0:
+			y = a + (b - a) * fx + (c - a) * fz
+			rise = Vector2(b - a, c - a) / step
+		else:
+			y = d + (c - d) * (1.0 - fx) + (b - d) * (1.0 - fz)
+			rise = Vector2(d - c, d - b) / step
+		if y < water_level + 1.8:
+			continue
+		if patch_n > 0:
+			var px := clampf((x - patch_origin.x) / PATCH_STEP, 0.0, patch_n - 1.001)
+			var pz := clampf((z - patch_origin.y) / PATCH_STEP, 0.0, patch_n - 1.001)
+			var pi := int(px)
+			var pj := int(pz)
+			var p0 := lerpf(patch_values[pj * patch_n + pi], patch_values[pj * patch_n + pi + 1], px - pi)
+			var p1 := lerpf(patch_values[(pj + 1) * patch_n + pi], patch_values[(pj + 1) * patch_n + pi + 1], px - pi)
+			if lerpf(p0, p1, pz - pj) < -0.15:
+				continue
+		var slope := 1.0 - 1.0 / sqrt(1.0 + rise.length_squared())  # 1 - normal.y
+		if slope > max_slope:
+			continue
+		state = (state * 1103515245 + 12345) & 0x7FFFFFFF
+		var s := (0.7 + state * (0.6 / 2147483648.0)) * (1.0 - slope / max_slope * 0.4)
+		state = (state * 1103515245 + 12345) & 0x7FFFFFFF
+		var yaw := state * (TAU / 2147483648.0)
+		state = (state * 1103515245 + 12345) & 0x7FFFFFFF
+		var stretch := 0.8 + state * (0.4 / 2147483648.0)
+		var cs := cos(yaw) * s
+		var sn := sin(yaw) * s
+		# Rows of (yaw rotation scaled by s, s * stretch, s) with the position.
+		buffer[w] = cs
+		buffer[w + 1] = 0.0
+		buffer[w + 2] = sn
+		buffer[w + 3] = x
+		buffer[w + 4] = 0.0
+		buffer[w + 5] = s * stretch
+		buffer[w + 6] = 0.0
+		buffer[w + 7] = y - 0.05
+		buffer[w + 8] = -sn
+		buffer[w + 9] = 0.0
+		buffer[w + 10] = cs
+		buffer[w + 11] = z
+		w += FLOATS_PER_TUFT
+	buffer.resize(w)
+	return buffer
 
 
 ## One tuft: a handful of curved, tapering blades fanning out from the root. Vertex

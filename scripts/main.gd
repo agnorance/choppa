@@ -54,16 +54,18 @@ func _ready() -> void:
 	if mode == "race":
 		map_id = "range"
 	next_mode = ""
+	GameMap.timing = _args.has("timing")
 	var started := Time.get_ticks_msec()
 	map = GameMap.create(map_id)
 	map.mode = mode
 	add_child(map)
+	GameMap.report("map", started)
 	if mode == "":
 		_show_menu()
 	else:
 		_start()
-	if _args.has("timing"):
-		print("timing: map built in %d ms, %d ms after launch" % [Time.get_ticks_msec() - started, started])
+	if GameMap.timing:
+		print("timing: map and players built in %d ms, %d ms after launch" % [Time.get_ticks_msec() - started, started])
 		await RenderingServer.frame_post_draw
 		print("timing: first frame drawn %d ms after launch" % Time.get_ticks_msec())
 

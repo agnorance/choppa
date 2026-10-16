@@ -5,10 +5,10 @@ proposal that can change after playtesting.
 
 ## Pitch
 
-**Arcade arena shooter with helicopters (decided).** Mario Kart battle-mode energy in the
-air: enclosed arenas with tunnels, trenches, arches and cover, flashy tricks that feed
-your boost, a machine gun for everyone, and item boxes full of dirty tricks to fool your
-friends. GET TO THE CHOPPA!
+**Arcade arena shooter with helicopters (decided).** Battlefield-style helicopter knife
+fights in enclosed desert arenas: canyons, tunnels, power lines and cover. Flying is the
+skill (two flight models, easy and realistic), machines break part by part, and the
+arena's service stations are what everyone fights over. GET TO THE CHOPPA!
 
 ## Art direction (decided)
 
@@ -218,42 +218,72 @@ Later: near-miss and tunnel-threading bonuses that reward daring flying.
 
 Bots fill empty slots in every mode. They also let me test multiplayer headless.
 
-## Items ("fool your friends")
+## Service stations and loadout (decided, replaces item boxes)
 
-Item boxes respawn a few seconds after pickup. Odds depend on the scoreboard: the leader
-gets defensive items, those trailing get the strong ones (`Items.TABLE`).
+The owner did not like Mario Kart pickups. Instead every arena has a few **service
+stations**: lit helipads with a mast.
 
-| Item | What it does | Status |
+- Set down on the pad (skids within 3 m of it, below 4 m/s) and the station works on
+  you: hull and parts repair, ammunition refills, over about 4 s. You are a sitting
+  duck while it does.
+- Afterwards it **powers down for 45 s** (light red), for everyone. Taking a station
+  somebody else needs is a tactic; camping one is not possible.
+- **Loadout**, refilled only at stations:
+
+| Weapon | Ammo | What it does |
 |---|---|---|
-| Turbo | Instant speed burst. | done |
-| Homing missile | Chases the choppa in a 45° cone ahead; 35 damage and a big shove. A barrel roll as it closes in shakes it off. | done |
-| Mine | Dropped behind you, arms after 1 s, 40 damage blast. Your own mine is safe for 3 s. | done |
-| Fake item box | Looks like an item box (upside-down "?"), 30 damage blast. | done |
-| Smoke screen | Cloud behind you for 9 s: inside, you can't lock on, nobody can lock onto you, and your screen goes dark. | done |
-| Control scrambler | Hits the leader: left/right swapped for 5 s. Never rolled by the leader. | done |
-| Shield | Bubble that absorbs 40 damage for up to 12 s. | done |
-| GET TO THE CHOPPA | Last place only (25% of their rolls): 6 s invulnerable, double gun damage, turbo. | done |
-| Winch hook | Grab the choppa in front and steal its item. | idea |
-| Decoy flare | Breaks missile locks; held behind you like a banana. | idea |
+| Machine gun | unlimited | 12.5 rounds/s, 4 damage, overheats (see Machine gun). |
+| Rockets | per class | Unguided, fast, 12 damage plus a small blast, hit the part they strike. Alternate pods. |
+| Missiles | per class | Lock on in a 45° cone, chase the target, 35 damage and a big shove. |
+| Flares | per class | Break every missile lock on you; the missile flies wide. Rolling hard also works. |
+| Mine | 1 | Dropped below, arms after 1 s, 40 damage blast. Good for denying a station. |
+| Smoke | 1 | Cloud for 9 s: nobody inside can lock on or be locked on. |
 
-Bots grab boxes when nobody is close, use items when it makes sense (missiles with a
-target, mines and fake boxes with someone behind, shields under fire) and barrel-roll
-away from incoming missiles.
+- Keys: LMB / Ctrl gun, RMB rockets, F missile, X flares, R mine, G smoke (gamepad:
+  RT gun, LT rockets, RB missile, B flares, X mine, D-pad down smoke; afterburner moves to
+  LB / Shift).
+- Bots land at a station when hurt or out of ammunition, fire rockets at close range,
+  missiles with a lock, flares when a missile closes in.
+- Gone with the item boxes: turbo, fake box, scrambler, shield, GET TO THE CHOPPA (the
+  name stays as the battle cry). Health crates are replaced by stations too.
+
+## Helicopter classes (decided)
+
+Pick one on the title screen. Same controls, different numbers; each has its own model.
+
+| Class | Model | Hull | Speed and handling | Loadout |
+|---|---|---|---|---|
+| **Scout** | Little Bird (the original) | 80 | Fastest, sharpest rates, lightest: drifts most | 8 rockets, 1 missile, 3 flares |
+| **Gunship** | Slim tandem attack helicopter | 110 | Middle | 14 rockets, 2 missiles, 2 flares |
+| **Heavy** | Armoured twin-engine transport | 160, parts tougher | Slow, heavy, sluggish, big target | 20 rockets, 3 missiles, 4 flares, double gun |
+
+Bots pick classes at random (seeded per name), so matches mix them.
 
 ## Maps
 
 Enclosed arenas: cliffs or walls all round that rise above the flight ceiling. Plenty of
 cover, tunnels to dive through and height differences. Built from a heightmap terrain
 plus modular pieces (`MapKit`: mesas with tunnels, arches, hoodoos, ruins, trees,
-boulders, water, clouds), so new maps are mostly a height function and placement.
-Low-poly, flat-shaded look with strong colours.
+boulders, water, props from Blender), so new maps are mostly a height function and
+placement. Every map has service stations.
 
 - **Mesa Basin** *(exists)*: desert basin ringed by sandstone cliffs; central mesa with
   crossing tunnels, ring of ruined arches, a trench for sneaking up low, a lake, hoodoo
   field, pine groves.
+- **Slot Canyon** *(next)*: a long winding canyon a few rotor spans wide with side
+  alcoves, a shallow river, natural bridges and an old mining camp (trestle, water tower,
+  shacks, power lines strung across the canyon). Forces low, tight flying.
 - **Test range** *(exists)*: open field with two tunnels; also the race course.
-- Ideas: **Dockyard** (shipping containers, cranes, a warehouse to fly through),
-  **Ice canyon** (frozen river, ice caves), **City block** (rooftops, streets, a tunnel).
+- Later: **Quarry** (terraced pit, cranes, conveyor bridge), **Dam** (spillway tunnels,
+  pylons and power lines), **Ruined Town** (streets as corridors, towers, a hangar).
+
+### Obstacle kit
+
+- **Power lines** *(next)*: thin cables between pylons, hard to see against the sky.
+  Touching one with the rotor wrecks it; with the body, it snaps you back and hurts.
+- **Wind** *(next)*: gust zones in canyons that push you sideways, shown by blowing dust.
+- **Tunnels**, arches, bridges *(exist)*.
+- Later: moving obstacles (trains, blast doors), destructible towers, night variants.
 
 ## Multiplayer
 
@@ -271,37 +301,27 @@ Low-poly, flat-shaded look with strong colours.
 
 ## Milestones
 
-1. **Foundation** *(done)*: project, flight model, chase/cockpit camera,
-   machine gun, touch controls, tests, CI builds.
-2. **Battle mode and first arena** *(done)*: health, damage, death, respawn, deathmatch
-   rules, kill feed, scoreboard, combat bots, Mesa Basin, terrain, effects (explosions,
-   rotor dust, boost flame, muzzle flash, damage smoke).
-3. **Items** *(done)*: missile, mine, fake box, smoke, scrambler, shield, GET TO THE
-   CHOPPA, with scoreboard-weighted odds; bots use them.
-4. **Load times** *(done)*: Python stays for the offline tools (Blender's API is Python
-   only; they run once), GDScript stays for the game (the C++ engine does the heavy
-   work). Measured with `--timing` on the owner's PC (RTX 5080), Mesa Basin battle:
-   - Before: map 1.7 s (grass 0.52 s, terrain 0.44 s, rocks 0.23 s, backdrop 0.19 s),
-     first frame 4.1 s after launch. (The roadmap's 2.5 s came from a `--verbose` run,
-     which slows everything four-fold.)
-   - Grass on worker threads, one MultiMesh buffer per chunk: 0.06 s. The worker
-     reads only plain arrays; any method call on an object from a thread serializes.
-   - Procedural textures baked to `assets/textures/baked/` (`tools/bake.ps1`).
-   - After: map 1.1 s, first frame 3.6 s. What remains: terrain mesh and collision
-     (0.44 s, height function called per vertex), rock meshes, and ~2.3 s between
-     the built scene and the first frame (shader and pipeline compilation, SDFGI).
-   - Only if profiling ever shows a hot spot (bots, netcode): a GDExtension in C++.
-     Not C#: it complicates the Android export.
-5. **Feel pass:** the flight model is now force-based (above); tune its numbers on real
-   hardware (Windows + Android), then sound mix, camera shake, hit markers. Music is
-   still missing.
-   **UI overhaul** *(done, see "UI" below)*.
-6. **LAN multiplayer:** host/join, discovery, prediction and interpolation.
-7. **More arenas** and battle variants.
-8. **Internet play**, choppa colours and customization.
+1. **Foundation** *(done)*: project, flight model, cameras, gun, touch, tests, CI.
+2. **Battle mode and first arena** *(done)*: Mesa Basin, bots, effects.
+3. **Items** *(done, being replaced by 9)*.
+4. **Load times** *(done)*: measured with `--timing`; grass on worker threads, baked
+   procedural textures. Map 1.7 s to 1.1 s, first frame 4.1 s to 3.6 s on the owner's PC.
+5. **UI overhaul** *(done)*: UiKit theme, tabbed settings, pause menu, HUD.
+6. **Flight and damage** *(done)*: easy and realistic flight models, modular damage
+   (rotor, tail rotor, engine, hull), safe landings, bot difficulty.
+7. **Plan after the owner's second playtest** *(this list)*.
+8. **Helicopter classes**: Scout, Gunship, Heavy, with Blender models.
+9. **Service stations and loadout**: replace item boxes and crates; rockets, missiles,
+   flares, mine, smoke; bots use them.
+10. **Slot Canyon** with power lines, wind and Blender props.
+11. **Feel pass** on real hardware: flight numbers, sound mix, hit markers, music.
+12. **LAN multiplayer**, then more arenas, internet play, colours and customization.
+
+Every step comes with tests (owner's rule: so we know where something broke).
 
 ## Decided after the first build
 
 - Machine gun: yes.
-- Control scheme: keep the current drone-style controls (steering plus separate lift).
+- Control scheme: two flight models. Easy is the original drone; realistic is the default.
+- Testing: every feature gets automated tests in `tests/run_tests.gd`.
 - Genre: arena shooter first, not a racing game.

@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(godot:*)",
+      "Bash(tools/test.sh:*)",
+      "Bash(tools/shot.sh:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run watch:*)",
+      "Bash(python tools/blender/make_textures.py:*)",
+      "Bash(python3 tools/blender/make_textures.py:*)",
+      "Bash(python tools/blender/make_rocks.py:*)",
+      "Bash(python3 tools/blender/make_rocks.py:*)",
+      "Bash(python tools/blender/make_choppa.py:*)",
+      "Bash(python3 tools/blender/make_choppa.py:*)",
+      "Bash(python tools/blender/make_cockpit.py:*)",
+      "Bash(python3 tools/blender/make_cockpit.py:*)",
+      "Bash(python tools/blender/make_trees.py:*)",
+      "Bash(python3 tools/blender/make_trees.py:*)"
+    ]
+  }
+}

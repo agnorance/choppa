@@ -13,3 +13,6 @@ build/
 *.apk
 *.aab
 __pycache__/
+
+# Claude Code: personal settings stay local
+.claude/settings.local.json

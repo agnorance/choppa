@@ -103,6 +103,29 @@ scripts in `tools/blender/` and committed, so you only need this to change them.
 
 You can also open the results in the regular Blender 5.2 app.
 
+## 8. Work on it with Claude Code
+
+The repo is set up for Claude Code: `CLAUDE.md` holds the project rules and commands,
+`.claude/skills/` has step-by-step guides (screenshots, Blender assets, new items, new
+maps, shipping a change), `.claude/settings.json` pre-approves the everyday commands.
+
+1. Install Claude Code (https://code.claude.com) and open a terminal in the repo.
+2. Tell the helper scripts where Godot is, once per user:
+   ```powershell
+   [Environment]::SetEnvironmentVariable("GODOT", "C:\Tools\Godot\Godot_v4.7.2-stable_win64_console.exe", "User")
+   ```
+   (open a new terminal afterwards). Without it they try the PATH and `C:\Tools\Godot`.
+3. If PowerShell refuses to run the scripts, allow local scripts once:
+   `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+4. Start `claude` in the repo. Handy scripts it (and you) can use:
+   - `tools\test.ps1`: import and run all tests.
+   - `tools\run.ps1 --mode=battle --map=basin`: play with game arguments.
+   - `tools\shot.ps1 out.png --cam=showcase --frames=150`: screenshot to a file.
+5. For Blender work also do step 7 (Python 3.13 and `bpy`).
+
+On your GPU screenshots take seconds, so effect timing (explosions, muzzle flashes)
+is best checked here rather than in the cloud sessions.
+
 ## Graphics and your GPU
 
 The game uses Godot's **Forward+** renderer on Windows (Vulkan or Direct3D 12) and the

@@ -12,3 +12,4 @@ build/
 *.jks
 *.apk
 *.aab
+__pycache__/

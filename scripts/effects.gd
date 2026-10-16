@@ -265,6 +265,11 @@ class Impact extends Node3D:
 	var _light: OmniLight3D
 
 	func _ready() -> void:
+		# Callers place us right after add_child; emit once we're there, or the
+		# world-space particles would burst at the origin.
+		_start.call_deferred()
+
+	func _start() -> void:
 		var out := normal.normalized()
 		match kind:
 			Kind.METAL:
@@ -352,6 +357,13 @@ class Explosion extends Node3D:
 	var _wave_material: ShaderMaterial
 
 	func _ready() -> void:
+		set_process(false)
+		# Callers place us right after add_child; emit once we're there, or the
+		# world-space particles would burst at the origin.
+		_start.call_deferred()
+
+	func _start() -> void:
+		set_process(true)
 		var fire := Effects.puffs(Effects.gradient([
 			Color(1.0, 0.85, 0.45, 1.0), Color(1.0, 0.42, 0.06, 0.95), Color(0.45, 0.16, 0.04, 0.85),
 			Color(0.12, 0.1, 0.09, 0.5), Color(0.1, 0.1, 0.1, 0.0),
@@ -428,7 +440,7 @@ class Explosion extends Node3D:
 		_light.shadow_enabled = Graphics.at_least(Graphics.Quality.HIGH)
 		add_child(_light)
 
-		_scorch_ground.call_deferred()
+		_scorch_ground()
 		get_tree().call_group("shake_cameras", "shake_from", global_position, size)
 
 	func _scorch_ground() -> void:

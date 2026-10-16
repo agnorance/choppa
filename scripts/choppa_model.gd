@@ -209,6 +209,8 @@ func update_pose(c: Choppa, delta: float) -> void:
 	_blur_material.albedo_color.a = clampf((_rotor_speed - 8.0) / 80.0, 0.0, 0.1)
 
 	_parts.visible = c.invulnerable <= 0.0 or fmod(c.invulnerable, 0.2) > 0.08
+	if cockpit_view:  # Blinks with the hull in chase view; always there from the seat.
+		cockpit_view.visible = _parts.visible or cockpit_view.reticle.visible
 	var firing := c.clock - c.last_shot_time < 0.05
 	for k in 2:
 		var on := firing and (k == 1) == (c.last_shot_side > 0.0)

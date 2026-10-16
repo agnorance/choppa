@@ -568,42 +568,12 @@ static func clouds(parent: Node3D, count: int, extent: float, height: float) -> 
 			mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
-## Gently waving water with a solid surface you can skim over.
+## A lake (see Water) with a solid surface you can skim over.
 static func water(parent: Node3D, center: Vector3, size: float) -> void:
-	if not _meshes.has("water"):
-		var shader := Shader.new()
-		shader.code = """
-shader_type spatial;
-render_mode blend_mix, specular_schlick_ggx;
-uniform vec3 deep : source_color = vec3(0.04, 0.2, 0.3);
-uniform vec3 shallow : source_color = vec3(0.12, 0.45, 0.5);
-varying vec2 world_xz;
-void vertex() {
-	world_xz = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz;
-	VERTEX.y += sin(world_xz.x * 0.15 + TIME * 1.3) * 0.15 + cos(world_xz.y * 0.12 + TIME) * 0.15;
-}
-void fragment() {
-	float ripple = sin(world_xz.x * 0.7 + TIME * 2.0) * sin(world_xz.y * 0.6 - TIME * 1.6);
-	float facing = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
-	ALBEDO = mix(shallow, deep, facing) + ripple * 0.03;
-	ROUGHNESS = 0.06;
-	SPECULAR = 0.8;
-	ALPHA = mix(0.95, 0.75, facing);
-}
-"""
-		var water_material := ShaderMaterial.new()
-		water_material.shader = shader
-		_meshes.water = water_material
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(size, size)
-	plane.subdivide_width = 24
-	plane.subdivide_depth = 24
-	var mesh := MeshInstance3D.new()
-	mesh.mesh = plane
-	mesh.material_override = _meshes.water
-	mesh.position = center
-	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	parent.add_child(mesh)
+	var surface := Water.new()
+	surface.size = size
+	surface.position = center
+	parent.add_child(surface)
 	block(parent, center + Vector3.DOWN * 1.0, Vector3(size, 2.0, size), Color.WHITE, 0.0, false).add_to_group("water")
 
 

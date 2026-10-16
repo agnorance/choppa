@@ -43,7 +43,11 @@ twist, heavy atmosphere, strong lighting and post-processing.
 - Grass (`scripts/grass.gd`): tufts of real blades in MultiMesh chunks on flat dry
   ground, fading out at 110 m (55 m and sparser on phones, none on LOW). Gusts roll
   across it and rotor downwash blows it flat around a low choppa.
-- Next: water, more effects polish.
+- Water (`scripts/water.gd`, `shaders/water.gdshader`): scrolling ripple normals over a
+  swell, refraction of the lake bed, colour by depth, sky sheen at grazing angles, shore
+  foam, and rings plus churned foam under a low choppa (with spray instead of dust).
+  The Compatibility renderer gets a plain waving surface.
+- Next: explosions and hit effects.
 
 ## Game feel (decided)
 

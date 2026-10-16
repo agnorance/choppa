@@ -65,6 +65,7 @@ func _ready() -> void:
 	_warning = AudioStreamPlayer.new()
 	_warning.stream = Sounds.stream("warning_loop")
 	_warning.volume_db = -12.0
+	_warning.bus = Sounds.bus()
 	add_child(_warning)
 	_warning.play()
 	_warning.stream_paused = true

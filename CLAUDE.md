@@ -22,9 +22,9 @@ Little Bird style choppa with cockpit view, effects, pines, grass, water, explos
 synthesized sound effects. All of that is on `main` (PR #1). New work continues on
 `godot-foundation`; open a PR to `main` when a chunk is done. Merging is the owner's
 call: they merge on GitHub (with "Create a merge commit").
-Load times are done (grass on threads, baked textures). Noted for later (ask before starting): flight physics feel pass (DESIGN.md, "Physics
-ideas"), UI overhaul (DESIGN.md, Milestones), choppa colours/customization, LAN
-multiplayer. Each session: check `git log` and the roadmap, then confirm the next step.
+Load times and the UI overhaul (settings menu, pause menu, mouse steering, HUD) are
+done. Noted for later (ask before starting): flight physics feel pass (DESIGN.md,
+"Physics ideas"), choppa colours/customization, LAN multiplayer. Each session: check `git log` and the roadmap, then confirm the next step.
 
 ## Commands
 
@@ -36,7 +36,9 @@ Godot must be 4.7.2. Two environments:
 | Play | `tools\run.ps1 --mode=battle --map=basin` | `godot --path . -- --mode=battle` |
 | Screenshot | `tools\shot.ps1 out.png --cam=showcase --frames=150` | `tools/shot.sh out.png --cam=showcase --frames=150` |
 | Re-import | `& $env:GODOT --headless --path . --import` | `godot --headless --path . --import` |
-| Bake textures | `toolsake.ps1` | `tools/bake.sh` |
+| Bake textures | `tools\bake.ps1` | `tools/bake.sh` |
+| Try a scene | `tools\try.ps1 settings` (no name lists them) | `godot --path . -- --menu --settings=0` |
+| Full check | `tools\check.ps1` (tests + every screen into `build\shots\`) | `tools/test.sh` |
 
 - Windows scripts find Godot via `$env:GODOT` (path to `Godot_v4.7.2-stable_win64_console.exe`),
   the PATH, or `C:\Tools\Godot\`. Setup: docs/SETUP_WINDOWS.md.
@@ -95,5 +97,11 @@ Godot must be 4.7.2. Two environments:
   mipmaps (and `normal_map=1` for normal maps). Details: the `blender-assets` skill.
 - Known harmless noise: the test run ends with "3 resources still in use at exit"
   (an audio playback still registered when the headless run quits).
+- 2D UI: every control goes through `UiKit` (theme, colours, fonts, `Bar`, `keycap`,
+  `panel`, `button`) so the look stays one thing (DESIGN.md, "UI"). A new player
+  setting is a key in `Settings.DEFAULTS`, read with `Settings.flag/choice/number`, and a
+  row in the right `SettingsMenu._build_*` tab; things that can change live are pushed
+  in `Settings.apply`. `--settings=<tab>` and `--pause=<tick>` screenshot them, and
+  `tools\check.ps1` shoots every screen.
 - Match the surrounding code: GDScript with static types, `##` doc comments on classes
   and public members, comments explain why rather than what.

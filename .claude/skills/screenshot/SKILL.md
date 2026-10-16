@@ -27,8 +27,12 @@ bad, before claiming a change works.
 | Item in use | `--autopilot=item:MISSILE` (item given at tick 20, used at tick 30) |
 | Battle with bots | `--mode=battle --map=basin --autopilot=bot` |
 | Title menu | `--menu` |
+| Settings screen | `--menu --settings=<tab>` (0 video, 1 graphics, 2 gameplay, 3 controls, 4 audio) |
+| Pause menu | `--mode=battle --autopilot=bot --pause=200` (the shot is taken at the pause) |
+| HUD with controls overlay | `--mode=battle --autopilot=bot --frames=240` (overlay on by default; off with touch) |
 
 Free mode is the default with `--shot`; `--map=basin` is the main arena.
+`tools\check.ps1` takes the whole standard set into `build\shots\` after running the tests.
 
 ## Pitfalls
 

@@ -49,6 +49,7 @@ const TRICKS := {
 
 @export var team_color := Color(0.95, 0.5, 0.1)
 @export var pilot_name := "Pilot"
+var aim_assist := true  ## Guns snap onto a target in the cone; the player can turn it off in the settings.
 @export var local_player := false  ## Hide own model from the cockpit camera.
 
 @export_group("Flight")
@@ -221,6 +222,8 @@ func step(delta: float) -> void:
 
 ## The choppa that aim assist would shoot at right now, or null.
 func aim_target() -> Choppa:
+	if not aim_assist:
+		return null
 	return _target_in_cone(AIM_ASSIST_ANGLE, AIM_ASSIST_RANGE)
 
 

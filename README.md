@@ -40,21 +40,45 @@ Pick a map in the menu (Mesa Basin or Test Range), then:
 - **Free flight:** explore the map with three training dummies to shoot.
 - **Race (test range):** 3 laps through both tunnels against bots. No damage in races.
 
-Esc (or the Android back button) returns to the menu.
+Esc (or Start, or the Android back button) pauses: resume, settings, restart the match,
+back to the title.
+
+## Settings
+
+From the title or the pause menu; saved in `user://settings.cfg`. Tabs switch with the
+mouse, Q / E or the shoulder buttons.
+
+- **Video:** window mode (windowed, fullscreen, exclusive), resolution, v-sync (off, on,
+  adaptive), FPS limit, render scale with bilinear / FSR 1 / FSR 2 upscaling,
+  anti-aliasing (FXAA, TAA, MSAA 2x to 8x), brightness, FPS counter.
+- **Graphics:** quality preset, shadows, global illumination, ambient occlusion,
+  reflections, volumetric fog, bloom, grass. "Auto" follows the preset; the preset and
+  the grass apply when the next match starts, everything else at once.
+- **Gameplay:** field of view, camera shake, default view (chase or cockpit), HUD size,
+  damage flash, aim assist, controls overlay.
+- **Controls:** mouse steering, sensitivity, invert, gamepad deadzone, touch controls
+  (auto, off, on); key bindings listed beside them.
+- **Audio:** master and effects volume.
+- **Reset to defaults** at the bottom.
 
 ## Controls
 
 | Action | Keyboard | Gamepad | Touch |
 |---|---|---|---|
 | Fly / strafe | W A S D | Left stick | Left half: drag |
-| Turn | Q E or ← → | Right stick X | Right half: drag sideways |
-| Climb / dive | Space / C or ↑ ↓ | Right stick Y | Right half: drag up/down |
+| Turn | Q E or ← →, or mouse | Right stick X | Right half: drag sideways |
+| Climb / dive | Space / C or ↑ ↓, or mouse | Right stick Y | Right half: drag up/down |
 | Boost | Shift | RB | BOOST |
 | Machine gun | Ctrl or left mouse | RT | FIRE (also auto-fires when locked on) |
 | Trick (+ direction) | F | A | TRICK |
 | Use item | R | X | ITEM |
 | Camera: chase view / cockpit | V | Y | CAM |
 | Respawn (race: at your last gate; not in battle) | Backspace | Back/Select | |
+| Pause | Esc | Start | Back button |
+| Controls overlay on/off | F1 | | |
+
+Mouse steering is on by default on desktop: the mouse is captured while you fly and
+released in menus. Turn it off or tune it in the settings.
 
 The machine gun snaps onto targets in a narrow cone ahead (white ring) and overheats
 after about two seconds of continuous fire. A barrel roll dodges bullets. Crashing into
@@ -92,4 +116,14 @@ godot --path . -- --mode=free --map=basin --autopilot=hover --cam=showcase --exp
 - `--health=30`: start damaged (cracked canopy, smoke).
 - `--explode=60`: set off an explosion ahead of you at physics tick 60.
 - `--timing`: print how long the map build and the first frame take.
+- `--settings=2` (with `--menu`): open the settings screen on tab 2 (0 video .. 4 audio); `--pause=60`: open the pause menu at tick 60.
+
+### Quick test
+
+```powershell
+tools\try.ps1              # lists the scenes
+tools\try.ps1 settings     # straight into a scene: menu, settings, battle, free, race,
+                           # cockpit, lake, damaged, touch, bots, missile, explode
+tools\check.ps1            # import, all tests, and screenshots of every screen into build\shots\
+```
 - `--shot=out.png --frames=90`: save a screenshot after 90 ticks and quit.

@@ -5,6 +5,8 @@ extends Node
 ##   --mode=battle|free|race  skip the menu (default with --shot/--autopilot: free)
 ##   --map=basin|range        which map (race always uses range)
 ##   --menu                   show the menu even with --shot
+##   --settings=<tab>         open the settings screen on the menu, tab 0-4 (for screenshots)
+##   --pause=<tick>           open the pause menu at that tick (the --shot is taken then)
 ##   --laps=<n>               race laps (default 3)
 ##   --kills=<n>              battle kill limit (default 8)
 ##   --autopilot=<plan>       fly a ScriptedPilot plan instead of reading controls;
@@ -39,6 +41,8 @@ var camera: Camera3D
 var hud: Hud
 var race: Race
 var battle: Battle
+var pause: PauseMenu
+var _over := false  ## The match has ended and the results are up.
 
 var _args := {}
 var _ticks := 0
@@ -47,6 +51,7 @@ var _menu_orbit := 0.0
 
 func _ready() -> void:
 	_parse_args()
+	Settings.load_once(get_tree())
 	mode = _args.get("mode", next_mode)
 	if mode == "" and not _args.has("menu") and (_args.has("shot") or _args.has("autopilot")):
 		mode = "free"
@@ -71,6 +76,7 @@ func _ready() -> void:
 
 
 func _show_menu() -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	camera = Camera3D.new()
 	camera.fov = 60.0
 	camera.far = 8000.0
@@ -81,11 +87,14 @@ func _show_menu() -> void:
 	Menu.map_index = maxi(0, ids.find(next_map))
 	menu.mode_chosen.connect(_restart_in)
 	add_child(menu)
+	if _args.has("settings"):
+		menu.open_settings(int(_args.settings))
 
 
 func _start() -> void:
 	var slot := RACE_GRID_SLOT if mode == "race" else 0
 	choppa = _new_choppa("You", Color(0.95, 0.5, 0.1), map.spawn_points[slot], true)
+	choppa.aim_assist = Settings.flag("aim_assist")
 	if mode == "free" and _args.has("spawn"):
 		choppa.respawn(_spawn_arg())
 	if _args.has("health"):
@@ -93,7 +102,7 @@ func _start() -> void:
 
 	var chase := ChaseCamera.new()
 	chase.target = choppa
-	chase.first_person = _args.get("cam", "") == "fp"
+	chase.first_person = _args.get("cam", "") == "fp" or (not _args.has("cam") and Settings.flag("cockpit_view"))
 	chase.showcase = _args.get("cam", "") == "showcase"
 	add_child(chase)
 	chase.make_current()
@@ -104,7 +113,7 @@ func _start() -> void:
 	add_child(hud)
 	if _args.has("touch"):
 		hud.touch.visible = true
-		hud.toggle_help()
+		hud.refresh_settings()
 	hud.touch.camera_pressed.connect(chase.toggle_mode)
 
 	match mode:
@@ -131,6 +140,7 @@ func _start() -> void:
 		pilot.choppa = choppa
 		pilot.touch = hud.touch
 		add_child(pilot)
+	_update_mouse()
 
 
 func _new_choppa(pilot_name: String, color: Color, at: Transform3D, local := false) -> Choppa:
@@ -172,6 +182,7 @@ func _start_race() -> void:
 	race_hud.restart_requested.connect(_restart_in.bind("race", "range"))
 	race_hud.menu_requested.connect(_restart_in.bind("", next_map))
 	add_child(race_hud)
+	race.race_over.connect(_on_match_over)
 
 
 func _start_battle() -> void:
@@ -196,6 +207,7 @@ func _start_battle() -> void:
 	battle_hud.restart_requested.connect(_restart_in.bind("battle", next_map))
 	battle_hud.menu_requested.connect(_restart_in.bind("", next_map))
 	add_child(battle_hud)
+	battle.match_over.connect(_on_match_over)
 
 
 func _add_racer_bot(target: Choppa, skill: float) -> void:
@@ -229,6 +241,7 @@ func _spawn_dummy(post: Vector3, color: Color) -> void:
 
 
 func _restart_in(new_mode: String, map_id: String) -> void:
+	get_tree().paused = false
 	next_mode = new_mode
 	if new_mode != "race":  # Races always use the test range; keep the chosen map.
 		next_map = map_id
@@ -253,17 +266,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		choppa.respawn(race.respawn_point(choppa) if race else map.spawn_points[0])
 	elif event.is_action_pressed("toggle_help"):
 		hud.toggle_help()
-	elif event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE:
-		_restart_in("", next_map)
+	elif event.is_action_pressed("pause"):
+		_toggle_pause()
 
 
 func _notification(what: int) -> void:
-	# Android back button: leave to the menu, or quit from the menu.
+	# Android back button: pause, or quit from the menu.
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		if mode == "":
 			get_tree().quit()
 		else:
-			_restart_in("", next_map)
+			_toggle_pause()
 
 
 func _physics_process(_delta: float) -> void:
@@ -272,12 +285,17 @@ func _physics_process(_delta: float) -> void:
 		var boom := Effects.Explosion.new()
 		add_child(boom)
 		boom.global_position = choppa.global_position + choppa.facing() * Vector3(0.0, 9.0, -26.0)
-	if _args.has("shot") and _ticks == int(_args.get("frames", "90")):
+	if _args.has("pause") and _ticks == int(_args.pause):
+		_toggle_pause()
+		if _args.has("shot"):  # Physics stops with the pause, so the shot is taken now.
+			_save_screenshot.call_deferred(_args.shot)
+	elif _args.has("shot") and not _args.has("pause") and _ticks == int(_args.get("frames", "90")):
 		_save_screenshot.call_deferred(_args.shot)
 
 
 func _save_screenshot(path: String) -> void:
 	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw  # Controls added this frame are laid out and drawn in the next.
 	path = path.replace("\\", "/")  # Godot reads a backslash path as relative to the project.
 	get_viewport().get_texture().get_image().save_png(path)
 	print("screenshot saved: ", path)
@@ -296,3 +314,38 @@ func _parse_args() -> void:
 			continue
 		var pair := arg.substr(2).split("=", true, 1)
 		_args[pair[0]] = pair[1] if pair.size() > 1 else ""
+
+
+## Esc or Start: the pause menu stops the whole match; closing it resumes.
+func _toggle_pause() -> void:
+	if pause:
+		pause.queue_free()
+		pause = null
+		get_tree().paused = false
+	else:
+		pause = PauseMenu.new()
+		pause.resumed.connect(_toggle_pause)
+		pause.restart_requested.connect(_restart_in.bind(mode, next_map))
+		pause.menu_requested.connect(_restart_in.bind("", next_map))
+		pause.settings_changed.connect(_on_settings_changed)
+		add_child(pause)
+		get_tree().paused = true
+	_update_mouse()
+
+
+func _on_settings_changed() -> void:
+	hud.refresh_settings()
+	choppa.aim_assist = Settings.flag("aim_assist")
+	_update_mouse()
+
+
+func _on_match_over() -> void:
+	_over = true
+	_update_mouse()
+
+
+## The mouse is captured while you steer with it, and free whenever there is something
+## to click: menus, the results, the pause screen.
+func _update_mouse() -> void:
+	var flying := mode != "" and Settings.flag("mouse_steer") and pause == null and not _over and not hud.touch.visible
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if flying else Input.MOUSE_MODE_VISIBLE

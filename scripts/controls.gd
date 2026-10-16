@@ -21,7 +21,30 @@ var _bindings := {
 	"toggle_camera": [KEY_V, JOY_BUTTON_Y],
 	"respawn": [KEY_BACKSPACE, JOY_BUTTON_BACK],
 	"toggle_help": [KEY_F1],
+	"pause": [KEY_ESCAPE, JOY_BUTTON_START],
+	"tab_left": [KEY_Q, JOY_BUTTON_LEFT_SHOULDER],  # Menus: previous tab.
+	"tab_right": [KEY_E, JOY_BUTTON_RIGHT_SHOULDER],
 }
+
+
+## Key bindings for the HUD overlay and the settings screen: [what, [keys...]] in display
+## order. Entries starting with "~" are notes, not keys. Keyboard and mouse only; the
+## gamepad follows the same actions.
+static func cheat_sheet(mouse: bool) -> Array:
+	var or_mouse: Array = ["~or mouse"] if mouse else []
+	return [
+		["Fly", ["W", "A", "S", "D"]],
+		["Turn", ["Q", "E"] + or_mouse],
+		["Climb / dive", ["Space", "C"] + or_mouse],
+		["Boost", ["Shift"]],
+		["Fire", ["LMB", "Ctrl"]],
+		["Trick", ["F", "~+ direction"]],
+		["Item", ["R"]],
+		["Camera", ["V"]],
+		["Respawn", ["Backspace"]],
+		["Pause", ["Esc"]],
+		["This overlay", ["F1"]],
+	]
 
 
 func _ready() -> void:

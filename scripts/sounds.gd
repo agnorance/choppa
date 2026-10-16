@@ -3,6 +3,14 @@ extends RefCounted
 ## Sound effects (assets/sounds, synthesized by tools/audio/make_sounds.py) and helpers
 ## to play them. One-shots free themselves when done; loops are owned by the caller.
 
+const BUS := "Effects"  ## Every effect plays through this bus (Settings makes it); music will get its own.
+
+
+## The bus for effects, or Master until the settings have created it (tests).
+static func bus() -> String:
+	return BUS if AudioServer.get_bus_index(BUS) >= 0 else "Master"
+
+
 ## The ResourceLoader caches it, so no cache of our own (a static one would keep the
 ## streams alive past exit).
 static func stream(sound_name: String) -> AudioStream:
@@ -16,6 +24,7 @@ static func play_at(parent: Node, sound_name: String, at: Vector3, volume_db := 
 	if parent == null or not parent.is_inside_tree():
 		return
 	var player := AudioStreamPlayer3D.new()
+	player.bus = bus()
 	player.stream = stream(sound_name)
 	player.volume_db = volume_db
 	player.pitch_scale = pitch
@@ -31,6 +40,7 @@ static func play_at(parent: Node, sound_name: String, at: Vector3, volume_db := 
 ## A one-shot riding along with `parent` (e.g. a missile's launch).
 static func play_on(parent: Node3D, sound_name: String, volume_db := 0.0, pitch := 1.0) -> void:
 	var player := AudioStreamPlayer3D.new()
+	player.bus = bus()
 	player.stream = stream(sound_name)
 	player.volume_db = volume_db
 	player.pitch_scale = pitch
@@ -55,6 +65,7 @@ static func play_ui(parent: Node, sound_name: String, volume_db := 0.0) -> void:
 ## don't phase. The caller adjusts pitch and volume and frees it with the parent.
 static func loop_on(parent: Node3D, sound_name: String, volume_db := 0.0, reach := 1.0) -> AudioStreamPlayer3D:
 	var player := AudioStreamPlayer3D.new()
+	player.bus = bus()
 	player.stream = stream(sound_name)
 	player.volume_db = volume_db
 	player.unit_size = 12.0 * reach

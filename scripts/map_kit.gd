@@ -15,7 +15,6 @@ static var _meshes := {}  ## Shared meshes and materials, built on first use.
 ## Sky, sun, haze and post-processing. How much of it runs depends on Graphics.quality.
 static func environment(parent: Node3D, sun_rotation := Vector3(-19.0, 70.0, 0.0)) -> void:
 	var high := Graphics.at_least(Graphics.Quality.HIGH)
-	var medium := Graphics.at_least(Graphics.Quality.MEDIUM)
 	var sky_material := ShaderMaterial.new()
 	sky_material.shader = load("res://shaders/sky.gdshader")
 	var sky := Sky.new()
@@ -41,28 +40,22 @@ static func environment(parent: Node3D, sun_rotation := Vector3(-19.0, 70.0, 0.0
 	env.fog_height = 6.0
 	env.fog_height_density = 0.004
 
-	if medium:
-		env.glow_enabled = true
-		env.glow_intensity = 0.55
-		env.glow_bloom = 0.06
-		env.glow_hdr_threshold = 1.1
-	if high:
+	env.glow_intensity = 0.55
+	env.glow_bloom = 0.06
+	env.glow_hdr_threshold = 1.1
+	if RenderingServer.get_current_rendering_method() == "forward_plus":
 		# Desktop target: RTX 3060 class. Bounce light off the canyon walls and into
-		# the tunnels, plus screen-space indirect light and reflections.
-		env.sdfgi_enabled = true
+		# the tunnels, plus screen-space indirect light and reflections. Which of these
+		# run is decided by Settings.apply_environment (quality preset or the player).
 		env.sdfgi_use_occlusion = true
 		env.sdfgi_cascades = 4
 		env.sdfgi_min_cell_size = 0.4
 		env.sdfgi_energy = 1.0
-		env.ssil_enabled = true
 		env.ssil_intensity = 0.8
-		env.ssr_enabled = true
 		env.ssr_max_steps = 48
-		env.ssao_enabled = true
 		env.ssao_radius = 2.0
 		env.ssao_intensity = 2.2
 		env.ssao_power = 1.6
-		env.volumetric_fog_enabled = true
 		env.volumetric_fog_density = 0.0012
 		env.volumetric_fog_albedo = Color(0.92, 0.88, 0.82)
 		env.volumetric_fog_anisotropy = 0.55
@@ -72,9 +65,12 @@ static func environment(parent: Node3D, sun_rotation := Vector3(-19.0, 70.0, 0.0
 	env.adjustment_enabled = true
 	env.adjustment_contrast = 1.1
 	env.adjustment_saturation = 1.05
+	env.set_meta("quality", Graphics.quality)
+	Settings.apply_environment(env)
 
 	var world_env := WorldEnvironment.new()
 	world_env.environment = env
+	world_env.add_to_group("environment")  # Settings re-applies live changes.
 	parent.add_child(world_env)
 
 	# Low afternoon sun: warm light, long soft shadows.

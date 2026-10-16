@@ -57,6 +57,37 @@ twist, heavy atmosphere, strong lighting and post-processing.
   launch and motor, missile lock warning in the cockpit, item pickup chime. 3D
   positioned, far sounds lose their highs. To tune on real speakers.
 
+## UI (decided)
+
+Modern and slick, nothing unnecessary (owner's request after the first build; it
+replaces the earlier idea of worn-metal PVKK-style panels for the 2D layer, which the
+3D cockpit already provides). `scripts/ui_kit.gd` holds the whole look: Barlow and
+Barlow Condensed (OFL, `assets/fonts/`), near-white text with one amber accent (the
+cockpit's), dark translucent panels with 1 px lines, thin bars, no gradients or chrome.
+
+- **Title:** the arena orbits behind a left-aligned column: modes, map selector,
+  settings, quit. Version bottom left, navigation hints bottom right.
+- **Settings** (`SettingsMenu`, shared by title and pause menu): tabs Video,
+  Graphics, Gameplay, Controls, Audio (Q/E or LB/RB switch), each a column of
+  `SettingRow`s (name left, value right, left/right to change; mouse, keyboard and
+  gamepad), plus Reset to defaults. Video: window mode, resolution, v-sync, FPS limit,
+  render scale and upscaler, anti-aliasing, brightness, FPS counter. Graphics:
+  quality preset, shadows, GI, ambient occlusion, reflections, volumetric fog, bloom,
+  grass ("Auto" follows the preset; `Settings.apply_environment` flips the live
+  Environment, the preset and the grass wait for the next map). Gameplay: FOV, camera
+  shake, default view, HUD size, damage flash, aim assist, controls overlay. Controls:
+  mouse steering, sensitivity, invert, gamepad deadzone, touch controls; key bindings
+  beside them on desktop. Audio: master and effects (bus "Effects"). Saved by
+  `Settings` (one dictionary, `DEFAULTS` lists every key) in `user://settings.cfg`.
+- **HUD:** speed and altitude top left, item top right, kills/rank/time top centre,
+  hull bottom left, boost (heat as a hairline) bottom centre. Call-outs in amber.
+  The controls overlay (key caps) sits bottom right, toggled in settings or with F1.
+  The cockpit view hides the flight readouts.
+- **Pause** (Esc / Start): resume, settings, restart, main menu, quit; the match stops.
+- **Mouse steering:** horizontal travel yaws, vertical climbs (invertible), captured
+  while flying and released in menus and on the results screen.
+- **Touch:** translucent discs with thin rings; a held button fills amber.
+
 ## Game feel (decided)
 
 **Easy to pick up, very hard to master.**
@@ -233,9 +264,7 @@ Low-poly, flat-shaded look with strong colours.
      Not C#: it complicates the Android export.
 5. **Feel pass:** tune on real hardware (Windows + Android): physics (see Physics
    ideas), sound mix, camera shake, hit markers. Music is still missing.
-   **UI overhaul (owner's request, to do):** menus, HUD, scoreboard and touch controls
-   are still placeholder Godot controls; restyle them to match the PVKK-like look
-   (stencil type, worn metal panels, amber/cream instruments).
+   **UI overhaul** *(done, see "UI" below)*.
 6. **LAN multiplayer:** host/join, discovery, prediction and interpolation.
 7. **More arenas** and battle variants.
 8. **Internet play**, choppa colours and customization.

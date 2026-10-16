@@ -54,6 +54,9 @@ func _run() -> void:
 		"test_scrambler_hits_the_leader",
 		"test_shield_absorbs_damage",
 		"test_get_to_the_choppa",
+		"test_effects_start_where_placed",
+		"test_grass_only_on_flat_dry_ground",
+		"test_canopy_cracks_follow_damage",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -714,3 +717,67 @@ func test_get_to_the_choppa() -> void:
 		await physics_frame
 		a.step(TICK)
 	_check(not hits.is_empty() and hits[0] == Bullet.DAMAGE * 2.0, "double damage, got %s" % [hits])
+
+
+func test_effects_start_where_placed() -> void:
+	# Callers add an effect and then move it; nothing may fire before the move, or the
+	# world-space particles burst at the origin.
+	var boom := Effects.Explosion.new()
+	_world.add_child(boom)
+	_check(boom.get_child_count() == 0, "explosion waits to be placed")
+	boom.global_position = Vector3(50.0, 10.0, -30.0)
+	var impact := Effects.Impact.new()
+	_world.add_child(impact)
+	_check(impact.get_child_count() == 0, "impact waits to be placed")
+	impact.global_position = Vector3(-20.0, 3.0, 5.0)
+	await process_frame
+	await process_frame
+	var fire := boom.get_child(0) as CPUParticles3D
+	_check(fire != null and fire.emitting, "explosion fires once placed")
+	_check(fire != null and fire.global_position.is_equal_approx(Vector3(50.0, 10.0, -30.0)), "...at its spot")
+	_check(impact.get_child_count() > 0, "impact fires once placed")
+
+
+func test_grass_only_on_flat_dry_ground() -> void:
+	# Flat ground at y=5 west of x=0, a 45 degree slope east of it.
+	var terrain := Terrain.new()
+	terrain.size = 120.0
+	terrain.resolution = 60
+	terrain.height_fn = func(x: float, _z: float) -> float: return 5.0 + maxf(0.0, x)
+	_world.add_child(terrain)
+	var grass := Grass.new()
+	grass.terrain = terrain
+	grass.radius = 40.0
+	grass.density = 0.5
+	_world.add_child(grass)
+	var tufts := 0
+	var on_slope := 0
+	for chunk: MultiMeshInstance3D in grass.get_children():
+		for k in chunk.multimesh.instance_count:
+			tufts += 1
+			if chunk.multimesh.get_instance_transform(k).origin.x > 2.5:
+				on_slope += 1
+	_check(tufts > 500, "grass grows on the flat, got %d tufts" % tufts)
+	_check(on_slope == 0, "none on the slope, got %d" % on_slope)
+	var flooded := Grass.new()
+	flooded.terrain = terrain
+	flooded.radius = 40.0
+	flooded.density = 0.5
+	flooded.water_level = 10.0
+	_world.add_child(flooded)
+	_check(flooded.get_child_count() == 0, "none under water")
+
+
+func test_canopy_cracks_follow_damage() -> void:
+	var c := _choppa(Vector3(0.0, 20.0, 0.0))
+	await _fly(c, 2)
+	var cracked := func() -> int:
+		return c.model._cracks.filter(func(m: MeshInstance3D) -> bool: return m.visible).size()
+	_check(c.model._cracks.size() >= 6, "crack spots on the glass, got %d" % c.model._cracks.size())
+	_check(cracked.call() == 0, "intact at full health")
+	c.damage(60.0, null)
+	await _fly(c, 2)
+	_check(cracked.call() >= 4, "cracked when hurt, got %d" % cracked.call())
+	c.heal(100.0)
+	await _fly(c, 2)
+	_check(cracked.call() == 0, "repaired when healed")

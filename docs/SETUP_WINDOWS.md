@@ -92,7 +92,14 @@ scripts in `tools/blender/` and committed, so you only need this to change them.
 
 1. Install **Python 3.13** (python.org; tick "Add to PATH").
 2. `pip install bpy==5.2.2` (Blender as a Python module, ~400 MB).
-3. `python tools/blender/make_textures.py` (or with names, e.g. `sandstone rock`).
+3. Run the script for what you want to change:
+   - `python tools/blender/make_textures.py` (or with names, e.g. `sandstone rock`)
+   - `python tools/blender/make_rocks.py`: mesa, arches, hoodoos, boulders
+   - `python tools/blender/make_choppa.py`: the helicopter
+     (`--preview out_dir` renders Cycles previews instead of exporting)
+   - `python tools/blender/make_cockpit.py`: the cockpit interior
+   - `python tools/blender/make_trees.py`: the pines and their needle texture
+     (`--preview out_dir` too)
 
 You can also open the results in the regular Blender 5.2 app.
 

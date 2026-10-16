@@ -78,3 +78,17 @@ scripts): [docs/SETUP_WINDOWS.md](docs/SETUP_WINDOWS.md).
 2. Open `project.godot` in Godot and press F5.
 
 Tests: `godot --headless --fixed-fps 60 --path . --script res://tests/run_tests.gd`
+
+Game arguments for trying things out go after `--` (full list at the top of
+`scripts/main.gd`), for example:
+
+```
+godot --path . -- --mode=free --map=basin --autopilot=hover --cam=showcase --explode=60
+```
+
+- `--mode=battle|free|race`, `--map=basin|range`: skip the menu.
+- `--autopilot=hover|shoot|bot|item:MISSILE`: let a script or bot fly.
+- `--cam=fp|showcase`: start in the cockpit, or with a fixed front view of the choppa.
+- `--health=30`: start damaged (cracked canopy, smoke).
+- `--explode=60`: set off an explosion ahead of you at physics tick 60.
+- `--shot=out.png --frames=90`: save a screenshot after 90 ticks and quit.

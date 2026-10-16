@@ -14,8 +14,9 @@ Per take: file, start (seconds, or "auto" for the loudest hit), length (seconds,
 leave out for the rest), pitch, gain_db. Per sound: loudness (gated RMS dBFS),
 peak, fade_in, fade_out, highpass, lowpass, loop + crossfade (seamless loops),
 channels (1, or 2 for music). One take writes name.wav; several write name_1.wav ..
-name_N.wav and the game picks one per play (Sounds.stream). Sounds without a recipe
-keep their synthesized stand-in from make_sounds.py.
+name_N.wav and the game picks one per play (Sounds.stream). Output goes to
+assets/sounds/library/, which git ignores while the repo is public; the game prefers
+it over the synthesized stand-ins in assets/sounds/ (make_sounds.py).
 """
 
 import argparse
@@ -29,7 +30,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import library  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-OUT = os.path.join(ROOT, "assets", "sounds")
+# Out of git while the repo is public (the library licence forbids sharing the files);
+# the game prefers these over the synthesized stand-ins in assets/sounds.
+OUT = os.path.join(ROOT, "assets", "sounds", "library")
 RECIPES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recipes.json")
 
 
@@ -38,7 +41,7 @@ def main():
     parser.add_argument("names", nargs="*", help="only these sounds (default: every recipe)")
     parser.add_argument("--library", default=os.environ.get("CHOPPA_SFX", ""), help="the sound library folder")
     parser.add_argument("--recipes", default=RECIPES, help="recipe file (default tools/audio/recipes.json)")
-    parser.add_argument("--out", default=OUT, help="output folder (default assets/sounds)")
+    parser.add_argument("--out", default=OUT, help="output folder (default assets/sounds/library)")
     args = parser.parse_args()
     if not args.library or not os.path.isdir(args.library):
         sys.exit("Set --library or CHOPPA_SFX to the sound library folder.")
@@ -49,6 +52,7 @@ def main():
         if name not in recipes:
             sys.exit("no recipe for %s" % name)
         takes = library.render(recipes[name], args.library)
+        os.makedirs(args.out, exist_ok=True)
         # Clear the old files first: a sound can go from one take to several and back.
         for old in glob.glob(os.path.join(args.out, name + "*.wav")):
             if re.fullmatch(re.escape(name) + r"(_\d+)?\.wav", os.path.basename(old)):

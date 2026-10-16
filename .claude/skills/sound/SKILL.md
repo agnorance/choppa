@@ -17,7 +17,8 @@ The game uses recorded library sounds (owner's decision: synthesis sounded cheap
 3. Put the picks into `tools/audio/recipes.json` (takes, start or "auto", length,
    pitch, loudness, filters, loop + crossfade, channels 2 for music) and run
    `python tools/audio/import_sounds.py gun`. Several takes become `gun_1.wav ..`;
-   `Sounds.stream` picks one per play.
+   `Sounds.stream` picks one per play. Output lands in `assets/sounds/library/`,
+   git-ignored while the repo is public; never commit those files.
 4. Re-import, run the tests, ask the owner to judge it in the game.
 5. Python runs without `-I` here: numpy is in the user site-packages.
 

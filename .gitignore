@@ -4,6 +4,7 @@ dist/
 .env.*
 *.log
 .DS_Store
+tmp.txt
 
 # Godot
 .godot/
@@ -16,3 +17,5 @@ __pycache__/
 
 # Claude Code: personal settings stay local
 .claude/settings.local.json
+# Recorded library sounds: the licence forbids sharing the files, and the repo is public.
+assets/sounds/library/

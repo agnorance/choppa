@@ -97,7 +97,9 @@ Godot must be 4.7.2. Two environments:
   pick. Sounds without a recipe keep their synthesized stand-in from `make_sounds.py`.
   Several takes are `name_1.wav ..`; `*_loop` sounds loop in code. Play everything
   through `Sounds` (`scripts/sounds.gd`). Nobody can listen but the owner: they pick.
-  Library licences (Sonniss) forbid redistributing the raw files.
+  Library licences (Sonniss) forbid redistributing the files: while the repo is public,
+  imported sounds go to `assets/sounds/library/` (git-ignored, preferred by `Sounds`),
+  so CI builds play the synthesized stand-ins. Owner will make the repo private later.
 - Procedural textures drawn in GDScript (dial, canopy cracks, muzzle star, scorch, puff)
   go through `Baked.texture(name)`: the generator stays next to its user and is listed
   in `Baked.generators()`; `tools/bake.ps1` draws them into `assets/textures/baked/`

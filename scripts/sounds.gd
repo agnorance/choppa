@@ -3,7 +3,9 @@ extends RefCounted
 ## Sound effects (assets/sounds) and helpers to play them. A sound may come in takes,
 ## `name_1.wav` .. `name_N.wav`, and every play picks one, so a burst of fire or a row
 ## of impacts does not sound copied. The files are cut from recorded libraries by
-## tools/audio/import_sounds.py, or are the synthesized stand-ins of make_sounds.py.
+## tools/audio/import_sounds.py into assets/sounds/library/ (kept out of git while the
+## repo is public: the library licence forbids sharing the files), and the game prefers
+## them there; otherwise it plays the synthesized stand-ins of make_sounds.py.
 ## One-shots free themselves when done; loops are owned by the caller.
 
 const BUS := "Effects"  ## Every effect plays through this bus (Settings makes it).
@@ -11,8 +13,11 @@ const MUSIC_BUS := "Music"
 const MUSIC_DB := -6.0
 const MUSIC_FADE := 1.2  ## Seconds to fade one track out and the next in.
 
-## Sound name -> how many numbered takes it has (0: a single name.wav). Only numbers,
-## so nothing here keeps a stream alive past exit.
+const LIBRARY := "res://assets/sounds/library/"  ## Recorded sounds, preferred when present.
+const STAND_INS := "res://assets/sounds/"
+
+## Sound name -> [folder, number of numbered takes (0: a single name.wav)]. Only paths
+## and numbers, so nothing here keeps a stream alive past exit.
 static var _takes := {}
 static var _music: AudioStreamPlayer
 static var _music_track := ""
@@ -26,10 +31,12 @@ static func bus() -> String:
 ## A stream for `sound_name`: one of its takes at random. `*_loop` sounds always loop,
 ## whatever their import settings say. The ResourceLoader caches the files.
 static func stream(sound_name: String) -> AudioStream:
-	var takes := _take_count(sound_name)
-	var path := "res://assets/sounds/%s.wav" % sound_name
+	var source := _source(sound_name)
+	var folder: String = source[0]
+	var takes: int = source[1]
+	var path := folder + sound_name + ".wav"
 	if takes > 0:
-		path = "res://assets/sounds/%s_%d.wav" % [sound_name, randi_range(1, takes)]
+		path = "%s%s_%d.wav" % [folder, sound_name, randi_range(1, takes)]
 	var s: AudioStream = load(path)
 	if sound_name.ends_with("_loop") and s is AudioStreamWAV:
 		_make_loop(s as AudioStreamWAV)
@@ -37,11 +44,22 @@ static func stream(sound_name: String) -> AudioStream:
 
 
 static func _take_count(sound_name: String) -> int:
+	return _source(sound_name)[1]
+
+
+## Where a sound comes from: the recorded library when it has the sound, else the
+## stand-ins; and how many takes it has there.
+static func _source(sound_name: String) -> Array:
 	if not _takes.has(sound_name):
-		var count := 0
-		while ResourceLoader.exists("res://assets/sounds/%s_%d.wav" % [sound_name, count + 1]):
-			count += 1
-		_takes[sound_name] = count
+		var found := [STAND_INS, 0]
+		for folder in [LIBRARY, STAND_INS]:
+			var count := 0
+			while ResourceLoader.exists("%s%s_%d.wav" % [folder, sound_name, count + 1]):
+				count += 1
+			if count > 0 or ResourceLoader.exists(folder + sound_name + ".wav"):
+				found = [folder, count]
+				break
+		_takes[sound_name] = found
 	return _takes[sound_name]
 
 

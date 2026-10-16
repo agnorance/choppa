@@ -217,15 +217,18 @@ Low-poly, flat-shaded look with strong colours.
    rotor dust, boost flame, muzzle flash, damage smoke).
 3. **Items** *(done)*: missile, mine, fake box, smoke, scrambler, shield, GET TO THE
    CHOPPA, with scoreboard-weighted odds; bots use them.
-4. **Load times (next):** Python stays for the offline tools (Blender's API is Python
+4. **Load times** *(done)*: Python stays for the offline tools (Blender's API is Python
    only; they run once), GDScript stays for the game (the C++ engine does the heavy
-   work). Two fixes, mainly for phones:
-   - Grass: the map build takes ~2.5 s on desktop, mostly placing ~220k tufts in
-     GDScript. Place them on worker threads (`WorkerThreadPool`) or bake the
-     placement once into a file shipped with the map.
-   - Procedural textures (gauge dials, canopy cracks, muzzle star, scorch, puff dot,
-     water ripples) are drawn pixel by pixel at every start. Bake them into PNGs like
-     the Blender textures (VRAM-compressed imports).
+   work). Measured with `--timing` on the owner's PC (RTX 5080), Mesa Basin battle:
+   - Before: map 1.7 s (grass 0.52 s, terrain 0.44 s, rocks 0.23 s, backdrop 0.19 s),
+     first frame 4.1 s after launch. (The roadmap's 2.5 s came from a `--verbose` run,
+     which slows everything four-fold.)
+   - Grass on worker threads, one MultiMesh buffer per chunk: 0.06 s. The worker
+     reads only plain arrays; any method call on an object from a thread serializes.
+   - Procedural textures baked to `assets/textures/baked/` (`tools/bake.ps1`).
+   - After: map 1.1 s, first frame 3.6 s. What remains: terrain mesh and collision
+     (0.44 s, height function called per vertex), rock meshes, and ~2.3 s between
+     the built scene and the first frame (shader and pipeline compilation, SDFGI).
    - Only if profiling ever shows a hot spot (bots, netcode): a GDExtension in C++.
      Not C#: it complicates the Android export.
 5. **Feel pass:** tune on real hardware (Windows + Android): physics (see Physics

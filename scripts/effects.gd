@@ -47,13 +47,12 @@ static func gradient(stops: Array) -> Gradient:
 	return g
 
 
-static var _dot: Texture2D
-
-
 ## A soft, cloudy white puff (radial falloff times noise), made once.
 static func _soft_dot() -> Texture2D:
-	if _dot:
-		return _dot
+	return Baked.texture("puff")
+
+
+static func _soft_dot_image() -> Image:
 	var noise := FastNoiseLite.new()
 	noise.frequency = 0.045
 	noise.fractal_octaves = 4
@@ -65,19 +64,15 @@ static func _soft_dot() -> Texture2D:
 			var cloud := noise.get_noise_2d(x, y) * 0.5 + 0.5
 			var a := clampf((1.0 - d * d) * (0.35 + cloud * 0.9), 0.0, 1.0)
 			image.set_pixel(x, y, Color(1.0, 1.0, 1.0, a * a))
-	image.generate_mipmaps()
-	_dot = ImageTexture.create_from_image(image)
-	return _dot
-
-
-static var _star: Texture2D
-static var _crack: Texture2D
+	return image
 
 
 ## Muzzle flash: a hot core with a few uneven spikes.
 static func star_texture() -> Texture2D:
-	if _star:
-		return _star
+	return Baked.texture("muzzle_star")
+
+
+static func star_image() -> Image:
 	var size := 128
 	var image := Image.create(size, size, true, Image.FORMAT_RGBA8)
 	var spikes := [0.0, 0.9, 1.7, 2.5, 3.3, 4.1, 5.0, 5.7]
@@ -92,16 +87,16 @@ static func star_texture() -> Texture2D:
 				a = maxf(a, (1.0 - smoothstep(0.0, 0.18 * (1.0 - r / reach), d)) * (1.0 - smoothstep(0.0, reach, r)))
 			a = maxf(a, 1.0 - smoothstep(0.0, 0.35, r))
 			image.set_pixel(x, y, Color(1.0, 0.8 + 0.2 * (1.0 - r), 0.55 + 0.45 * (1.0 - r), clampf(a, 0.0, 1.0)))
-	image.generate_mipmaps()
-	_star = ImageTexture.create_from_image(image)
-	return _star
+	return image
 
 
 ## Bullet strike in glass: a crushed white centre, jagged radial cracks and a few
 ## broken rings around them.
 static func crack_texture() -> Texture2D:
-	if _crack:
-		return _crack
+	return Baked.texture("glass_cracks")
+
+
+static func crack_image() -> Image:
 	var size := 256
 	var image := Image.create(size, size, true, Image.FORMAT_RGBA8)
 	image.fill(Color(1, 1, 1, 0))
@@ -141,9 +136,7 @@ static func crack_texture() -> Texture2D:
 			var core := (1.0 - smoothstep(0.0, 0.16, r)) * rng.randf_range(0.5, 1.0)
 			var px := image.get_pixel(x, y)
 			image.set_pixel(x, y, Color(1, 1, 1, maxf(px.a, core)))
-	image.generate_mipmaps()
-	_crack = ImageTexture.create_from_image(image)
-	return _crack
+	return image
 
 
 static func _draw_line(image: Image, a: Vector2, b: Vector2, alpha: float) -> void:
@@ -230,13 +223,12 @@ static func flash(size: float, color: Color) -> MeshInstance3D:
 	return mesh
 
 
-static var _scorch: Texture2D
-
-
 ## Burnt ground: a dark, ragged blot fading out at the edge.
 static func scorch_texture() -> Texture2D:
-	if _scorch:
-		return _scorch
+	return Baked.texture("scorch")
+
+
+static func scorch_image() -> Image:
 	var size := 128
 	var noise := FastNoiseLite.new()
 	noise.seed = 21
@@ -250,9 +242,7 @@ static func scorch_texture() -> Texture2D:
 			var a := clampf((1.0 - smoothstep(0.35, 1.0, p.length() + (n - 0.5) * 0.5)) * 1.2, 0.0, 0.92)
 			var c := lerpf(0.03, 0.12, n)
 			image.set_pixel(x, y, Color(c, c * 0.9, c * 0.8, a))
-	image.generate_mipmaps()
-	_scorch = ImageTexture.create_from_image(image)
-	return _scorch
+	return image
 
 
 ## A bullet striking something: sparks off metal, a dust puff and chips off the ground,

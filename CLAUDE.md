@@ -22,8 +22,7 @@ Little Bird style choppa with cockpit view, effects, pines, grass, water, explos
 synthesized sound effects. All of that is on `main` (PR #1). New work continues on
 `godot-foundation`; open a PR to `main` when a chunk is done. Merging is the owner's
 call: they merge on GitHub (with "Create a merge commit").
-Next up: load times (DESIGN.md, Milestones 4: grass on threads or baked, bake the
-procedural textures). Noted for later (ask before starting): flight physics feel pass (DESIGN.md, "Physics
+Load times are done (grass on threads, baked textures). Noted for later (ask before starting): flight physics feel pass (DESIGN.md, "Physics
 ideas"), UI overhaul (DESIGN.md, Milestones), choppa colours/customization, LAN
 multiplayer. Each session: check `git log` and the roadmap, then confirm the next step.
 
@@ -37,6 +36,7 @@ Godot must be 4.7.2. Two environments:
 | Play | `tools\run.ps1 --mode=battle --map=basin` | `godot --path . -- --mode=battle` |
 | Screenshot | `tools\shot.ps1 out.png --cam=showcase --frames=150` | `tools/shot.sh out.png --cam=showcase --frames=150` |
 | Re-import | `& $env:GODOT --headless --path . --import` | `godot --headless --path . --import` |
+| Bake textures | `toolsake.ps1` | `tools/bake.sh` |
 
 - Windows scripts find Godot via `$env:GODOT` (path to `Godot_v4.7.2-stable_win64_console.exe`),
   the PATH, or `C:\Tools\Godot\`. Setup: docs/SETUP_WINDOWS.md.
@@ -83,6 +83,13 @@ Godot must be 4.7.2. Two environments:
   `assets/sounds/*.wav`. Loops (`*_loop`) need `edit/loop_mode=2` in their `.import`.
   Play them through `Sounds` (`scripts/sounds.gd`). Nobody can listen in the cloud:
   ask the owner how new sounds feel and tune the generator.
+- Procedural textures drawn in GDScript (dial, canopy cracks, muzzle star, scorch, puff)
+  go through `Baked.texture(name)`: the generator stays next to its user and is listed
+  in `Baked.generators()`; `tools/bake.ps1` draws them into `assets/textures/baked/`
+  (committed). After changing a generator, bake again and commit the PNGs.
+- Load times: check with `-- --timing` (prints map phases and the first frame). Never
+  judge speed under `--verbose`, it slows a start four-fold. Worker threads in GDScript
+  only pay off when the task calls no methods on objects (see `Grass._place`).
 - Textures/models come from Blender scripts in `tools/blender/` (`pip install bpy==5.2.2`).
   Generated files are committed. Texture `.import` files must keep VRAM compression and
   mipmaps (and `normal_map=1` for normal maps). Details: the `blender-assets` skill.

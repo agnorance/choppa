@@ -14,6 +14,7 @@ var _phase := randf() * TAU
 
 
 func _ready() -> void:
+	add_to_group("item_boxes")
 	var shape := CollisionShape3D.new()
 	var box_shape := BoxShape3D.new()
 	box_shape.size = Vector3.ONE * 3.0
@@ -65,6 +66,6 @@ func _process(delta: float) -> void:
 func _on_body_entered(body: Node3D) -> void:
 	if not is_available() or not body is Choppa:
 		return
-	(body as Choppa).give_item(Items.roll(rng))
+	(body as Choppa).give_item(Items.roll(rng, (body as Choppa).standing))
 	_respawn = RESPAWN_TIME
 	_visual.visible = false

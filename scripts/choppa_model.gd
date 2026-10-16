@@ -20,6 +20,9 @@ var _dust: CPUParticles3D
 var _trail: CPUParticles3D
 var _smoke: CPUParticles3D
 var _flashes: Array[MeshInstance3D] = []
+var _bubble: MeshInstance3D
+var _bubble_material: StandardMaterial3D
+var _sparks: CPUParticles3D
 
 
 func _ready() -> void:
@@ -111,7 +114,7 @@ func _ready() -> void:
 
 	# Rotor downwash kicking up dust when flying low.
 	_dust = Effects.puffs(Effects.gradient([
-		Color(0.76, 0.66, 0.5, 0.0), Color(0.76, 0.66, 0.5, 0.8), Color(0.72, 0.62, 0.48, 0.0),
+		Color(0.8, 0.77, 0.7, 0.0), Color(0.8, 0.77, 0.7, 0.55), Color(0.78, 0.75, 0.68, 0.0),
 	]), 48, 1.4)
 	_dust.top_level = true
 	_dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
@@ -145,6 +148,40 @@ func _ready() -> void:
 	_trail.scale_amount_max = 1.4
 	_trail.emitting = false
 	add_child(_trail)
+
+	# Shield bubble; turns gold during GET TO THE CHOPPA.
+	var sphere := SphereMesh.new()
+	sphere.radius = 3.6
+	sphere.height = 5.4
+	sphere.radial_segments = 20
+	sphere.rings = 10
+	_bubble_material = StandardMaterial3D.new()
+	_bubble_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_bubble_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_bubble_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_bubble = MeshInstance3D.new()
+	_bubble.mesh = sphere
+	_bubble.material_override = _bubble_material
+	_bubble.position = Vector3(0.0, 0.2, 0.8)
+	_bubble.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_bubble.visible = false
+	add_child(_bubble)
+
+	# Purple sparks while the controls are scrambled.
+	_sparks = Effects.puffs(Effects.gradient([
+		Color(0.9, 0.5, 1.0, 1.0), Color(0.6, 0.2, 1.0, 0.0),
+	]), 30, 0.5)
+	_sparks.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	_sparks.emission_sphere_radius = 2.5
+	_sparks.direction = Vector3.UP
+	_sparks.spread = 180.0
+	_sparks.initial_velocity_min = 2.0
+	_sparks.initial_velocity_max = 5.0
+	_sparks.scale_amount_min = 0.3
+	_sparks.scale_amount_max = 0.6
+	_sparks.local_coords = true
+	_sparks.emitting = false
+	add_child(_sparks)
 
 	# Black smoke when badly damaged.
 	_smoke = Effects.puffs(Effects.gradient([
@@ -196,6 +233,13 @@ func update_pose(c: Choppa, delta: float) -> void:
 	for flash in _flashes:
 		flash.visible = c.clock - c.last_shot_time < 0.05
 	_trail.emitting = c.is_boosting()
+	_sparks.emitting = c.scrambled > 0.0
+	_bubble.visible = c.shield > 0.0 or c.rampage > 0.0
+	if _bubble.visible:
+		var gold := c.rampage > 0.0
+		var pulse := 0.5 + 0.5 * sin(c.clock * 6.0)
+		_bubble_material.albedo_color = Color(1.0, 0.8, 0.2, 0.18 + pulse * 0.1) if gold \
+			else Color(0.3, 0.85, 1.0, 0.12 + 0.12 * c.shield / Choppa.SHIELD_HP)
 	_smoke.emitting = c.health < 35.0
 	_dust.emitting = c.altitude < 14.0
 	if _dust.emitting:

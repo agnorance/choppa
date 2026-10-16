@@ -80,20 +80,24 @@ Bots fill empty slots in every mode. They also let me test multiplayer headless.
 ## Items ("fool your friends")
 
 Item boxes respawn a few seconds after pickup. Odds depend on the scoreboard: the leader
-gets defensive items, those trailing get the strong ones.
+gets defensive items, those trailing get the strong ones (`Items.TABLE`).
 
-| Item | What it does |
-|---|---|
-| Turbo | Instant full boost burst. *(implemented)* |
-| Homing missile | Locks onto the choppa ahead. Dodge with a barrel roll. |
-| Mine | Drops behind you, hovers in place. |
-| Fake item box | Looks exactly like an item box. |
-| Smoke screen | Ink cloud behind you; anyone flying through gets a blacked-out screen. |
-| Control scrambler | Hits the leader: their left/right controls swap for a few seconds. |
-| Winch hook | Grab the choppa in front and steal its item. |
-| Decoy flare | Breaks missile locks; held behind you like a banana. |
-| Shield | Blocks one hit. |
-| GET TO THE CHOPPA | Last place only: a short invulnerable rampage with a heavy gun. |
+| Item | What it does | Status |
+|---|---|---|
+| Turbo | Instant speed burst. | done |
+| Homing missile | Chases the choppa in a 45° cone ahead; 35 damage and a big shove. A barrel roll as it closes in shakes it off. | done |
+| Mine | Dropped behind you, arms after 1 s, 40 damage blast. Your own mine is safe for 3 s. | done |
+| Fake item box | Looks like an item box (upside-down "?"), 30 damage blast. | done |
+| Smoke screen | Cloud behind you for 9 s: inside, you can't lock on, nobody can lock onto you, and your screen goes dark. | done |
+| Control scrambler | Hits the leader: left/right swapped for 5 s. Never rolled by the leader. | done |
+| Shield | Bubble that absorbs 40 damage for up to 12 s. | done |
+| GET TO THE CHOPPA | Last place only (25% of their rolls): 6 s invulnerable, double gun damage, turbo. | done |
+| Winch hook | Grab the choppa in front and steal its item. | idea |
+| Decoy flare | Breaks missile locks; held behind you like a banana. | idea |
+
+Bots grab boxes when nobody is close, use items when it makes sense (missiles with a
+target, mines and fake boxes with someone behind, shields under fire) and barrel-roll
+away from incoming missiles.
 
 ## Maps
 
@@ -131,8 +135,8 @@ Low-poly, flat-shaded look with strong colours.
 2. **Battle mode and first arena** *(done)*: health, damage, death, respawn, deathmatch
    rules, kill feed, scoreboard, combat bots, Mesa Basin, terrain, effects (explosions,
    rotor dust, boost flame, muzzle flash, damage smoke).
-3. **Items:** missiles, mines, fake boxes, smoke and the rest, with scoreboard-weighted
-   odds.
+3. **Items** *(done)*: missile, mine, fake box, smoke, scrambler, shield, GET TO THE
+   CHOPPA, with scoreboard-weighted odds; bots use them.
 4. **Feel pass:** tune on real hardware (Windows + Android), audio, camera shake, hit
    markers.
 5. **LAN multiplayer:** host/join, discovery, prediction and interpolation.

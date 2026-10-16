@@ -1,7 +1,8 @@
 class_name ScriptedPilot
 extends Node
 ## Canned flight plans for screenshots and smoke tests (`--autopilot=<plan>`).
-## Plans: hover, shoot, forward, boost, roll, flip, snap, pirouette.
+## Plans: hover, shoot, forward, boost, roll, flip, snap, pirouette, and item:<NAME>
+## (hover, then get and use that item, e.g. item:MISSILE).
 
 const CRUISE_ALTITUDE := 7.0
 
@@ -21,6 +22,11 @@ func _physics_process(_delta: float) -> void:
 	i.clear()
 	i.lift = clampf((CRUISE_ALTITUDE - choppa.altitude) * 0.3, -1.0, 1.0)
 	if plan == "hover":
+		return
+	if plan.begins_with("item:"):
+		if _tick == 20:
+			choppa.give_item(plan.substr(5))
+		i.use_item = _tick == 30
 		return
 	if plan == "shoot":
 		i.fire = true

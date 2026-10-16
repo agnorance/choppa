@@ -67,6 +67,7 @@ static func _soft_dot() -> Texture2D:
 
 ## Fireball, smoke, flying debris and a flash of light. Cleans itself up.
 class Explosion extends Node3D:
+	var size := 1.0  ## Scales the fireball, debris and flash.
 	var _t := 0.0
 	var _light: OmniLight3D
 
@@ -78,7 +79,6 @@ class Explosion extends Node3D:
 		fire.one_shot = true
 		fire.explosiveness = 0.9
 		fire.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-		fire.emission_sphere_radius = 1.5
 		fire.direction = Vector3.UP
 		fire.spread = 180.0
 		fire.initial_velocity_min = 4.0
@@ -86,8 +86,9 @@ class Explosion extends Node3D:
 		fire.damping_min = 6.0
 		fire.damping_max = 10.0
 		fire.gravity = Vector3(0.0, 2.0, 0.0)
-		fire.scale_amount_min = 3.0
-		fire.scale_amount_max = 6.0
+		fire.scale_amount_min = 3.0 * size
+		fire.scale_amount_max = 6.0 * size
+		fire.emission_sphere_radius = 1.5 * size
 		add_child(fire)
 		fire.emitting = true
 
@@ -105,8 +106,8 @@ class Explosion extends Node3D:
 		debris.local_coords = false
 		debris.direction = Vector3.UP
 		debris.spread = 120.0
-		debris.initial_velocity_min = 10.0
-		debris.initial_velocity_max = 22.0
+		debris.initial_velocity_min = 10.0 * size
+		debris.initial_velocity_max = 22.0 * size
 		debris.angular_velocity_min = -360.0
 		debris.angular_velocity_max = 360.0
 		debris.gravity = Vector3(0.0, -20.0, 0.0)
@@ -116,7 +117,7 @@ class Explosion extends Node3D:
 		_light = OmniLight3D.new()
 		_light.light_color = Color(1.0, 0.6, 0.25)
 		_light.light_energy = 6.0
-		_light.omni_range = 30.0
+		_light.omni_range = 30.0 * size
 		add_child(_light)
 
 	func _process(delta: float) -> void:

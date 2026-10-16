@@ -14,6 +14,7 @@ static var _material: StandardMaterial3D
 var shooter: Choppa
 var direction := Vector3.FORWARD
 var speed := SPEED
+var damage := DAMAGE
 
 var _age := 0.0
 
@@ -49,7 +50,7 @@ func _physics_process(delta: float) -> void:
 		global_position = to
 		return
 	var target := hit.collider as Choppa
-	if target and target.take_hit(direction * KNOCKBACK, shooter, DAMAGE) and is_instance_valid(shooter):
+	if target and target.take_hit(direction * KNOCKBACK, shooter, damage) and is_instance_valid(shooter):
 		shooter.scored_hit.emit(target)
 	if target == null or not target.trick == "BARREL ROLL":
 		_spark(hit.position)

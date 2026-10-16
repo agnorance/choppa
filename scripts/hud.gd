@@ -17,6 +17,9 @@ var _heat: ProgressBar
 var _health: ProgressBar
 var _health_fill: StyleBoxFlat
 var _vignette: TextureRect
+var _smoke: ColorRect
+var _warning: Label
+var _effects: Label
 var _heat_fill: StyleBoxFlat
 var _crosshair: Control
 var _hit_flash := 0.0
@@ -105,6 +108,18 @@ func _ready() -> void:
 	_vignette.modulate.a = 0.0
 	root.add_child(_vignette)
 
+	_smoke = ColorRect.new()
+	_smoke.color = Color(0.12, 0.12, 0.14, 0.0)
+	_smoke.anchor_right = 1.0
+	_smoke.anchor_bottom = 1.0
+	_smoke.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_smoke)
+	root.move_child(_smoke, 0)  # Under the HUD, so speed and health stay readable.
+
+	_warning = _label(root, 40, Vector2(0.5, 0.62), Vector2.ZERO)
+	_warning.add_theme_color_override("font_color", Color(1.0, 0.25, 0.2))
+	_effects = _label(root, 24, Vector2(1, 0), Vector2(-24, 52))
+
 	_crosshair = Control.new()
 	_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_crosshair.anchor_right = 1.0
@@ -132,6 +147,11 @@ func _ready() -> void:
 	choppa.scored_hit.connect(func(_target: Choppa) -> void: _hit_flash = 0.12)
 	choppa.damaged.connect(func(amount: float, _attacker: Choppa) -> void:
 		_vignette.modulate.a = minf(1.0, _vignette.modulate.a + amount / 20.0))
+	choppa.scrambled_by.connect(func(by: Choppa) -> void:
+		_show_callout("SCRAMBLED BY %s!" % by.pilot_name.to_upper(), Color(0.8, 0.4, 1.0)))
+	choppa.item_used.connect(func(item_name: String) -> void:
+		if item_name == "GET TO THE CHOPPA":
+			_show_callout("GET TO THE CHOPPA!", Color(1.0, 0.85, 0.2)))
 	choppa.gun_overheated.connect(func() -> void: _show_callout("OVERHEAT", Color(1, 0.4, 0.2)))
 	_update_item()
 
@@ -152,6 +172,16 @@ func _process(delta: float) -> void:
 	var hp := choppa.health / Choppa.MAX_HEALTH
 	_health_fill.bg_color = Color(0.9, 0.2, 0.15).lerp(Color(0.3, 0.85, 0.35), smoothstep(0.2, 0.6, hp))
 	_vignette.modulate.a = maxf(0.0, _vignette.modulate.a - delta * 1.5)
+	_smoke.color.a = move_toward(_smoke.color.a, 0.82 if choppa.in_smoke() else 0.0, delta * 3.0)
+	_warning.text = "MISSILE!  ROLL!" if _missile_hunting() and fmod(choppa.clock, 0.4) < 0.25 else ""
+	var effects := PackedStringArray()
+	if choppa.shield > 0.0:
+		effects.append("SHIELD %d" % ceili(choppa.shield))
+	if choppa.scrambled > 0.0:
+		effects.append("SCRAMBLED %d" % ceili(choppa.scrambled))
+	if choppa.rampage > 0.0:
+		effects.append("RAMPAGE %d" % ceili(choppa.rampage))
+	_effects.text = "\n".join(effects)
 	_crosshair.queue_redraw()
 	if _callout_time > 0.0:
 		_callout_time -= delta
@@ -193,6 +223,15 @@ func _show_callout(text: String, color: Color) -> void:
 
 func _update_item() -> void:
 	_item.text = "ITEM: %s" % (choppa.item if choppa.item != "" else "-")
+	_item.add_theme_color_override("font_color", Items.color(choppa.item) if choppa.item != "" else Color.WHITE)
+
+
+func _missile_hunting() -> bool:
+	for node in choppa.get_tree().get_nodes_in_group("missiles"):
+		var missile := node as Weapons.Missile
+		if missile.is_hunting(choppa) and missile.global_position.distance_to(choppa.global_position) < 200.0:
+			return true
+	return false
 
 
 ## Pins a control's corner (or edge middle, for 0.5) at `anchor` (fractions of the

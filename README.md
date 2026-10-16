@@ -60,6 +60,11 @@ The machine gun snaps onto targets in a narrow cone ahead (white ring) and overh
 after about two seconds of continuous fire. A barrel roll dodges bullets. Crashing into
 walls hurts too.
 
+Item boxes (rainbow "?") give a random item; the further behind you are, the better:
+turbo, homing missile (barrel-roll to shake one off), mine, fake item box (watch for the
+upside-down "?"), smoke screen, control scrambler (hits the leader), shield, and for last
+place only: GET TO THE CHOPPA.
+
 Tricks: roll (trick + left/right), front flip (trick + forward), 180 snap (trick + back),
 pirouette (trick alone). Landing a trick close to the ground fills your boost meter
 twice as much.

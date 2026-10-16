@@ -73,6 +73,7 @@ func tick(delta: float) -> void:
 	if over:
 		return
 	time_left -= delta
+	_update_standings()
 	for choppa: Choppa in _respawn.keys():
 		_respawn[choppa] -= delta
 		if _respawn[choppa] <= 0.0:
@@ -82,6 +83,13 @@ func tick(delta: float) -> void:
 	if time_left <= 0.0:
 		time_left = 0.0
 		_end()
+
+
+## Tells each pilot how it's doing (0 leader .. 1 last), which steers item odds.
+func _update_standings() -> void:
+	var order := standings()
+	for n in order.size():
+		order[n].standing = float(n) / maxi(1, order.size() - 1)
 
 
 func _physics_process(delta: float) -> void:

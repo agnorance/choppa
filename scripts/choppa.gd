@@ -14,6 +14,8 @@ signal gun_overheated
 signal damaged(amount: float, attacker: Choppa)
 signal died(killer: Choppa)
 signal healed(amount: float)
+signal item_used(item_name: String)
+signal scrambled_by(attacker: Choppa)
 
 ## Below this altitude a trick counts as "low" and its boost reward doubles.
 const LOW_ALTITUDE := 6.0
@@ -30,6 +32,12 @@ const AIM_ASSIST_RANGE := 160.0
 const MAX_HEALTH := 100.0
 const CRASH_DAMAGE_FROM := 22.0  ## Wall impacts harder than this hurt.
 const SPAWN_SHIELD := 2.0  ## Seconds of invulnerability after respawning.
+const SHIELD_HP := 40.0
+const SHIELD_TIME := 12.0
+const SCRAMBLE_TIME := 5.0
+const RAMPAGE_TIME := 6.0  ## GET TO THE CHOPPA.
+const MISSILE_CONE := deg_to_rad(45.0)
+const MISSILE_RANGE := 250.0
 ## A crash this soon after being shot counts as a kill for whoever shot you.
 const CRASH_CREDIT_TIME := 4.0
 const TRICKS := {
@@ -69,6 +77,11 @@ var overheated := false
 var health := MAX_HEALTH
 var alive := true
 var mortal := true  ## False in races: hits still push, but never hurt.
+var standing := 0.5  ## 0 leading .. 1 last; set by the game mode, steers item odds.
+var shield := 0.0  ## Damage the shield bubble still absorbs.
+var shield_time := 0.0
+var scrambled := 0.0  ## Seconds left with left/right swapped.
+var rampage := 0.0  ## Seconds left of GET TO THE CHOPPA.
 var invulnerable := 0.0
 var clock := 0.0  ## Simulation seconds this choppa has existed.
 var last_shot_time := -10.0  ## `clock` at the last shot, for the muzzle flash.
@@ -135,7 +148,18 @@ func step(delta: float) -> void:
 	if not alive:
 		return
 	invulnerable = maxf(0.0, invulnerable - delta)
+	shield_time = maxf(0.0, shield_time - delta)
+	if shield_time <= 0.0:
+		shield = 0.0
+	scrambled = maxf(0.0, scrambled - delta)
+	rampage = maxf(0.0, rampage - delta)
 	var i := input
+	if scrambled > 0.0:
+		var swapped := PilotInput.new()
+		swapped.copy_from(i)
+		swapped.yaw = -i.yaw
+		swapped.move.x = -i.move.x
+		i = swapped
 	if stun > 0.0:
 		stun -= delta
 		i = PilotInput.new()
@@ -194,19 +218,38 @@ func step(delta: float) -> void:
 
 ## The choppa that aim assist would shoot at right now, or null.
 func aim_target() -> Choppa:
+	return _target_in_cone(AIM_ASSIST_ANGLE, AIM_ASSIST_RANGE)
+
+
+## Who a missile fired now would chase: a wider cone than the guns.
+func missile_target() -> Choppa:
+	return _target_in_cone(MISSILE_CONE, MISSILE_RANGE)
+
+
+## Whether a smoke cloud hides this choppa (it can't see out, nobody can lock on).
+func in_smoke() -> bool:
+	for cloud in get_tree().get_nodes_in_group("smoke"):
+		if (cloud as Weapons.SmokeCloud).covers(global_position):
+			return true
+	return false
+
+
+func _target_in_cone(cone: float, reach: float) -> Choppa:
+	if in_smoke():
+		return null
 	var forward := facing() * Vector3.FORWARD
 	var best: Choppa = null
-	var best_angle := AIM_ASSIST_ANGLE
+	var best_angle := cone
 	for node in get_tree().get_nodes_in_group("choppas"):
 		var other := node as Choppa
 		if other == self or not other.alive:
 			continue
 		var to := other.global_position - global_position
 		var flat := Vector3(to.x, 0.0, to.z)
-		if to.length() > AIM_ASSIST_RANGE or flat.length() < 0.1:
+		if to.length() > reach or flat.length() < 0.1:
 			continue
 		var angle := forward.angle_to(flat)
-		if angle < best_angle and absf(atan2(to.y, flat.length())) < AIM_ASSIST_PITCH:
+		if angle < best_angle and absf(atan2(to.y, flat.length())) < AIM_ASSIST_PITCH and not other.in_smoke():
 			best = other
 			best_angle = angle
 	return best
@@ -223,11 +266,17 @@ func take_hit(impulse: Vector3, shooter: Choppa, amount := 0.0) -> bool:
 
 
 func damage(amount: float, attacker: Choppa) -> void:
-	if not alive or not mortal or invulnerable > 0.0 or amount <= 0.0:
+	if not alive or not mortal or invulnerable > 0.0 or rampage > 0.0 or amount <= 0.0:
 		return
 	if attacker and attacker != self:
 		_last_attacker = attacker
 		_last_attacker_time = clock
+	if shield > 0.0:
+		var absorbed := minf(shield, amount)
+		shield -= absorbed
+		amount -= absorbed
+		if amount <= 0.0:
+			return
 	health -= amount
 	damaged.emit(amount, attacker)
 	if health <= 0.0:
@@ -269,12 +318,68 @@ func use_item() -> void:
 		"":
 			return
 		"TURBO":
-			turbo_time = 1.6
-			# Kick in instantly, like a mushroom.
-			var forward := facing() * Vector3.FORWARD
-			velocity = forward * maxf(velocity.length(), boost_speed) + Vector3.UP * velocity.y
+			_turbo(1.6)
+		"MISSILE":
+			var missile := Weapons.Missile.new()
+			missile.shooter = self
+			missile.target = missile_target()
+			missile.direction = facing() * Vector3.FORWARD
+			_drop(missile, Vector3(0.0, -0.6, -3.0))
+		"MINE":
+			var mine := Weapons.Mine.new()
+			mine.owner_choppa = self
+			_drop(mine, Vector3(0.0, -1.0, 9.0))
+		"FAKE BOX":
+			var fake := Weapons.FakeItemBox.new()
+			fake.owner_choppa = self
+			_drop(fake, Vector3(0.0, -0.5, 7.0))
+		"SMOKE":
+			_drop(Weapons.SmokeCloud.new(), Vector3(0.0, 0.0, 10.0))
+		"SCRAMBLER":
+			var victim := _scramble_target()
+			if victim:
+				victim.scrambled = SCRAMBLE_TIME
+				victim.scrambled_by.emit(self)
+		"SHIELD":
+			shield = SHIELD_HP
+			shield_time = SHIELD_TIME
+		"GET TO THE CHOPPA":
+			rampage = RAMPAGE_TIME
+			boost_meter = 1.0
+			_turbo(2.0)
+	var used := item
 	item = ""
 	item_changed.emit(item)
+	item_used.emit(used)
+
+
+func _turbo(seconds: float) -> void:
+	turbo_time = seconds
+	# Kick in instantly, like a mushroom.
+	var forward := facing() * Vector3.FORWARD
+	velocity = forward * maxf(velocity.length(), boost_speed) + Vector3.UP * velocity.y
+
+
+## Puts an item object into the world at `offset` in this choppa's frame (-Z ahead).
+func _drop(thing: Node3D, offset: Vector3) -> void:
+	get_parent().add_child(thing)
+	thing.global_position = global_position + facing() * offset
+	thing.reset_physics_interpolation()
+
+
+## The leader among everyone else (lowest standing), nearest one on a tie.
+func _scramble_target() -> Choppa:
+	var best: Choppa = null
+	for node in get_tree().get_nodes_in_group("choppas"):
+		var other := node as Choppa
+		if other == self or not other.alive:
+			continue
+		if best == null or other.standing < best.standing or (
+			other.standing == best.standing
+			and global_position.distance_to(other.global_position) < global_position.distance_to(best.global_position)
+		):
+			best = other
+	return best
 
 
 func respawn(at: Transform3D) -> void:
@@ -288,6 +393,10 @@ func respawn(at: Transform3D) -> void:
 	turbo_time = 0.0
 	heat = 0.0
 	overheated = false
+	shield = 0.0
+	shield_time = 0.0
+	scrambled = 0.0
+	rampage = 0.0
 	if not alive:
 		alive = true
 		_shape.set_deferred("disabled", false)
@@ -328,6 +437,8 @@ func _shoot() -> void:
 	last_shot_time = clock
 	var bullet := Bullet.new()
 	bullet.shooter = self
+	if rampage > 0.0:
+		bullet.damage *= 2.0
 	bullet.direction = direction
 	# Bullets inherit your speed so they never fall behind you while boosting.
 	bullet.speed = Bullet.SPEED + maxf(0.0, velocity.dot(direction))

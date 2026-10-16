@@ -26,6 +26,9 @@ var _under_fire := 0.0
 var _cooling_gun := false
 var _wander := Vector3.ZERO
 var _wander_time := 0.0
+var _chasing_box: ItemBox
+var _box_time := 0.0
+var _ignored_boxes := {}  ## ItemBox -> seconds left to ignore it.
 
 
 func _ready() -> void:
@@ -60,11 +63,27 @@ func steer(delta: float) -> void:
 	var look: Vector3
 	var distance := 0.0
 	var crate := _crate_if_hurt()
+	var box := _item_box_worth_it()
+	if box != _chasing_box:
+		_chasing_box = box
+		_box_time = 0.0
+	elif box:
+		_box_time += delta
+		if _box_time > 10.0:
+			_ignored_boxes[box] = 20.0  # Can't reach it; try another.
+	for ignored: ItemBox in _ignored_boxes.keys():
+		_ignored_boxes[ignored] -= delta
+		if _ignored_boxes[ignored] <= 0.0:
+			_ignored_boxes.erase(ignored)
+	var pickup := crate != null or box != null
 	if _unstick > 0.0:
 		goal = pos + _unstick_dir * 30.0
 		look = goal
 	elif crate:
 		goal = crate.global_position
+		look = goal
+	elif box:
+		goal = box.global_position
 		look = goal
 	elif target:
 		var to := target.global_position - pos
@@ -83,7 +102,8 @@ func steer(delta: float) -> void:
 			_wander_time = 6.0
 		goal = _wander
 		look = goal
-	goal.y = clampf(goal.y, 8.0, ceiling - 8.0)
+	# Keep off the ground and under the ceiling, unless grabbing a pickup.
+	goal.y = clampf(goal.y, 2.0 if pickup and _unstick <= 0.0 else 8.0, ceiling - 8.0)
 
 	var to_local := choppa.facing().inverse()
 	var local_look := to_local * (look - pos)
@@ -109,9 +129,12 @@ func steer(delta: float) -> void:
 	var in_sights := choppa.aim_target()
 	i.fire = in_sights != null and not _cooling_gun and _can_see(in_sights)
 	i.boost = target != null and distance > 110.0 and absf(angle) < 0.3 and choppa.boost_meter > 0.3
-	i.use_item = choppa.item != ""
+	i.use_item = _should_use_item(distance)
 
-	if _under_fire > 0.0 and _dodge_cooldown <= 0.0 and rng.randf() < 0.05 * skill:
+	var dodge_chance := 0.05 * skill if _under_fire > 0.0 else 0.0
+	if _missile_incoming():
+		dodge_chance = 0.25 * skill
+	if _dodge_cooldown <= 0.0 and rng.randf() < dodge_chance:
 		i.trick = true
 		i.move = Vector2(1.0 if rng.randf() < 0.5 else -1.0, 0.0)
 		_dodge_cooldown = 3.0
@@ -141,6 +164,62 @@ func _pick_target() -> Choppa:
 			best_score = score
 			best = other
 	return best
+
+
+## A nearby item box to grab when empty-handed and nobody is close.
+func _item_box_worth_it() -> ItemBox:
+	if choppa.item != "":
+		return null
+	if target and choppa.global_position.distance_to(target.global_position) < 90.0:
+		return null
+	var best: ItemBox = null
+	var best_distance := 160.0
+	for node in choppa.get_tree().get_nodes_in_group("item_boxes"):
+		var box := node as ItemBox
+		var d := choppa.global_position.distance_to(box.global_position)
+		if box.is_available() and d < best_distance and not _ignored_boxes.has(box):
+			best = box
+			best_distance = d
+	return best
+
+
+func _should_use_item(target_distance: float) -> bool:
+	match choppa.item:
+		"":
+			return false
+		"MISSILE":
+			return choppa.missile_target() != null
+		"MINE", "FAKE BOX":
+			return _enemy_behind(70.0)
+		"SMOKE":
+			return _under_fire > 0.0 or _enemy_behind(50.0)
+		"SHIELD":
+			return _under_fire > 0.0 or choppa.health < 60.0
+		"TURBO":
+			return target_distance > 100.0
+		"GET TO THE CHOPPA":
+			return target != null and target_distance < 120.0
+	return true  # SCRAMBLER and anything new: use it right away.
+
+
+func _enemy_behind(reach: float) -> bool:
+	var forward := choppa.facing() * Vector3.FORWARD
+	for node in choppa.get_tree().get_nodes_in_group("choppas"):
+		var other := node as Choppa
+		if other == choppa or not other.alive:
+			continue
+		var to := other.global_position - choppa.global_position
+		if to.length() < reach and forward.dot(to.normalized()) < -0.3:
+			return true
+	return false
+
+
+func _missile_incoming() -> bool:
+	for node in choppa.get_tree().get_nodes_in_group("missiles"):
+		var missile := node as Weapons.Missile
+		if missile.is_hunting(choppa) and missile.global_position.distance_to(choppa.global_position) < 30.0:
+			return true
+	return false
 
 
 func _crate_if_hurt() -> HealthCrate:

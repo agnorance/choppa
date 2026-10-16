@@ -46,6 +46,14 @@ func _run() -> void:
 		"test_health_crate_heals",
 		"test_terrain_collision_matches_mesh",
 		"test_bots_battle_in_arena",
+		"test_missile_homes_and_hits",
+		"test_barrel_roll_shakes_off_missile",
+		"test_mine_arms_then_explodes",
+		"test_fake_item_box_explodes",
+		"test_smoke_blocks_lock_on",
+		"test_scrambler_hits_the_leader",
+		"test_shield_absorbs_damage",
+		"test_get_to_the_choppa",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -195,7 +203,7 @@ func test_item_box_gives_item_and_respawns() -> void:
 	_world.add_child(box)
 	var choppa := _choppa(Vector3(0.0, 10.0, 0.0))
 	await _fly(choppa, 60, func(i: PilotInput, _t: int) -> void: i.move = Vector2(0.0, 1.0))
-	_check(choppa.item == "TURBO", "got an item, item=%s" % choppa.item)
+	_check(Items.TABLE.has(choppa.item), "got an item, item=%s" % choppa.item)
 	_check(not box.is_available(), "box broke")
 	box._process(ItemBox.RESPAWN_TIME + 0.1)
 	_check(box.is_available(), "box respawned")
@@ -204,8 +212,18 @@ func test_item_box_gives_item_and_respawns() -> void:
 func test_item_roll_only_returns_known_items() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1
-	for n in 200:
-		_check(Items.POOL.has(Items.roll(rng)), "rolled a known item")
+	var leader := {}
+	var last := {}
+	for n in 2000:
+		var a := Items.roll(rng, 0.0)
+		var b := Items.roll(rng, 1.0)
+		leader[a] = leader.get(a, 0) + 1
+		last[b] = last.get(b, 0) + 1
+	_check(leader.keys().all(func(k: String) -> bool: return Items.TABLE.has(k)), "known items")
+	_check(not leader.has("SCRAMBLER"), "the leader never gets the scrambler")
+	_check(not leader.has("GET TO THE CHOPPA"), "the leader never gets the comeback item")
+	_check(last.get("GET TO THE CHOPPA", 0) > 300, "last place gets the comeback item")
+	_check(last.get("MISSILE", 0) > leader.get("MISSILE", 0) * 2, "missiles favour those behind")
 
 
 func _bullets() -> Array:
@@ -541,10 +559,12 @@ func test_bots_battle_in_arena() -> void:
 	battle.setup(field, map.spawn_points, 99, 120.0)
 	var bumps := {}
 	var travelled := {}
+	var used := []
 	for c in field:
 		bumps[c] = 0
 		travelled[c] = 0.0
 		c.bumped.connect(func(_i: float) -> void: bumps[c] += 1)
+		c.item_used.connect(func(item_name: String) -> void: used.append(item_name))
 		var bot := FighterBot.new()
 		bot.choppa = c
 		bot.ceiling = map.ceiling
@@ -561,9 +581,131 @@ func test_bots_battle_in_arena() -> void:
 			last[c] = c.global_position
 	var summary := field.map(func(c: Choppa) -> String:
 		return "%s k%d d%d bumps%d %.0fm" % [c.pilot_name, battle.kills_of(c), battle.deaths_of(c), bumps[c], travelled[c]])
-	print("    ", summary)
+	print("    ", summary, " items used: ", used)
 	var kills := 0
 	for c in field:
 		kills += battle.kills_of(c)
 		_check(travelled[c] > 800.0, "%s kept moving" % c.pilot_name)
 	_check(kills >= 4, "bots score kills, got %d" % kills)
+	_check(used.size() >= 4, "bots use items, got %s" % [used])
+
+
+## Steps choppas by hand for `ticks` ticks while the item objects run on their own.
+func _step_all(field: Array, ticks: int) -> void:
+	for t in ticks:
+		await physics_frame
+		for c: Choppa in field:
+			c.step(TICK)
+
+
+func test_missile_homes_and_hits() -> void:
+	var shooter := _choppa(Vector3(0.0, 20.0, 0.0))
+	# Off to the side and higher: only a homing missile can hit this.
+	var target := _choppa(Vector3(40.0, 35.0, -90.0))
+	shooter.give_item("MISSILE")
+	_check(shooter.missile_target() == target, "locks on")
+	shooter.use_item()
+	await _step_all([shooter, target], 150)
+	_check(target.health < Choppa.MAX_HEALTH - 20.0, "missile hit, hp=%f" % target.health)
+	_check(shooter.health == Choppa.MAX_HEALTH, "shooter unhurt")
+
+
+func test_barrel_roll_shakes_off_missile() -> void:
+	var shooter := _choppa(Vector3(0.0, 20.0, 0.0))
+	var target := _choppa(Vector3(0.0, 20.0, -120.0))
+	shooter.give_item("MISSILE")
+	shooter.use_item()
+	var missile: Weapons.Missile = _world.get_children().filter(func(n: Node) -> bool: return n is Weapons.Missile)[0]
+	for t in 150:
+		await physics_frame
+		target.input.trick = missile and is_instance_valid(missile) and target.global_position.distance_to(missile.global_position) < 22.0
+		target.input.move = Vector2(1.0, 0.0) if target.input.trick else Vector2.ZERO
+		shooter.step(TICK)
+		target.step(TICK)
+	_check(target.health == Choppa.MAX_HEALTH, "dodged, hp=%f" % target.health)
+
+
+func test_mine_arms_then_explodes() -> void:
+	var layer := _choppa(Vector3(0.0, 20.0, 0.0))
+	var victim := _choppa(Vector3(0.0, 20.0, 60.0))
+	layer.give_item("MINE")
+	layer.use_item()
+	await _step_all([layer, victim], 10)
+	_check(layer.health == Choppa.MAX_HEALTH, "doesn't go off under its owner before arming")
+	await _step_all([layer], 60)
+	# Fly the victim into it.
+	victim.velocity = Vector3(0.0, 0.0, -30.0)
+	for t in 120:
+		victim.input.move = Vector2(0.0, 1.0)
+		await physics_frame
+		victim.step(TICK)
+	_check(victim.health <= Choppa.MAX_HEALTH - 25.0, "mine went off, hp=%f" % victim.health)
+
+
+func test_fake_item_box_explodes() -> void:
+	var layer := _choppa(Vector3(0.0, 20.0, 0.0))
+	layer.give_item("FAKE BOX")
+	layer.use_item()
+	await _step_all([layer], 70)
+	var victim := _choppa(Vector3(0.0, 20.0, 40.0))
+	victim.velocity = Vector3(0.0, 0.0, -25.0)
+	for t in 120:
+		victim.input.move = Vector2(0.0, 1.0)
+		await physics_frame
+		victim.step(TICK)
+	_check(victim.health < Choppa.MAX_HEALTH, "fake box hurt, hp=%f" % victim.health)
+	_check(victim.item == "", "and gave no item")
+
+
+func test_smoke_blocks_lock_on() -> void:
+	var a := _choppa(Vector3(0.0, 20.0, 0.0))
+	var b := _choppa(Vector3(0.0, 20.0, -60.0))
+	_check(a.aim_target() == b, "locked before smoke")
+	var cloud := Weapons.SmokeCloud.new()
+	_world.add_child(cloud)
+	cloud.global_position = b.global_position
+	_check(b.in_smoke(), "b is in the cloud")
+	_check(a.aim_target() == null, "can't lock onto a choppa in smoke")
+	_check(b.aim_target() == null, "can't lock from inside smoke")
+
+
+func test_scrambler_hits_the_leader() -> void:
+	var user := _choppa(Vector3(0.0, 20.0, 0.0))
+	var leader := _choppa(Vector3(50.0, 20.0, 0.0))
+	var other := _choppa(Vector3(-20.0, 20.0, 0.0))
+	user.standing = 1.0
+	leader.standing = 0.0
+	other.standing = 0.5
+	user.give_item("SCRAMBLER")
+	user.use_item()
+	_check(leader.scrambled > 0.0 and other.scrambled == 0.0, "the leader got scrambled")
+	await _fly(leader, 30, func(i: PilotInput, _t: int) -> void: i.yaw = 1.0)
+	_check((leader.facing() * Vector3.FORWARD).x < -0.3, "steering right turned it left")
+
+
+func test_shield_absorbs_damage() -> void:
+	var a := _choppa(Vector3(0.0, 20.0, 0.0))
+	a.give_item("SHIELD")
+	a.use_item()
+	a.damage(30.0, null)
+	_check(a.health == Choppa.MAX_HEALTH, "first 40 damage absorbed")
+	a.damage(30.0, null)
+	_check(a.health == Choppa.MAX_HEALTH - 20.0, "the rest gets through, hp=%f" % a.health)
+
+
+func test_get_to_the_choppa() -> void:
+	var a := _choppa(Vector3(0.0, 20.0, 0.0))
+	var b := _choppa(Vector3(0.0, 20.0, -30.0))
+	a.give_item("GET TO THE CHOPPA")
+	a.use_item()
+	a.damage(90.0, b)
+	_check(a.health == Choppa.MAX_HEALTH, "invulnerable during the rampage")
+	_check(a.velocity.length() >= a.boost_speed, "turbo kick")
+	var hits := []
+	b.damaged.connect(func(amount: float, _by: Choppa) -> void: hits.append(amount))
+	a.velocity = Vector3.ZERO
+	for t in 20:
+		a.input.fire = true
+		await physics_frame
+		a.step(TICK)
+	_check(not hits.is_empty() and hits[0] == Bullet.DAMAGE * 2.0, "double damage, got %s" % [hits])

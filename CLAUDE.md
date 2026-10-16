@@ -73,6 +73,10 @@ Godot must be 4.7.2. Two environments:
   them (see `Effects.Explosion._start`), or they burst at the origin.
 - Very bright HDR colours wash out to cream under AgX tone mapping; keep fire colours
   near 1 and saturated.
+- Shaders: keep `pow()` bases and `normalize()` inputs clamped. One NaN texel in the sky
+  shader poisons the filtered radiance map and every lit surface turns black on real
+  GPUs (NVIDIA and AMD Vulkan); the cloud's software Vulkan hides it, so after a shader
+  change check a screenshot on the owner's PC.
 - `Graphics.quality` (LOW / MEDIUM / HIGH) decides how much detail to spend. Headless
   runs are LOW (no grass), the Compatibility renderer is LOW, phones MEDIUM, desktop HIGH.
 - Sounds come from `tools/audio/make_sounds.py` (numpy only): synthesized, committed as

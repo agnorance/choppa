@@ -28,6 +28,8 @@ func _ready() -> void:
 	_material.shader = preload("res://shaders/grass.gdshader")
 	var mesh := tuft_mesh()
 	mesh.surface_set_material(0, _material)
+	var started := Time.get_ticks_msec()
+	var total := 0
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 77
 	var per_chunk := int(CHUNK * CHUNK * density)
@@ -64,6 +66,7 @@ func _ready() -> void:
 			multimesh.instance_count = transforms.size()
 			for k in transforms.size():
 				multimesh.set_instance_transform(k, transforms[k])
+			total += transforms.size()
 			var chunk := MultiMeshInstance3D.new()
 			chunk.multimesh = multimesh
 			chunk.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -71,6 +74,7 @@ func _ready() -> void:
 			chunk.visibility_range_end_margin = 25.0
 			chunk.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 			add_child(chunk)
+	print_verbose("grass: %d tufts in %d ms" % [total, Time.get_ticks_msec() - started])
 
 
 func _process(_delta: float) -> void:

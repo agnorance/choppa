@@ -353,7 +353,7 @@ class Explosion extends Node3D:
 
 	func _ready() -> void:
 		var fire := Effects.puffs(Effects.gradient([
-			Color(1.6, 1.4, 0.9, 1.0), Color(1.4, 0.6, 0.15, 0.95), Color(0.5, 0.22, 0.08, 0.8),
+			Color(1.0, 0.85, 0.45, 1.0), Color(1.0, 0.42, 0.06, 0.95), Color(0.45, 0.16, 0.04, 0.85),
 			Color(0.12, 0.1, 0.09, 0.5), Color(0.1, 0.1, 0.1, 0.0),
 		]), 46, 1.5)
 		fire.one_shot = true
@@ -393,7 +393,7 @@ class Explosion extends Node3D:
 		add_child(smoke)
 		smoke.emitting = true
 
-		var embers := Effects.sparks(int(36 * size), 1.3, Vector2(14.0, 34.0) * sqrt(size), Color(4.0, 1.8, 0.5),
+		var embers := Effects.sparks(int(36 * size), 1.3, Vector2(14.0, 34.0) * sqrt(size), Color(2.2, 0.75, 0.12),
 			0.5 * size)
 		embers.direction = Vector3.UP
 		embers.spread = 180.0
@@ -407,7 +407,7 @@ class Explosion extends Node3D:
 		add_child(debris)
 		debris.emitting = true
 
-		_flash = Effects.flash(10.0 * size, Color(1.6, 1.3, 0.9))
+		_flash = Effects.flash(10.0 * size, Color(1.0, 0.75, 0.4))
 		add_child(_flash)
 
 		# Shock wave: a disc of bent air racing outward.

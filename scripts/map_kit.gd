@@ -12,47 +12,133 @@ const PINE := [Color(0.18, 0.38, 0.2), Color(0.22, 0.44, 0.22), Color(0.26, 0.4,
 static var _meshes := {}  ## Shared meshes and materials, built on first use.
 
 
-static func environment(parent: Node3D) -> void:
-	var sky_material := ProceduralSkyMaterial.new()
-	sky_material.sky_top_color = Color(0.25, 0.45, 0.8)
-	sky_material.sky_horizon_color = Color(0.7, 0.8, 0.9)
-	sky_material.ground_horizon_color = Color(0.7, 0.8, 0.9)
+## Sky, sun, haze and post-processing. How much of it runs depends on Graphics.quality.
+static func environment(parent: Node3D, sun_rotation := Vector3(-27.0, -40.0, 0.0)) -> void:
+	var high := Graphics.at_least(Graphics.Quality.HIGH)
+	var medium := Graphics.at_least(Graphics.Quality.MEDIUM)
+	var sky_material := ShaderMaterial.new()
+	sky_material.shader = load("res://shaders/sky.gdshader")
 	var sky := Sky.new()
 	sky.sky_material = sky_material
+	sky.radiance_size = Sky.RADIANCE_SIZE_256
+	sky.process_mode = Sky.PROCESS_MODE_INCREMENTAL
 
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.35
-	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	env.ambient_light_energy = 0.9
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	env.tonemap_mode = Environment.TONE_MAPPER_AGX
+	env.tonemap_exposure = 1.05
+
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.62, 0.72, 0.85)
-	env.fog_density = 0.0005
-	env.fog_sky_affect = 0.0
+	env.fog_light_color = Color(0.7, 0.72, 0.76)
+	env.fog_sun_scatter = 0.2
+	env.fog_density = 0.0006
+	env.fog_aerial_perspective = 0.5
+	env.fog_sky_affect = 0.15
+	env.fog_height = 6.0
+	env.fog_height_density = 0.004
+
+	if medium:
+		env.glow_enabled = true
+		env.glow_intensity = 0.55
+		env.glow_bloom = 0.06
+		env.glow_hdr_threshold = 1.1
+	if high:
+		# Desktop target: RTX 3060 class. Bounce light off the canyon walls and into
+		# the tunnels, plus screen-space indirect light and reflections.
+		env.sdfgi_enabled = true
+		env.sdfgi_use_occlusion = true
+		env.sdfgi_cascades = 4
+		env.sdfgi_min_cell_size = 0.4
+		env.sdfgi_energy = 1.0
+		env.ssil_enabled = true
+		env.ssil_intensity = 0.8
+		env.ssr_enabled = true
+		env.ssr_max_steps = 48
+		env.ssao_enabled = true
+		env.ssao_radius = 2.0
+		env.ssao_intensity = 2.2
+		env.ssao_power = 1.6
+		env.volumetric_fog_enabled = true
+		env.volumetric_fog_density = 0.0012
+		env.volumetric_fog_albedo = Color(0.92, 0.88, 0.82)
+		env.volumetric_fog_anisotropy = 0.55
+		env.volumetric_fog_length = 160.0
+		env.volumetric_fog_ambient_inject = 0.35
+		env.volumetric_fog_sky_affect = 0.4
+	env.adjustment_enabled = true
+	env.adjustment_contrast = 1.08
+	env.adjustment_saturation = 1.08
+
 	var world_env := WorldEnvironment.new()
 	world_env.environment = env
 	parent.add_child(world_env)
 
+	# Low afternoon sun: warm light, long soft shadows.
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-50.0, -35.0, 0.0)
-	sun.light_energy = 0.9
+	sun.rotation_degrees = sun_rotation
+	sun.light_color = Color(1.0, 0.9, 0.78)
+	sun.light_energy = 1.7
+	sun.light_angular_distance = 0.6
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 180.0
+	sun.shadow_blur = 1.2
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	sun.directional_shadow_blend_splits = true
+	sun.directional_shadow_max_distance = 280.0 if high else 150.0
+	sun.light_volumetric_fog_energy = 1.4
 	parent.add_child(sun)
 
 
+## Textured, world-space triplanar stone for structures. Warm colours become sandstone,
+## neutral ones rock; the colour tints the texture.
+static func surface(color: Color) -> Material:
+	var key := "surface_" + color.to_html()
+	if _meshes.has(key):
+		return _meshes[key]
+	var kind := "sandstone" if color.r > color.b + 0.12 else "rock"
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = load("res://assets/textures/%s_albedo.png" % kind)
+	m.normal_enabled = true
+	m.normal_texture = load("res://assets/textures/%s_normal.png" % kind)
+	m.normal_scale = 1.2
+	m.roughness_texture = load("res://assets/textures/%s_rough.png" % kind)
+	m.roughness = 1.0
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_triplanar_sharpness = 4.0
+	m.uv1_scale = Vector3.ONE * 0.12
+	var peak := maxf(color.r, maxf(color.g, color.b))
+	m.albedo_color = Color.WHITE.lerp(Color(color.r / peak, color.g / peak, color.b / peak), 0.35)
+	_meshes[key] = m
+	return m
+
+
+## The splat material for Terrain and flat ground.
+static func terrain_material(water_level := -100.0) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = load("res://shaders/terrain.gdshader")
+	for slot: Array in [["grass", "grass"], ["dirt", "dirt"], ["sand", "sand"], ["cliff", "sandstone"]]:
+		m.set_shader_parameter(slot[0] + "_albedo", load("res://assets/textures/%s_albedo.png" % slot[1]))
+		m.set_shader_parameter(slot[0] + "_normal", load("res://assets/textures/%s_normal.png" % slot[1]))
+	var noise := FastNoiseLite.new()
+	noise.frequency = 0.01
+	noise.fractal_octaves = 4
+	var macro := NoiseTexture2D.new()
+	macro.width = 512
+	macro.height = 512
+	macro.seamless = true
+	macro.generate_mipmaps = true
+	macro.noise = noise
+	m.set_shader_parameter("macro_noise", macro)
+	m.set_shader_parameter("water_level", water_level)
+	return m
+
+
 static func ground(parent: Node3D, size: float) -> void:
-	var image := Image.create(64, 64, false, Image.FORMAT_RGB8)
-	for x in 64:
-		for y in 64:
-			var odd := (x < 32) != (y < 32)
-			image.set_pixel(x, y, Color(0.36, 0.55, 0.28) if odd else Color(0.4, 0.6, 0.31))
-	image.generate_mipmaps()
-	var material := StandardMaterial3D.new()
-	material.albedo_texture = ImageTexture.create_from_image(image)
-	material.uv1_scale = Vector3(size / 16.0, size / 16.0, 1.0)
-	material.roughness = 0.95
+	var material := terrain_material()
 
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(size, size)
@@ -114,7 +200,7 @@ static func block(
 		box.size = size
 		var mesh := MeshInstance3D.new()
 		mesh.mesh = box
-		mesh.material_override = material(color)
+		mesh.material_override = surface(color)
 		body.add_child(mesh)
 	parent.add_child(body)
 	return body
@@ -129,7 +215,7 @@ static func mountain(parent: Node3D, base: Vector3, radius: float, height: float
 	cone.rings = 1
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = cone
-	mesh.material_override = material(ROCK_DARK.lerp(Color(0.4, 0.45, 0.4), randf() * 0.5))
+	mesh.material_override = surface(ROCK_DARK)
 	mesh.position = base + Vector3.UP * height * 0.5
 	parent.add_child(mesh)
 
@@ -193,7 +279,7 @@ static func pillar(parent: Node3D, base: Vector3, radius: float, height: float) 
 	cylinder.radial_segments = 8
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = cylinder
-	mesh.material_override = material(ROCK)
+	mesh.material_override = surface(ROCK)
 	var shape := CollisionShape3D.new()
 	var cylinder_shape := CylinderShape3D.new()
 	cylinder_shape.radius = radius
@@ -240,7 +326,7 @@ static func cross_mesa(
 	block(root, Vector3(0.0, roof_y, 0.0), Vector3(size, roof, tunnel_width), color)
 	block(root, Vector3(0.0, roof_y, 0.0), Vector3(tunnel_width, roof, size), color)
 	# Rock strata: thin darker ledges sticking out of the walls.
-	var ledge := material(color.darkened(0.25))
+	var ledge := surface(color.darkened(0.25))
 	var y := 5.0
 	while y < height - 2.0:
 		var band := BoxMesh.new()
@@ -297,7 +383,13 @@ static func tree(parent: Node3D, base: Vector3, size: float, variant: int) -> vo
 		crown.radial_segments = 7
 		crown.rings = 1
 		_meshes.crown = crown
-		_meshes.bark = material(BARK)
+		var bark := StandardMaterial3D.new()
+		bark.albedo_texture = load("res://assets/textures/bark_albedo.png")
+		bark.normal_enabled = true
+		bark.normal_texture = load("res://assets/textures/bark_normal.png")
+		bark.uv1_triplanar = true
+		bark.uv1_scale = Vector3(1.5, 0.6, 1.5)
+		_meshes.bark = bark
 		_meshes.pines = PINE.map(func(c: Color) -> StandardMaterial3D: return material(c))
 	var body := StaticBody3D.new()
 	body.position = base
@@ -329,7 +421,7 @@ static func boulder(parent: Node3D, base: Vector3, size: float, color := ROCK) -
 	body.position = base
 	body.rotation = Vector3(randf() * 0.4, randf() * TAU, randf() * 0.4)
 	parent.add_child(body)
-	var mesh := _mesh_child(body, _meshes.boulder, material(color.darkened(randf() * 0.2)), Vector3.ZERO)
+	var mesh := _mesh_child(body, _meshes.boulder, surface(color), Vector3.ZERO)
 	mesh.scale = Vector3(size * randf_range(0.9, 1.4), size * randf_range(0.6, 1.0), size)
 	var shape := CollisionShape3D.new()
 	var sphere := SphereShape3D.new()
@@ -349,13 +441,13 @@ static func hoodoo(parent: Node3D, base: Vector3, radius: float, height: float) 
 	column.height = height
 	column.radial_segments = 7
 	column.rings = 3
-	_mesh_child(body, column, material(SANDSTONE.lerp(ROCK, randf())), Vector3(0.0, height * 0.5, 0.0))
+	_mesh_child(body, column, surface(SANDSTONE), Vector3(0.0, height * 0.5, 0.0))
 	var cap := CylinderMesh.new()
 	cap.top_radius = radius * 1.1
 	cap.bottom_radius = radius * 1.3
 	cap.height = radius * 0.8
 	cap.radial_segments = 7
-	_mesh_child(body, cap, material(ROCK_DARK), Vector3(0.0, height + radius * 0.4, 0.0))
+	_mesh_child(body, cap, surface(ROCK_DARK), Vector3(0.0, height + radius * 0.4, 0.0))
 	for part: Array in [[radius, height, height * 0.5], [radius * 1.3, radius * 0.8, height + radius * 0.4]]:
 		var shape := CollisionShape3D.new()
 		var cylinder := CylinderShape3D.new()
@@ -376,7 +468,7 @@ static func ruined_column(parent: Node3D, base: Vector3, drums: int, color := SA
 	drum.bottom_radius = 1.7
 	drum.height = 3.2
 	drum.radial_segments = 8
-	var stone := material(color)
+	var stone := surface(color)
 	for k in drums:
 		var piece := _mesh_child(body, drum, stone, Vector3(randf_range(-0.2, 0.2), 1.6 + k * 3.2, randf_range(-0.2, 0.2)))
 		piece.rotation.y = randf() * TAU

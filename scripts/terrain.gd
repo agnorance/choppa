@@ -1,14 +1,13 @@
 class_name Terrain
 extends StaticBody3D
-## Low-poly heightmap terrain: a flat-shaded, vertex-coloured mesh plus matching
-## collision, both built from a height function.
+## Heightmap terrain: a smooth-shaded mesh plus matching collision, both built from a
+## height function. Its look comes from `material` (see shaders/terrain.gdshader).
 
 var size := 1200.0
 var resolution := 120  ## Cells per side.
 ## (x, z) -> height.
 var height_fn: Callable
-## (center: Vector3, slope: float 0 flat..1 vertical) -> Color.
-var color_fn: Callable
+var material: Material
 
 var _heights := PackedFloat32Array()
 var _step := 0.0
@@ -23,23 +22,42 @@ func _ready() -> void:
 		for i in n:
 			_heights[j * n + i] = height_fn.call(-half + i * _step, -half + j * _step)
 
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	vertices.resize(n * n)
+	normals.resize(n * n)
+	for j in n:
+		for i in n:
+			var k := j * n + i
+			vertices[k] = _vertex(i, j)
+			# Central differences give smooth per-vertex normals.
+			var dx := _h(i - 1, j) - _h(i + 1, j)
+			var dz := _h(i, j - 1) - _h(i, j + 1)
+			normals[k] = Vector3(dx, 2.0 * _step, dz).normalized()
+	var indices := PackedInt32Array()
+	indices.resize(resolution * resolution * 6)
+	var w := 0
 	for j in resolution:
 		for i in resolution:
-			var a := _vertex(i, j)
-			var b := _vertex(i + 1, j)
-			var c := _vertex(i, j + 1)
-			var d := _vertex(i + 1, j + 1)
-			_triangle(st, a, b, c)
-			_triangle(st, b, d, c)
-	var material := StandardMaterial3D.new()
-	material.vertex_color_use_as_albedo = true
-	material.roughness = 0.95
-	var mesh := MeshInstance3D.new()
-	mesh.mesh = st.commit()
-	mesh.material_override = material
-	add_child(mesh)
+			var a := j * n + i
+			var b := a + 1
+			var c := a + n
+			var d := c + 1
+			# Clockwise seen from above = front face in Godot.
+			for index in [a, b, c, b, d, c]:
+				indices[w] = index
+				w += 1
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var instance := MeshInstance3D.new()
+	instance.mesh = mesh
+	instance.material_override = material
+	add_child(instance)
 
 	# HeightMapShape3D has 1 m spacing; scale it uniformly and shrink heights to match.
 	var data := PackedFloat32Array()
@@ -75,21 +93,11 @@ func height_at(x: float, z: float) -> float:
 	return d + (c - d) * (1.0 - fx) + (b - d) * (1.0 - fz)
 
 
+func _h(i: int, j: int) -> float:
+	var n := resolution + 1
+	return _heights[clampi(j, 0, resolution) * n + clampi(i, 0, resolution)]
+
+
 func _vertex(i: int, j: int) -> Vector3:
 	var half := size * 0.5
 	return Vector3(-half + i * _step, _heights[j * (resolution + 1) + i], -half + j * _step)
-
-
-func _triangle(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
-	var normal := (b - a).cross(c - a).normalized()
-	if normal.y < 0.0:
-		var swap := b
-		b = c
-		c = swap
-		normal = -normal
-	# Godot treats clockwise triangles as front faces, seen from the normal's side.
-	st.set_normal(normal)
-	st.set_color(color_fn.call((a + b + c) / 3.0, 1.0 - normal.y))
-	st.add_vertex(a)
-	st.add_vertex(c)
-	st.add_vertex(b)

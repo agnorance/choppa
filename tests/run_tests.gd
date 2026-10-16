@@ -532,7 +532,6 @@ func test_terrain_collision_matches_mesh() -> void:
 	terrain.size = 200.0
 	terrain.resolution = 20
 	terrain.height_fn = func(x: float, z: float) -> float: return sin(x * 0.05) * 10.0 + z * 0.1
-	terrain.color_fn = func(_c: Vector3, _s: float) -> Color: return Color.GREEN
 	_world.add_child(terrain)
 	await physics_frame
 	var space := _world.get_world_3d().direct_space_state

@@ -10,10 +10,35 @@ air: enclosed arenas with tunnels, trenches, arches and cover, flashy tricks tha
 your boost, a machine gun for everyone, and item boxes full of dirty tricks to fool your
 friends. GET TO THE CHOPPA!
 
+## Art direction (decided)
+
+Richly detailed, atmospheric 3D. Reference: **PVKK: Planetenverteidigungskanonenkommandant**
+(Bippinbits, also made in Godot): mechanical designs with a WW1/WW2 feel plus a sci-fi
+twist, heavy atmosphere, strong lighting and post-processing.
+
+- **Target hardware: desktop with an RTX 3060 or better** (`Graphics.Quality.HIGH`):
+  Forward+ with SDFGI, SSIL, SSAO, SSR, volumetric fog, glow, AgX tone mapping, dense
+  terrain. Android gets a reduced MEDIUM preset on the Mobile renderer.
+- Materials are tileable PBR textures generated in Blender (`tools/blender/`), terrain is
+  splatted by slope and height in `shaders/terrain.gdshader`.
+- Next: sculpted rock formations instead of boxes, a detailed dieselpunk helicopter
+  model, dense grass and proper trees, better water and effects.
+
+## Game feel (decided)
+
+**Easy to pick up, very hard to master.**
+
+- Easy: the choppa hovers by itself, the gun has aim assist, items are one button, a
+  crash is never instant death.
+- Deep: boost economy fed by tricks (double reward flying low), momentum and drifting,
+  barrel rolls timed against bullets and missiles, item tactics, reading the arena.
+- Rule for new features: they may add depth for experts, but must not make the first
+  minute harder.
+
 ## Platform and tech (decided)
 
-- **Engine:** Godot 4.7, GDScript, Compatibility (OpenGL) renderer so the same build runs on
-  cheap Android phones and in CI.
+- **Engine:** Godot 4.7, GDScript. Forward+ renderer on desktop, Mobile renderer on
+  Android, automatic fallback to Compatibility on devices without Vulkan.
 - **Targets:** Windows desktop and Android (sideloaded APK). Gamepad, keyboard and touch.
 - **Camera:** third person from right behind the choppa, with a first-person cockpit view
   toggle.

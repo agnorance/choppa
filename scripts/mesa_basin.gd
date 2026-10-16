@@ -33,9 +33,9 @@ func _ready() -> void:
 	MapKit.environment(self)
 	terrain = Terrain.new()
 	terrain.size = SIZE
-	terrain.resolution = 126
+	terrain.resolution = [126, 252, 506][Graphics.quality]  # 1.5 m cells on desktop.
 	terrain.height_fn = _height
-	terrain.color_fn = _color
+	terrain.material = MapKit.terrain_material(WATER_LEVEL)
 	add_child(terrain)
 
 	MapKit.cross_mesa(self, Vector3(0.0, -2.0, 0.0), 110.0, 42.0, 22.0, 17.0, Color(0.76, 0.47, 0.31))
@@ -86,7 +86,6 @@ func _ready() -> void:
 		if _clear_of_structures(at):
 			MapKit.boulder(self, Vector3(at.x, _ground(at.x, at.z), at.z), _rng.randf_range(2.0, 6.0))
 
-	MapKit.clouds(self, 22, 450.0, 150.0)
 
 	# Pickups.
 	for k in 4:
@@ -149,17 +148,3 @@ func _height(x: float, z: float) -> float:
 	h = lerpf(h, -9.0, lake)
 	return h + _detail.get_noise_2d(x, z) * 0.8
 
-
-func _color(center: Vector3, slope: float) -> Color:
-	var n := _detail.get_noise_2d(center.x * 2.0, center.z * 2.0) * 0.5 + 0.5
-	var color := Color(0.38, 0.5, 0.25).lerp(Color(0.55, 0.56, 0.3), n)  # Grass.
-	if center.y < WATER_LEVEL + 1.5:
-		color = Color(0.7, 0.62, 0.45)  # Sandy lake shore and bed.
-	if center.y > 60.0:
-		color = Color(0.68, 0.6, 0.38)  # Dry grass on the cliff tops.
-	color = color.lerp(Color(0.6, 0.45, 0.3), smoothstep(0.2, 0.35, slope))  # Dirt.
-	# Sandstone cliffs with alternating strata.
-	var band := posmod(floori(center.y / 7.0), 3)
-	var rock: Color = [Color(0.74, 0.44, 0.29), Color(0.66, 0.38, 0.26), Color(0.8, 0.55, 0.38)][band]
-	color = color.lerp(rock, smoothstep(0.35, 0.5, slope))
-	return color * (0.92 + n * 0.16)

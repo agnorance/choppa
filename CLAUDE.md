@@ -1,7 +1,8 @@
 # choppa: instructions for Claude
 
-Arcade helicopter arena shooter (multiplayer planned), started 2026-10-16. Godot 4.7 (GDScript, Compatibility
-renderer), targets Windows and Android. Design and roadmap: docs/DESIGN.md.
+Arcade helicopter arena shooter (multiplayer planned), started 2026-10-16. Godot 4.7
+(GDScript; Forward+ on desktop, Mobile on Android), targets Windows (RTX 3060+) first,
+then Android. Design, art direction and roadmap: docs/DESIGN.md.
 
 - The owner plays and tests on Windows (desktop) and Android (sideloaded APK).
 - Commits: no AI attribution (no Co-Authored-By or similar lines).
@@ -17,7 +18,11 @@ renderer), targets Windows and Android. Design and roadmap: docs/DESIGN.md.
   visual changes.
 - Game arguments go after `--`; see `scripts/main.gd` for the list. Useful:
   `--mode=battle --map=basin --autopilot=bot` (a bot flies you), `--menu` (title screen).
-  The software renderer here is slow (~5 fps), so long screenshots take minutes.
+  The software renderer here is slow (~1 fps with Forward+), so long screenshots take
+  minutes. Forward+ needs Vulkan: `apt-get install -y mesa-vulkan-drivers` (lavapipe).
+- Textures/models come from Blender scripts in `tools/blender/` (`pip install bpy==5.2.2`).
+  Generated files are committed. Texture `.import` files must keep VRAM compression and
+  mipmaps (and `normal_map=1` for normal maps).
 - A choppa only reads a `PilotInput`; keep input sources (keyboard, touch, network, bots)
   out of `choppa.gd` so multiplayer stays straightforward.
 - Maps and models are built from primitives in code for now; keep scene files minimal.

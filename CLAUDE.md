@@ -19,8 +19,9 @@ changing gameplay or looks; it records what the owner decided).
 
 Done: flight model, tricks, boost, battle/free/race modes, items, bots, Mesa Basin, the
 Little Bird style choppa with cockpit view, effects, pines, grass, water, explosions,
-synthesized sound effects. PR #1 (`godot-foundation` -> `main`) waits for the owner to
-merge it on GitHub (merging is the owner's call).
+synthesized sound effects. All of that is on `main` (PR #1). New work continues on
+`godot-foundation`; open a PR to `main` when a chunk is done. Merging is the owner's
+call: they merge on GitHub (with "Create a merge commit").
 Next up: load times (DESIGN.md, Milestones 4: grass on threads or baked, bake the
 procedural textures). Noted for later (ask before starting): flight physics feel pass (DESIGN.md, "Physics
 ideas"), UI overhaul (DESIGN.md, Milestones), choppa colours/customization, LAN

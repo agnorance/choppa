@@ -62,6 +62,9 @@ func _run() -> void:
 		"test_station_needs_a_landing",
 		"test_airframes_differ",
 		"test_hurt_bot_lands_at_a_station",
+		"test_power_line_wrecks_a_rotor",
+		"test_wind_pushes_choppas",
+		"test_bots_battle_in_canyon",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -468,7 +471,16 @@ func test_terrain_collision_matches_mesh() -> void:
 
 
 func test_bots_battle_in_arena() -> void:
-	var map := MesaBasin.new()
+	await _bot_battle(MesaBasin.new())
+
+
+func test_bots_battle_in_canyon() -> void:
+	await _bot_battle(SlotCanyon.new())
+
+
+## Four fighter bots for two minutes on `map`: they must move, fight, use rockets and
+## the service stations.
+func _bot_battle(map: GameMap) -> void:
 	map.mode = "battle"
 	_world.add_child(map)
 	var field: Array[Choppa] = []
@@ -945,3 +957,41 @@ func test_hurt_bot_lands_at_a_station() -> void:
 			break
 	_check(served == [c], "the bot landed and got serviced, hp=%f, %.1f m from the pad" % [c.health,
 		Vector2(c.global_position.x, c.global_position.z + 60.0).length()])
+
+
+func test_power_line_wrecks_a_rotor() -> void:
+	_ground()
+	var line := Hazards.power_line(_world, [Vector3(-30.0, 0.0, -20.0), Vector3(30.0, 0.0, -20.0)] as Array[Vector3])
+	# Fly level into the cables at rotor height: in the middle the cables sag to about
+	# 22.4 m, so at 21 m the body passes under and the rotor (1.9 m up) meets them.
+	var choppa := _choppa(Vector3(0.0, 21.0, 0.0))
+	var hp := choppa.health
+	for t in 120:
+		choppa.velocity = Vector3(0.0, 0.0, -12.0)
+		await physics_frame
+		choppa.step(TICK)
+		line._physics_process(TICK)
+		if choppa.health < hp:
+			break
+	_check(choppa.health < hp, "touching the cables hurts, hp=%f" % choppa.health)
+	_check(choppa.wear(Choppa.Part.ROTOR) > 0.5, "the rotor took the cable, wear %f" % choppa.wear(Choppa.Part.ROTOR))
+	var below := _choppa(Vector3(5.0, 10.0, 10.0))
+	for t in 200:
+		below.velocity = Vector3(0.0, 0.0, -12.0)
+		await physics_frame
+		below.step(TICK)
+		line._physics_process(TICK)
+	_check(below.health == Choppa.MAX_HEALTH and below.global_position.z < -20.0, "flying under them is fine")
+
+
+func test_wind_pushes_choppas() -> void:
+	var zone := Hazards.wind(_world, Vector3(0.0, 30.0, 0.0), Vector3(60.0, 60.0, 60.0), Vector3(6.0, 0.0, 0.0))
+	var inside := _choppa(Vector3(0.0, 30.0, 0.0))
+	var outside := _choppa(Vector3(0.0, 30.0, 120.0))
+	for t in 120:
+		await physics_frame
+		zone._physics_process(TICK)
+		inside.step(TICK)
+		outside.step(TICK)
+	_check(inside.global_position.x > 3.0, "the wind pushed it along +X, x=%f" % inside.global_position.x)
+	_check(absf(outside.global_position.x) < 0.1, "nothing outside the zone")

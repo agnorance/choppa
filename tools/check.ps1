@@ -26,6 +26,12 @@ $shots = [ordered]@{
 	"race"            = "--mode=race --autopilot=bot --frames=300"
 	"touch"           = "--map=basin --autopilot=forward --touch --frames=120"
 	"showcase"        = "--map=basin --cam=showcase --autopilot=hover --frames=150 --dummies=0"
+	"gunship"         = "--map=basin --airframe=gunship --cam=showcase --autopilot=hover --frames=150 --dummies=0"
+	"heavy"           = "--map=basin --airframe=heavy --cam=showcase --autopilot=hover --frames=150 --dummies=0"
+	"station"         = "--map=basin --spawn=79,8,110,40 --autopilot=hover --frames=120 --dummies=0"
+	"canyon"          = "--map=canyon --autopilot=forward --frames=150 --dummies=0"
+	"canyon_camp"     = "--map=canyon --spawn=77,25,190,0 --autopilot=hover --frames=100 --dummies=0"
+	"canyon_battle"   = "--mode=battle --map=canyon --autopilot=bot --frames=600"
 }
 foreach ($name in $shots.Keys) {
 	$out = Join-Path $dir "$name.png"

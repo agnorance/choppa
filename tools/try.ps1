@@ -7,6 +7,8 @@ $scenes = [ordered]@{
 	"settings" = @("--menu", "--settings=0", "--map=basin")
 	"battle"   = @("--mode=battle", "--map=basin")
 	"free"     = @("--mode=free", "--map=basin")
+	"canyon"   = @("--mode=free", "--map=canyon")
+	"canyonbattle" = @("--mode=battle", "--map=canyon")
 	"easy"     = @("--mode=free", "--map=basin", "--easy")
 	"race"     = @("--mode=race")
 	"cockpit"  = @("--mode=free", "--map=basin", "--cam=fp")

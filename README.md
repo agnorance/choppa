@@ -32,7 +32,7 @@ Then add two repository secrets under **Settings > Secrets and variables > Actio
 
 ## Modes
 
-Pick a map in the menu (Mesa Basin or Test Range), then:
+Pick a map in the menu (Mesa Basin, Slot Canyon or Test Range), then:
 
 - **Battle vs 3 bots** (Easy / Normal / Hard on the title screen): free-for-all. First to 8 kills, or the leader after 5 minutes.
   You respawn 3 s after being shot down, with a short spawn shield and a full loadout.
@@ -134,7 +134,7 @@ godot --path . -- --mode=free --map=basin --autopilot=hover --cam=showcase --exp
 tools\try.ps1              # lists the scenes
 tools\try.ps1 settings     # straight into a scene: menu, settings, battle, free, easy, race, cockpit,
                            # lake, damaged, tailrotor, engine, touch, bots, missile, rockets,
-                           # gunship, heavy, explode
+                           # gunship, heavy, canyon, canyonbattle, explode
 tools\check.ps1            # import, all tests, and screenshots of every screen into build\shots\
 ```
 - `--shot=out.png --frames=90`: save a screenshot after 90 ticks and quit.

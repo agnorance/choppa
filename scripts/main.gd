@@ -3,7 +3,7 @@ extends Node
 ##
 ## Command-line options (after `--`), mostly for automated screenshots:
 ##   --mode=battle|free|race  skip the menu (default with --shot/--autopilot: free)
-##   --map=basin|range        which map (race always uses range)
+##   --map=basin|canyon|range which map (race always uses range)
 ##   --menu                   show the menu even with --shot
 ##   --settings=<tab>         open the settings screen on the menu, tab 0-4 (for screenshots)
 ##   --pause=<tick>           open the pause menu at that tick (the --shot is taken then)
@@ -67,6 +67,8 @@ func _ready() -> void:
 	if first_start and mode == "" and not _args.has("menu") and (_args.has("shot") or _args.has("autopilot")):
 		mode = "free"
 	var map_id: String = _args.get("map", next_map) if first_start else next_map
+	if mode != "race":
+		next_map = map_id  # So the menu shows the map it opened on (races always use the range).
 	if mode == "race":
 		map_id = "range"
 	next_mode = ""
@@ -273,8 +275,8 @@ func _process(delta: float) -> void:
 		return
 	# Slow orbit over the map behind the title menu.
 	_menu_orbit += delta * 0.06
-	camera.global_position = Vector3(sin(_menu_orbit) * 190.0, 75.0, cos(_menu_orbit) * 190.0)
-	camera.look_at(Vector3(0.0, 15.0, 0.0))
+	camera.global_position = map.menu_center + Vector3(sin(_menu_orbit) * map.menu_orbit.x, map.menu_orbit.y, cos(_menu_orbit) * map.menu_orbit.x)
+	camera.look_at(map.menu_center)
 
 
 func _unhandled_input(event: InputEvent) -> void:

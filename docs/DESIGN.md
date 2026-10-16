@@ -270,18 +270,24 @@ placement. Every map has service stations.
 - **Mesa Basin** *(exists)*: desert basin ringed by sandstone cliffs; central mesa with
   crossing tunnels, ring of ruined arches, a trench for sneaking up low, a lake, hoodoo
   field, pine groves.
-- **Slot Canyon** *(next)*: a long winding canyon a few rotor spans wide with side
-  alcoves, a shallow river, natural bridges and an old mining camp (trestle, water tower,
-  shacks, power lines strung across the canyon). Forces low, tight flying.
+- **Slot Canyon** *(exists)*: a 900 m S-shaped canyon through a 150 m plateau, the floor
+  50 to 120 m wide with a shallow river and gravel banks, terraced walls far above the
+  85 m ceiling. An old mining camp in the wide bend (headframe, water tower, shacks,
+  fuel tank, crates), a timber trestle across the narrows, two natural arches spanning
+  the canyon, power lines strung across it twice and along the camp, gusting
+  crosswinds in two narrows, four service stations. Props from Blender
+  (`tools/blender/make_props.py`).
 - **Test range** *(exists)*: open field with two tunnels; also the race course.
 - Later: **Quarry** (terraced pit, cranes, conveyor bridge), **Dam** (spillway tunnels,
   pylons and power lines), **Ruined Town** (streets as corridors, towers, a hangar).
 
 ### Obstacle kit
 
-- **Power lines** *(next)*: thin cables between pylons, hard to see against the sky.
-  Touching one with the rotor wrecks it; with the body, it snaps you back and hurts.
-- **Wind** *(next)*: gust zones in canyons that push you sideways, shown by blowing dust.
+- **Power lines** *(exist, `Hazards.power_line`)*: three thin cables between lattice
+  pylons, sagging, hard to see against the sky. The rotor disc touching one takes 60
+  rotor damage; any touch throws you back and costs 25 hull. Bots steer under them.
+- **Wind** *(exists, `Hazards.wind`)*: gusting zones that push choppas sideways,
+  shown by blowing dust.
 - **Tunnels**, arches, bridges *(exist)*.
 - Later: moving obstacles (trains, blast doors), destructible towers, night variants.
 
@@ -310,10 +316,10 @@ placement. Every map has service stations.
 6. **Flight and damage** *(done)*: easy and realistic flight models, modular damage
    (rotor, tail rotor, engine, hull), safe landings, bot difficulty.
 7. **Plan after the owner's second playtest** *(this list)*.
-8. **Helicopter classes**: Scout, Gunship, Heavy, with Blender models.
-9. **Service stations and loadout**: replace item boxes and crates; rockets, missiles,
-   flares, mine, smoke; bots use them.
-10. **Slot Canyon** with power lines, wind and Blender props.
+8. **Helicopter classes** *(done)*: Scout, Gunship, Heavy, with Blender models.
+9. **Service stations and loadout** *(done)*: rockets, missiles, flares, mine, smoke;
+   bots land at stations and use every weapon.
+10. **Slot Canyon** *(done)* with power lines, wind and Blender props.
 11. **Feel pass** on real hardware: flight numbers, sound mix, hit markers, music.
 12. **LAN multiplayer**, then more arenas, internet play, colours and customization.
 

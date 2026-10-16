@@ -251,6 +251,15 @@ func _avoidance() -> Vector3:
 		if hit and not hit.collider is Choppa:
 			var closeness := 1.0 - pos.distance_to(hit.position) / length
 			push += (hit.normal + Vector3.UP * 0.3) * closeness * 2.0
+	# Power lines have no collision for the rays to find: keep well clear of the cables,
+	# passing under them rather than over.
+	var look_ahead := pos + choppa.velocity * 0.8
+	for node in choppa.get_tree().get_nodes_in_group("power_lines"):
+		var cable := (node as Hazards.PowerLine).nearest(look_ahead)
+		var away := look_ahead - cable
+		if away.length() < 12.0:
+			var down := Vector3.DOWN if look_ahead.y < cable.y + 3.0 else Vector3.UP
+			push += (away.normalized() * 0.5 + down) * (1.0 - away.length() / 12.0) * 2.5
 	return push
 
 

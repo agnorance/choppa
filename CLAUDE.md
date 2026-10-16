@@ -22,9 +22,10 @@ Little Bird style choppa with cockpit view, effects, pines, grass, water, explos
 synthesized sound effects. All of that is on `main` (PR #1). New work continues on
 `godot-foundation`; open a PR to `main` when a chunk is done. Merging is the owner's
 call: they merge on GitHub (with "Create a merge commit").
-Load times, the UI, two flight models and the damage model are done. The plan is
-DESIGN.md "Milestones": helicopter classes, service stations with a loadout (replacing
-item boxes), Slot Canyon. Every feature gets tests (owner's rule). Each session: check `git log` and the roadmap, then confirm the next step.
+Done so far: load times, the UI, two flight models, the damage model, helicopter
+classes (Scout, Gunship, Heavy), service stations with a loadout, Slot Canyon with
+power lines and wind. Next per DESIGN.md "Milestones": the feel pass on real hardware,
+then LAN multiplayer. Every feature gets tests (owner's rule). Each session: check `git log` and the roadmap, then confirm the next step.
 
 ## Commands
 

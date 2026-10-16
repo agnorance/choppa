@@ -49,6 +49,13 @@ jobs:
         run: |
           set -o pipefail
           godot --headless --fixed-fps 60 --path . --script res://tests/run_tests.gd 2>&1 | tee test.log
+      - name: Main menu after a battle start
+        run: |
+          # "Main menu" must land on the title, not in another battle (a shadowed static
+          # once made it loop): leave at tick 30, then the menu must stay put.
+          n=$(godot --headless --path . --fixed-fps 60 --quit-after 240 -- --mode=battle --map=range --leave=30 2>&1 | grep -c "leaving for the menu" || true)
+          echo "left for the menu $n time(s)"
+          [ "$n" = "1" ]
       - name: Report test failures
         if: failure()
         run: |

@@ -25,6 +25,7 @@ extends Node
 ##   --level=<n>              play as a pilot of that level (not saved)
 ##   --entitle=hangar,collector,apex  own those packs for this run (not saved)
 ##   --hangar                 open the hangar on the title screen
+##   --leave=<tick>           go back to the main menu at that tick (checks the way out)
 ##   --explode=<tick>         set off an explosion 26 m ahead of you at that tick
 ##   --timing                 print how long the map build and the first frame took
 ## Multiplayer (NetGame):
@@ -105,11 +106,13 @@ func _ready() -> void:
 		_start_client()  # The server says which map.
 		return
 	GameMap.timing = _args.has("timing")
-	var started := Time.get_ticks_msec()
+	# Not called `started`: a local of that name shadowed the static flag in the whole
+	# function, so "Main menu" after a `--mode=battle` start began another battle.
+	var build_start := Time.get_ticks_msec()
 	map = GameMap.create(map_id)
 	map.mode = mode
 	add_child(map)
-	GameMap.report("map", started)
+	GameMap.report("map", build_start)
 	if mode == "":
 		_show_menu()
 	elif net_role == "server":
@@ -117,7 +120,7 @@ func _ready() -> void:
 	else:
 		_start()
 	if GameMap.timing:
-		print("timing: map and players built in %d ms, %d ms after launch" % [Time.get_ticks_msec() - started, started])
+		print("timing: map and players built in %d ms, %d ms after launch" % [Time.get_ticks_msec() - build_start, build_start])
 		await RenderingServer.frame_post_draw
 		print("timing: first frame drawn %d ms after launch" % Time.get_ticks_msec())
 
@@ -550,6 +553,10 @@ func _physics_process(_delta: float) -> void:
 		var boom := Effects.Explosion.new()
 		add_child(boom)
 		boom.global_position = choppa.global_position + choppa.facing() * Vector3(0.0, 9.0, -26.0)
+	if _args.has("leave") and _ticks == int(_args.leave) and mode != "":
+		print("leaving for the menu")
+		_restart_in("", next_map)
+		return
 	if _args.has("pause") and _ticks == int(_args.pause):
 		_toggle_pause()
 		if _args.has("shot"):  # Physics stops with the pause, so the shot is taken now.

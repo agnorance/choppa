@@ -1,0 +1,142 @@
+class_name ChoppaModel
+extends Node3D
+## Low-poly helicopter built from primitives, plus its tilt and trick animations.
+## Purely visual: it never affects the simulation. Forward is -Z.
+
+## Render layer bit for the local player's own choppa, hidden from the cockpit camera.
+const OWN_LAYER := 1 << 1
+
+var color := Color(0.95, 0.5, 0.1)
+var own := false  ## Set before adding to the tree to put meshes on OWN_LAYER.
+var cockpit: Marker3D  ## First-person camera mount.
+
+var _rotor: Node3D
+var _tail_rotor: Node3D
+var _blur_material: StandardMaterial3D
+var _tilt := Vector2.ZERO  ## x: pitch, y: roll.
+var _rotor_speed := 0.0
+
+
+func _ready() -> void:
+	var paint := _material(color, 0.2, 0.45)
+	var dark := _material(color.darkened(0.45), 0.2, 0.6)
+	var metal := _material(Color(0.22, 0.23, 0.25), 0.7, 0.4)
+	var glass := _material(Color(0.12, 0.2, 0.3), 0.3, 0.1)
+
+	var body_mesh := SphereMesh.new()
+	body_mesh.radial_segments = 16
+	body_mesh.rings = 8
+	_part(body_mesh, paint, Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 0.9, 1.5))
+	_part(body_mesh, glass, Vector3(0.0, 0.15, -0.85), Vector3.ZERO, Vector3(0.75, 0.62, 0.8))
+
+	var boom := CylinderMesh.new()
+	boom.top_radius = 0.12
+	boom.bottom_radius = 0.26
+	boom.height = 3.4
+	boom.radial_segments = 8
+	_part(boom, paint, Vector3(0.0, 0.2, 2.6), Vector3(90.0, 0.0, 0.0))
+	_part(_box(Vector3(0.12, 1.0, 0.6)), dark, Vector3(0.0, 0.7, 4.15), Vector3(-15.0, 0.0, 0.0))
+	_part(_box(Vector3(1.4, 0.08, 0.4)), dark, Vector3(0.0, 0.25, 3.6))
+
+	_tail_rotor = Node3D.new()
+	_tail_rotor.position = Vector3(0.14, 0.75, 4.3)
+	add_child(_tail_rotor)
+	_part(_box(Vector3(0.05, 1.2, 0.14)), metal, Vector3.ZERO, Vector3.ZERO, Vector3.ONE, _tail_rotor)
+
+	var mast := CylinderMesh.new()
+	mast.top_radius = 0.1
+	mast.bottom_radius = 0.14
+	mast.height = 0.5
+	_part(mast, metal, Vector3(0.0, 1.05, 0.0))
+
+	_rotor = Node3D.new()
+	_rotor.position = Vector3(0.0, 1.3, 0.0)
+	add_child(_rotor)
+	var blade := _box(Vector3(7.0, 0.05, 0.3))
+	_part(blade, metal, Vector3.ZERO, Vector3.ZERO, Vector3.ONE, _rotor)
+	_part(blade, metal, Vector3.ZERO, Vector3(0.0, 90.0, 0.0), Vector3.ONE, _rotor)
+
+	var disc := CylinderMesh.new()
+	disc.top_radius = 3.5
+	disc.bottom_radius = 3.5
+	disc.height = 0.02
+	disc.radial_segments = 24
+	_blur_material = StandardMaterial3D.new()
+	_blur_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_blur_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_blur_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_blur_material.albedo_color = Color(0.9, 0.9, 0.9, 0.0)
+	_part(disc, _blur_material, Vector3(0.0, 1.3, 0.0))
+
+	for side in [-1.0, 1.0]:
+		_part(_box(Vector3(0.1, 0.1, 3.0)), metal, Vector3(0.75 * side, -1.1, 0.0))
+		for z in [-0.7, 0.7]:
+			_part(
+				_box(Vector3(0.08, 0.55, 0.08)), metal,
+				Vector3(0.62 * side, -0.85, z), Vector3(0.0, 0.0, -20.0 * side)
+			)
+
+	cockpit = Marker3D.new()
+	cockpit.position = Vector3(0.0, 0.4, -1.25)
+	add_child(cockpit)
+
+
+## Tilts the body with motion, plays trick animations and spins the rotors.
+func update_pose(c: Choppa, delta: float) -> void:
+	var local_v := c.facing().inverse() * c.velocity
+	var target := Vector2(
+		clampf(local_v.z / c.boost_speed, -1.0, 1.0) * 0.45,
+		clampf(-local_v.x / c.boost_speed, -1.0, 1.0) * 0.5 + c.turn_rate * 0.12
+	)
+	_tilt = _tilt.lerp(target, 1.0 - exp(-6.0 * delta))
+
+	var pitch := _tilt.x
+	var yaw := 0.0
+	var roll := _tilt.y
+	var p := smoothstep(0.0, 1.0, c.trick_progress())
+	match c.trick:
+		"BARREL ROLL":
+			roll -= c.trick_dir * TAU * p
+		"FRONT FLIP":
+			pitch -= TAU * p
+		"PIROUETTE":
+			yaw += c.trick_dir * TAU * p
+		"180 SNAP":
+			roll -= 0.7 * sin(p * PI)
+	transform.basis = Basis.from_euler(Vector3(pitch, yaw, roll))
+
+	var target_rotor := 20.0 + (10.0 if c.is_boosting() else 0.0) + c.velocity.y * 0.3
+	_rotor_speed = lerpf(_rotor_speed, target_rotor, 1.0 - exp(-3.0 * delta))
+	_rotor.rotate_y(_rotor_speed * delta)
+	_tail_rotor.rotate_x(_rotor_speed * 1.6 * delta)
+	_blur_material.albedo_color.a = clampf((_rotor_speed - 8.0) / 60.0, 0.0, 0.22)
+
+
+func _material(albedo: Color, metallic: float, roughness: float) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = albedo
+	material.metallic = metallic
+	material.roughness = roughness
+	return material
+
+
+func _box(size: Vector3) -> BoxMesh:
+	var box := BoxMesh.new()
+	box.size = size
+	return box
+
+
+func _part(
+	mesh: Mesh, material: Material, pos: Vector3, rot_degrees := Vector3.ZERO,
+	scl := Vector3.ONE, parent: Node3D = self
+) -> MeshInstance3D:
+	var instance := MeshInstance3D.new()
+	instance.mesh = mesh
+	instance.material_override = material
+	instance.position = pos
+	instance.rotation_degrees = rot_degrees
+	instance.scale = scl
+	if own:
+		instance.layers = OWN_LAYER
+	parent.add_child(instance)
+	return instance

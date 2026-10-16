@@ -4,3 +4,11 @@ dist/
 .env.*
 *.log
 .DS_Store
+
+# Godot
+.godot/
+build/
+*.keystore
+*.jks
+*.apk
+*.aab

@@ -1,0 +1,266 @@
+class_name Choppa
+extends CharacterBody3D
+## Arcade helicopter. Reads `input` every physics tick and never touches Input directly,
+## so the same code runs for local players, bots and (later) network peers.
+
+signal trick_started(trick_name: String)
+signal trick_landed(trick_name: String, reward: float, low: bool)
+signal trick_botched(trick_name: String)
+signal bumped(impact: float)
+signal item_changed(item_name: String)
+
+## Below this altitude a trick counts as "low" and its boost reward doubles.
+const LOW_ALTITUDE := 6.0
+## Distance from the body origin to the bottom of the skids.
+const GROUND_CLEARANCE := 1.15
+const BOUNCE_IMPACT := 14.0
+const TRICK_COOLDOWN := 0.15
+const TRICKS := {
+	"BARREL ROLL": {"duration": 0.55, "reward": 0.15},
+	"FRONT FLIP": {"duration": 0.6, "reward": 0.18},
+	"180 SNAP": {"duration": 0.45, "reward": 0.12},
+	"PIROUETTE": {"duration": 0.7, "reward": 0.12},
+}
+
+@export var team_color := Color(0.95, 0.5, 0.1)
+@export var local_player := false  ## Hide own model from the cockpit camera.
+
+@export_group("Flight")
+@export var max_speed := 36.0
+@export var boost_speed := 60.0
+@export var turbo_speed := 72.0
+@export var accel := 28.0
+@export var climb_speed := 16.0
+@export var climb_accel := 45.0
+@export var turn_speed := 2.4  ## rad/s
+@export var turn_accel := 14.0
+@export var boost_drain := 0.35  ## meter per second
+@export var max_altitude := 140.0
+
+var input := PilotInput.new()
+var heading := 0.0  ## Yaw in radians; 0 faces -Z.
+var turn_rate := 0.0
+var boost_meter := 0.5
+var turbo_time := 0.0
+var item := ""
+var stun := 0.0
+var altitude := 500.0  ## Height of the skids above whatever is below.
+
+var trick := ""  ## Name of the trick in progress, "" when none.
+var trick_time := 0.0
+var trick_dir := 1.0
+
+var model: ChoppaModel
+
+var _trick_cooldown := 0.0
+var _trick_low := false
+var _snap_from := 0.0
+var _prev_trick := false
+var _prev_item := false
+
+
+func _ready() -> void:
+	motion_mode = MOTION_MODE_FLOATING
+	heading = rotation.y
+
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = 1.1
+	capsule.height = 5.4
+	var shape := CollisionShape3D.new()
+	shape.shape = capsule
+	shape.rotation_degrees.x = 90.0
+	shape.position.z = 0.8
+	add_child(shape)
+
+	model = ChoppaModel.new()
+	model.color = team_color
+	model.own = local_player
+	add_child(model)
+
+
+func _physics_process(delta: float) -> void:
+	step(delta)
+
+
+func is_boosting() -> bool:
+	return turbo_time > 0.0 or (input.boost and boost_meter > 0.0 and stun <= 0.0)
+
+
+func trick_progress() -> float:
+	if trick == "":
+		return 0.0
+	return clampf(trick_time / TRICKS[trick].duration, 0.0, 1.0)
+
+
+func facing() -> Basis:
+	return Basis(Vector3.UP, heading)
+
+
+## Advances the simulation by one tick.
+func step(delta: float) -> void:
+	var i := input
+	if stun > 0.0:
+		stun -= delta
+		i = PilotInput.new()
+
+	if i.trick and not _prev_trick:
+		_start_trick(i)
+	if i.use_item and not _prev_item:
+		use_item()
+	_prev_trick = i.trick
+	_prev_item = i.use_item
+
+	_trick_cooldown = maxf(0.0, _trick_cooldown - delta)
+	_update_trick(delta)
+
+	if trick == "180 SNAP":
+		turn_rate = 0.0
+	else:
+		turn_rate = move_toward(turn_rate, -i.yaw * turn_speed, turn_accel * delta)
+		heading = wrapf(heading + turn_rate * delta, -PI, PI)
+
+	var boosting := is_boosting()
+	var top := max_speed
+	if turbo_time > 0.0:
+		turbo_time -= delta
+		top = turbo_speed
+	elif boosting:
+		boost_meter = maxf(0.0, boost_meter - boost_drain * delta)
+		top = boost_speed
+
+	var wish := facing() * Vector3(i.move.x, 0.0, -i.move.y)
+	if boosting:
+		# Boost always drives you forward, steering still blends in.
+		wish += facing() * Vector3.FORWARD
+	wish = wish.limit_length(1.0)
+
+	var horizontal := Vector3(velocity.x, 0.0, velocity.z)
+	var rate := accel * 2.0 if boosting else accel
+	if wish.length_squared() < 0.01 or horizontal.length() > top:
+		rate = accel * 0.6
+	horizontal = horizontal.move_toward(wish * top, rate * delta)
+	var vertical := move_toward(velocity.y, i.lift * climb_speed, climb_accel * delta)
+	if global_position.y > max_altitude:
+		vertical = minf(vertical, 0.0)
+	velocity = horizontal + Vector3.UP * vertical
+
+	rotation = Vector3(0.0, heading, 0.0)
+	var before := velocity
+	move_and_slide()
+	_handle_collisions(before)
+	_update_altitude()
+	model.update_pose(self, delta)
+
+
+func give_item(item_name: String) -> bool:
+	if item != "":
+		return false
+	item = item_name
+	item_changed.emit(item)
+	return true
+
+
+func use_item() -> void:
+	match item:
+		"":
+			return
+		"TURBO":
+			turbo_time = 1.6
+			# Kick in instantly, like a mushroom.
+			var forward := facing() * Vector3.FORWARD
+			velocity = forward * maxf(velocity.length(), boost_speed) + Vector3.UP * velocity.y
+	item = ""
+	item_changed.emit(item)
+
+
+func respawn(at: Transform3D) -> void:
+	global_position = at.origin
+	heading = at.basis.get_euler().y
+	rotation = Vector3(0.0, heading, 0.0)
+	velocity = Vector3.ZERO
+	turn_rate = 0.0
+	trick = ""
+	stun = 0.0
+	turbo_time = 0.0
+	reset_physics_interpolation()
+	_update_altitude()
+
+
+func _start_trick(i: PilotInput) -> void:
+	if trick != "" or _trick_cooldown > 0.0:
+		return
+	var f := facing()
+	if absf(i.move.x) > 0.5 and absf(i.move.x) >= absf(i.move.y):
+		trick = "BARREL ROLL"
+		trick_dir = signf(i.move.x)
+		velocity += f * Vector3(trick_dir * 26.0, 2.0, 0.0)
+	elif i.move.y > 0.5:
+		trick = "FRONT FLIP"
+		velocity += f * Vector3(0.0, 3.0, -24.0)
+	elif i.move.y < -0.5:
+		trick = "180 SNAP"
+		_snap_from = heading
+		# Keep your speed, but it now points where you are about to face.
+		velocity = Vector3(-velocity.x, velocity.y, -velocity.z)
+	else:
+		trick = "PIROUETTE"
+		trick_dir = -1.0 if i.yaw > 0.0 else 1.0
+		velocity.y += 14.0
+	trick_time = 0.0
+	_trick_low = altitude < LOW_ALTITUDE
+	trick_started.emit(trick)
+
+
+func _update_trick(delta: float) -> void:
+	if trick == "":
+		return
+	trick_time += delta
+	if altitude < LOW_ALTITUDE:
+		_trick_low = true
+	if trick == "180 SNAP":
+		heading = wrapf(_snap_from + PI * smoothstep(0.0, 1.0, trick_progress()), -PI, PI)
+	if trick_time >= TRICKS[trick].duration:
+		var reward: float = TRICKS[trick].reward * (2.0 if _trick_low else 1.0)
+		boost_meter = minf(1.0, boost_meter + reward)
+		trick_landed.emit(trick, reward, _trick_low)
+		trick = ""
+		_trick_cooldown = TRICK_COOLDOWN
+
+
+func _botch_trick() -> void:
+	var botched := trick
+	trick = ""
+	_trick_cooldown = TRICK_COOLDOWN
+	trick_botched.emit(botched)
+
+
+func _handle_collisions(before: Vector3) -> void:
+	var impact := 0.0
+	var normal := Vector3.ZERO
+	for k in get_slide_collision_count():
+		var collision := get_slide_collision(k)
+		var hit := -before.dot(collision.get_normal())
+		if hit > impact:
+			impact = hit
+			normal = collision.get_normal()
+	if impact <= 0.0:
+		return
+	if trick != "":
+		_botch_trick()
+	var is_ground := normal.y > 0.7
+	if impact > BOUNCE_IMPACT and not is_ground:
+		velocity = before.bounce(normal) * 0.45
+		stun = clampf(impact / 60.0, 0.15, 0.5)
+		bumped.emit(impact)
+
+
+func _update_altitude() -> void:
+	var query := PhysicsRayQueryParameters3D.create(
+		global_position, global_position + Vector3.DOWN * 500.0
+	)
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit:
+		altitude = global_position.y - hit.position.y - GROUND_CLEARANCE
+	else:
+		altitude = 500.0

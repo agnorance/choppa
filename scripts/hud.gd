@@ -20,6 +20,7 @@ var _boost: UiKit.Bar
 var _heat: UiKit.Bar
 var _health: UiKit.Bar
 var _health_text: Label
+var _parts := {}  ## Choppa.Part -> Label, lit as the part wears.
 var _vignette: TextureRect
 var _smoke: ColorRect
 var _warning: Label
@@ -131,6 +132,13 @@ func _ready() -> void:
 	hull_row.add_child(_health_text)
 	_health = UiKit.Bar.new(240.0, 5.0)
 	hull_column.add_child(_health)
+	var parts_row := HBoxContainer.new()
+	parts_row.add_theme_constant_override("separation", 14)
+	hull_column.add_child(parts_row)
+	for entry: Array in [[Choppa.Part.ROTOR, "Rotor"], [Choppa.Part.TAIL, "Tail rotor"], [Choppa.Part.ENGINE, "Engine"]]:
+		var lamp := UiKit.outlined(UiKit.caption(entry[1], 12, UiKit.FAINT))
+		parts_row.add_child(lamp)
+		_parts[entry[0]] = lamp
 	_flight.append(hull_column)
 
 	_warning = UiKit.outlined(UiKit.display("", 34, UiKit.DANGER))
@@ -206,6 +214,11 @@ func _process(delta: float) -> void:
 	var hp := choppa.health / Choppa.MAX_HEALTH
 	_health.set_value(hp, UiKit.DANGER.lerp(UiKit.GOOD, smoothstep(0.2, 0.6, hp)))
 	_health_text.text = str(ceili(choppa.health))
+	for part: Choppa.Part in _parts:
+		var wear := choppa.wear(part)
+		var lamp: Label = _parts[part]
+		lamp.add_theme_color_override("font_color",
+			UiKit.FAINT if wear <= 0.0 else (UiKit.DANGER if wear >= 1.0 else UiKit.ACCENT.lerp(UiKit.DANGER, wear)))
 	_vignette.modulate.a = maxf(0.0, _vignette.modulate.a - delta * 1.5)
 	_smoke.color.a = move_toward(_smoke.color.a, 0.82 if choppa.in_smoke() else 0.0, delta * 3.0)
 	_warning.text = "MISSILE  -  ROLL!" if _missile_hunting() and fmod(choppa.clock, 0.4) < 0.25 else ""

@@ -50,7 +50,7 @@ func _physics_process(delta: float) -> void:
 		global_position = to
 		return
 	var target := hit.collider as Choppa
-	if target and target.take_hit(direction * KNOCKBACK, shooter, damage) and is_instance_valid(shooter):
+	if target and target.take_hit(direction * KNOCKBACK, shooter, damage, hit.position) and is_instance_valid(shooter):
 		shooter.scored_hit.emit(target)
 	if target == null or not target.is_rolling_hard():
 		_impact(hit)

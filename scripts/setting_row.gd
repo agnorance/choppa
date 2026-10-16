@@ -7,7 +7,7 @@ extends Button
 
 signal changed(index: int)
 
-const VALUE_WIDTH := 170.0
+const VALUE_WIDTH := 230.0  ## Room for "Exclusive fullscreen" without the arrows covering it.
 const ARROW_WIDTH := 30.0
 
 var options: PackedStringArray

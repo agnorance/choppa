@@ -83,8 +83,10 @@ on the mouse (then A/D roll), "Flight assist" adds auto-level and height hold, a
 "Aim assist" (off by default) snaps the guns onto targets. Rolling hard throws off
 bullets and missiles.
 
-The machine gun overheats after about two seconds of continuous fire. Crashing into
-walls hurts too.
+The machine gun overheats after about two seconds of continuous fire. Crashing hurts
+(anything over 8 m/s into an obstacle), and where you get hit matters: a wrecked tail
+rotor spins you, a chewed main rotor shakes you and loses lift, a dead engine cannot
+hold a hover. Repair crates fix all of it.
 
 Item boxes (rainbow "?") give a random item; the further behind you are, the better:
 turbo, homing missile (barrel-roll to shake one off), mine, fake item box (watch for the
@@ -115,7 +117,7 @@ godot --path . -- --mode=free --map=basin --autopilot=hover --cam=showcase --exp
 - `--mode=battle|free|race`, `--map=basin|range`: skip the menu.
 - `--autopilot=hover|shoot|bot|item:MISSILE`: let a script or bot fly.
 - `--cam=fp|showcase`: start in the cockpit, or with a fixed front view of the choppa.
-- `--health=30`: start damaged (cracked canopy, smoke).
+- `--health=30`: start damaged (cracked canopy, smoke); `--wear=tail,engine`: start with wrecked parts.
 - `--explode=60`: set off an explosion ahead of you at physics tick 60.
 - `--timing`: print how long the map build and the first frame take.
 - `--settings=2` (with `--menu`): open the settings screen on tab 2 (0 video .. 4 audio); `--pause=60`: open the pause menu at tick 60.
@@ -124,8 +126,8 @@ godot --path . -- --mode=free --map=basin --autopilot=hover --cam=showcase --exp
 
 ```powershell
 tools\try.ps1              # lists the scenes
-tools\try.ps1 settings     # straight into a scene: menu, settings, battle, free, race,
-                           # cockpit, lake, damaged, touch, bots, missile, explode
+tools\try.ps1 settings     # straight into a scene: menu, settings, battle, free, race, cockpit,
+                           # lake, damaged, tailrotor, engine, touch, bots, missile, explode
 tools\check.ps1            # import, all tests, and screenshots of every screen into build\shots\
 ```
 - `--shot=out.png --frames=90`: save a screenshot after 90 ticks and quit.

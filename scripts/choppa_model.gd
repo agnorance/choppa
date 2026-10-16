@@ -21,6 +21,7 @@ var _rotor_speed := 0.0
 var _dust: CPUParticles3D
 var _trails: Array[CPUParticles3D] = []
 var _smoke: CPUParticles3D
+var _tail_smoke: CPUParticles3D
 var _flashes: Array[Node3D] = []  ## Left, right.
 var _flash_lights: Array[OmniLight3D] = []
 var _casings: Array[CPUParticles3D] = []
@@ -178,20 +179,40 @@ func _ready() -> void:
 	_sparks.emitting = false
 	add_child(_sparks)
 
-	# Black smoke when badly damaged.
+	# Thick black smoke out of the engine when badly damaged: many big, slow, dark puffs
+	# that keep growing, so it reads as a plume from across the arena.
 	_smoke = Effects.puffs(Effects.gradient([
-		Color(0.15, 0.15, 0.15, 0.0), Color(0.12, 0.12, 0.12, 0.7), Color(0.2, 0.2, 0.2, 0.0),
-	]), 24, 1.6)
+		Color(0.12, 0.12, 0.12, 0.0), Color(0.1, 0.1, 0.1, 1.0), Color(0.16, 0.16, 0.16, 0.9),
+		Color(0.3, 0.3, 0.3, 0.0),
+	]), 110, 3.6, true)
 	_smoke.position = _rotor.position * Vector3(1.0, 0.7, 1.0)  # Out of the engine.
 	_smoke.direction = Vector3.UP
-	_smoke.spread = 25.0
-	_smoke.initial_velocity_min = 1.0
-	_smoke.initial_velocity_max = 3.0
-	_smoke.gravity = Vector3(0.0, 2.0, 0.0)
-	_smoke.scale_amount_min = 1.5
-	_smoke.scale_amount_max = 3.0
+	_smoke.spread = 20.0
+	_smoke.initial_velocity_min = 2.0
+	_smoke.initial_velocity_max = 4.5
+	_smoke.damping_min = 0.5
+	_smoke.damping_max = 1.0
+	_smoke.gravity = Vector3(0.0, 2.5, 0.0)
+	_smoke.scale_amount_min = 3.0
+	_smoke.scale_amount_max = 6.0
 	_smoke.emitting = false
 	add_child(_smoke)
+	_tail_smoke = Effects.puffs(Effects.gradient([
+		Color(0.25, 0.25, 0.25, 0.0), Color(0.2, 0.2, 0.2, 0.95), Color(0.3, 0.3, 0.3, 0.7),
+		Color(0.4, 0.4, 0.4, 0.0),
+	]), 80, 3.0, true)
+	_tail_smoke.position = _tail_rotor.position
+	_tail_smoke.direction = Vector3.BACK
+	_tail_smoke.spread = 30.0
+	_tail_smoke.initial_velocity_min = 1.5
+	_tail_smoke.initial_velocity_max = 3.5
+	_tail_smoke.damping_min = 0.5
+	_tail_smoke.damping_max = 1.0
+	_tail_smoke.gravity = Vector3(0.0, 2.0, 0.0)
+	_tail_smoke.scale_amount_min = 2.2
+	_tail_smoke.scale_amount_max = 4.5
+	_tail_smoke.emitting = false
+	add_child(_tail_smoke)
 
 
 ## Spins the rotors and drives the effects; the body's attitude is the choppa's own
@@ -239,7 +260,8 @@ func update_pose(c: Choppa, delta: float) -> void:
 		var pulse := 0.5 + 0.5 * sin(c.clock * 6.0)
 		_bubble_material.albedo_color = Color(1.0, 0.8, 0.2, 0.18 + pulse * 0.1) if gold \
 			else Color(0.3, 0.85, 1.0, 0.12 + 0.12 * c.shield / Choppa.SHIELD_HP)
-	_smoke.emitting = c.health < 35.0
+	_smoke.emitting = c.health < 35.0 or c.wear(Choppa.Part.ENGINE) > 0.5
+	_tail_smoke.emitting = c.wear(Choppa.Part.TAIL) > 0.5
 	_dust.emitting = c.altitude < 14.0
 	var ground := c.global_position + Vector3.DOWN * (c.altitude + Choppa.GROUND_CLEARANCE - 0.3)
 	if _dust.emitting:

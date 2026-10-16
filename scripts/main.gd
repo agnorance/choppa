@@ -18,6 +18,7 @@ extends Node
 ##   --frames=<n>             ticks before the screenshot (default 90)
 ##   --dummies=<n>            training targets in free flight (default 3)
 ##   --health=<n>             start with this much health (to see damage effects)
+##   --wear=tail,rotor,engine start with these parts wrecked (spin, shaking, weak engine)
 ##   --explode=<tick>         set off an explosion 26 m ahead of you at that tick
 ##   --timing                 print how long the map build and the first frame took
 
@@ -108,6 +109,10 @@ func _start() -> void:
 		choppa.respawn(_spawn_arg())
 	if _args.has("health"):
 		choppa.health = float(_args.health)
+	if _args.has("wear"):
+		for name in (_args.wear as String).split(","):
+			var part: Choppa.Part = {"tail": Choppa.Part.TAIL, "rotor": Choppa.Part.ROTOR, "engine": Choppa.Part.ENGINE}[name]
+			choppa.parts[part] = 0.0
 
 	var chase := ChaseCamera.new()
 	chase.target = choppa

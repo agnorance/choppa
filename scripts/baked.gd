@@ -16,6 +16,7 @@ static var _cache := {}
 static func generators() -> Dictionary:
 	return {
 		"puff": Effects._soft_dot_image,
+		"smoke": Effects.smoke_image,
 		"muzzle_star": Effects.star_image,
 		"glass_cracks": Effects.crack_image,
 		"scorch": Effects.scorch_image,

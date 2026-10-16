@@ -57,6 +57,10 @@ func _run() -> void:
 		"test_settings_roundtrip",
 		"test_mouse_steers",
 		"test_aim_assist_can_be_turned_off",
+		"test_tail_rotor_hit_spins_the_choppa",
+		"test_engine_hit_loses_lift",
+		"test_crash_damages_hull_and_parts",
+		"test_blast_wrecks_the_nearest_part",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -681,7 +685,9 @@ func test_get_to_the_choppa() -> void:
 		a.input.fire = true
 		await physics_frame
 		a.step(TICK)
-	_check(not hits.is_empty() and hits[0] == Bullet.DAMAGE * 2.0, "double damage, got %s" % [hits])
+	# Shot from behind, the rounds land on the tail boom: a part hit costs 60 % hull.
+	_check(not hits.is_empty() and (is_equal_approx(hits[0], Bullet.DAMAGE * 2.0) or is_equal_approx(hits[0], Bullet.DAMAGE * 1.2)),
+		"double damage, got %s" % [hits])
 
 
 func test_effects_start_where_placed() -> void:
@@ -809,3 +815,57 @@ func test_aim_assist_can_be_turned_off() -> void:
 	_check(shooter.aim_target() == target, "the guns lock onto a choppa straight ahead")
 	shooter.aim_assist = false
 	_check(shooter.aim_target() == null, "with aim assist off nothing locks on")
+
+
+func test_tail_rotor_hit_spins_the_choppa() -> void:
+	_ground()
+	var choppa := _choppa(Vector3(0.0, 30.0, 0.0))
+	var tail := choppa.to_global(Vector3(0.0, 0.3, 3.6))
+	var hull := choppa.health
+	choppa.take_hit(Vector3.ZERO, null, 10.0, tail)
+	_check(choppa.parts[Choppa.Part.TAIL] == Choppa.PART_HEALTH[Choppa.Part.TAIL] - 10.0, "tail rotor took the hit")
+	_check(is_equal_approx(choppa.health, hull - 6.0), "a tail hit costs less hull, hp=%f" % choppa.health)
+	for k in 4:
+		choppa.take_hit(Vector3.ZERO, null, 10.0, tail)
+	_check(choppa.wear(Choppa.Part.TAIL) == 1.0, "tail rotor wrecked")
+	await _fly(choppa, 90)
+	_check(absf(choppa.rates.y) > 1.5, "spins without the tail rotor, yaw rate %f" % choppa.rates.y)
+	await _fly(choppa, 60, func(i: PilotInput, _t: int) -> void: i.yaw = -signf(choppa.rates.y))
+	_check(absf(choppa.rates.y) > 0.6, "the pedals cannot stop the spin, yaw rate %f" % choppa.rates.y)
+
+
+func test_engine_hit_loses_lift() -> void:
+	_ground()
+	var choppa := _choppa(Vector3(0.0, 30.0, 0.0))
+	choppa.parts[Choppa.Part.ENGINE] = 0.0
+	await _fly(choppa, 60)
+	_check(choppa.velocity.y < -2.0, "sinks at hover collective with the engine wrecked, vy=%f" % choppa.velocity.y)
+	choppa.boost_meter = 1.0
+	await _fly(choppa, 30, func(i: PilotInput, _t: int) -> void: i.boost = true)
+	_check(is_equal_approx(choppa.boost_meter, 1.0), "no afterburner without an engine")
+	_check(choppa.heal(50.0), "a repair kit fixes parts too")
+	_check(choppa.parts[Choppa.Part.ENGINE] == Choppa.PART_HEALTH[Choppa.Part.ENGINE], "engine repaired")
+
+
+func test_crash_damages_hull_and_parts() -> void:
+	MapKit.block(_world, Vector3(0.0, 10.0, -20.0), Vector3(40.0, 40.0, 2.0), Color.GRAY)
+	var choppa := _choppa(Vector3(0.0, 10.0, -5.0))
+	choppa.velocity = Vector3(0.0, 0.0, -25.0)
+	await _fly(choppa, 60)
+	_check(choppa.health < Choppa.MAX_HEALTH - 10.0, "a 25 m/s wall hit hurts, hp=%f" % choppa.health)
+	_check(choppa.health > 0.0, "but does not kill outright")
+	# Backing into it tail first (facing -Z, moving +Z) wrecks the tail rotor.
+	var tail_first := _choppa(Vector3(0.0, 10.0, -33.0))
+	tail_first.velocity = Vector3(0.0, 0.0, 25.0)
+	await _fly(tail_first, 60)
+	_check(tail_first.wear(Choppa.Part.TAIL) > 0.5, "tail strike wrecked the tail rotor, wear %f" % tail_first.wear(Choppa.Part.TAIL))
+
+
+func test_blast_wrecks_the_nearest_part() -> void:
+	var choppa := _choppa(Vector3(0.0, 30.0, 0.0))
+	choppa.blast_damage(20.0, null, choppa.to_global(Vector3(0.0, 0.5, 4.0)))
+	_check(choppa.parts[Choppa.Part.TAIL] == Choppa.PART_HEALTH[Choppa.Part.TAIL] - 16.0, "blast at the tail hit the tail rotor")
+	_check(is_equal_approx(choppa.health, Choppa.MAX_HEALTH - 20.0), "and the hull")
+	var other := _choppa(Vector3(0.0, 30.0, 50.0))
+	other.blast_damage(20.0, null, other.to_global(Vector3(0.0, 2.0, 0.0)))
+	_check(other.parts[Choppa.Part.ROTOR] < Choppa.PART_HEALTH[Choppa.Part.ROTOR], "blast above hit the main rotor")

@@ -10,6 +10,7 @@ signal hit_taken(impulse: Vector3, shooter: Choppa)
 signal scored_hit(target: Choppa)
 signal gun_overheated
 signal damaged(amount: float, attacker: Choppa)
+signal part_damaged(part: Part, left: float)  ## A rotor, the tail rotor or the engine took a hit.
 signal died(killer: Choppa)
 signal healed(amount: float)
 signal item_used(item_name: String)
@@ -17,8 +18,12 @@ signal scrambled_by(attacker: Choppa)
 
 ## Distance from the body origin to the bottom of the skids.
 const GROUND_CLEARANCE := 1.15
-const BOUNCE_IMPACT := 14.0
+const BOUNCE_IMPACT := 10.0
 const GRAVITY := 9.81
+
+## Where a hit lands. HULL is everything that only costs health; the others also wreck
+## something: ROTOR shakes and loses lift, TAIL spins you, ENGINE loses power.
+enum Part { HULL, ROTOR, TAIL, ENGINE }
 const DODGE_ROLL_RATE := 2.8  ## rad/s: rolling this fast throws off bullets and missiles.
 const LEVEL_GAIN := 2.5  ## Flight assist: rate per radian of tilt that brings the body level.
 const GROUND_EFFECT := 0.08  ## Extra thrust fraction right above the ground...
@@ -30,7 +35,12 @@ const AIM_ASSIST_ANGLE := deg_to_rad(12.0)  ## Horizontal cone that snaps bullet
 const AIM_ASSIST_PITCH := deg_to_rad(35.0)
 const AIM_ASSIST_RANGE := 160.0
 const MAX_HEALTH := 100.0
-const CRASH_DAMAGE_FROM := 22.0  ## Wall impacts harder than this hurt.
+const CRASH_DAMAGE_FROM := 8.0  ## Impacts (m/s into the obstacle) harder than this hurt.
+const CRASH_DAMAGE_PER_MS := 2.0  ## Hull damage per m/s above that.
+const TAIL_TORQUE := 2.2  ## rad/s the body spins with the tail rotor gone, at hover thrust.
+const VIBRATION := 0.9  ## rad/s of shaking with the main rotor wrecked.
+## Damage each part takes before it is wrecked. The hull is `health`.
+const PART_HEALTH := {Part.ROTOR: 40.0, Part.TAIL: 30.0, Part.ENGINE: 50.0}
 const SPAWN_SHIELD := 2.0  ## Seconds of invulnerability after respawning.
 const SHIELD_HP := 40.0
 const SHIELD_TIME := 12.0
@@ -77,6 +87,7 @@ var altitude := 500.0  ## Height of the skids above whatever is below.
 var heat := 0.0  ## Gun heat, 0..1.
 var overheated := false
 var health := MAX_HEALTH
+var parts := {}  ## Part -> health left; see PART_HEALTH.
 var alive := true
 var mortal := true  ## False in races: hits still push, but never hurt.
 var standing := 0.5  ## 0 leading .. 1 last; set by the game mode, steers item odds.
@@ -103,6 +114,7 @@ var _last_attacker_time := -100.0
 
 func _ready() -> void:
 	motion_mode = MOTION_MODE_FLOATING
+	_repair_all()
 	heading = rotation.y
 	add_to_group("choppas")
 
@@ -169,6 +181,15 @@ func step(delta: float) -> void:
 	if flight_assist and i.cyclic.is_zero_approx():
 		wanted.x += nose_down() * LEVEL_GAIN
 		wanted.z += bank_right() * LEVEL_GAIN
+	# Damage: a wrecked tail rotor leaves the main rotor's torque unopposed, so the body
+	# spins and the pedals do little; a chewed-up main rotor shakes the whole machine.
+	var tail := wear(Part.TAIL)
+	var rotor := wear(Part.ROTOR)
+	var engine := wear(Part.ENGINE)
+	wanted.y = wanted.y * (1.0 - 0.75 * tail) - TAIL_TORQUE * tail * tail * (1.0 + i.collective * collective_range)
+	if rotor > 0.0:
+		wanted.x += sin(clock * 31.0) * VIBRATION * rotor
+		wanted.z += sin(clock * 23.0 + 1.0) * VIBRATION * rotor
 	rates = rates.move_toward(wanted, angular_accel * delta)
 	var b := (global_transform.basis * Basis.from_euler(rates * delta)).orthonormalized()
 	turn_rate = rates.y
@@ -182,11 +203,12 @@ func step(delta: float) -> void:
 	if flight_assist:
 		thrust /= clampf(b.y.y, 0.5, 1.0)  # Hold height when tilted.
 	thrust *= 1.0 + GROUND_EFFECT * clampf(1.0 - altitude / GROUND_EFFECT_HEIGHT, 0.0, 1.0)
+	thrust *= (1.0 - 0.15 * rotor) * (1.0 - 0.35 * engine)  # Damaged lift and power.
 	var accel := b.y * thrust + Vector3.DOWN * GRAVITY
 	if turbo_time > 0.0:
 		turbo_time -= delta
 		accel += forward * turbo_thrust
-	elif is_boosting():
+	elif is_boosting() and engine < 1.0:
 		boost_meter = maxf(0.0, boost_meter - boost_drain * delta)
 		accel += forward * afterburner_thrust
 	elif not i.boost:
@@ -262,14 +284,59 @@ func _target_in_cone(cone: float, reach: float) -> Choppa:
 	return best
 
 
-## Called by a bullet. Returns false when the hit is dodged.
-func take_hit(impulse: Vector3, shooter: Choppa, amount := 0.0) -> bool:
+## Called by a bullet. `at` is where it struck (world space); a hit on the tail rotor,
+## main rotor or engine wrecks that part and costs less hull. Returns false when dodged.
+func take_hit(impulse: Vector3, shooter: Choppa, amount := 0.0, at := Vector3.INF) -> bool:
 	if not alive or is_rolling_hard():
 		return false
 	velocity += impulse
 	hit_taken.emit(impulse, shooter)
-	damage(amount, shooter)
+	var part := part_at(at) if at.is_finite() else Part.HULL
+	if part == Part.HULL:
+		damage(amount, shooter)
+	else:
+		damage_part(part, amount)
+		damage(amount * 0.6, shooter)
 	return true
+
+
+## A blast centred at `from`: full hull damage, and the part nearest the blast suffers.
+func blast_damage(amount: float, attacker: Choppa, from: Vector3) -> void:
+	var part := part_at(from)
+	if part != Part.HULL:
+		damage_part(part, amount * 0.8)
+	damage(amount, attacker)
+
+
+## Which part a world position is closest to, by where it sits on the body: the cabin
+## reaches about 1 m behind the centre, the engine sits on top behind it, the tail boom
+## runs on from there (the collision capsule ends at z = 3), the rotor is above it all.
+func part_at(at: Vector3) -> Part:
+	var local := to_local(at)
+	if local.z > 2.2:
+		return Part.TAIL
+	if local.y > 1.1:
+		return Part.ROTOR
+	if local.z > 0.6 and local.y > 0.3:
+		return Part.ENGINE
+	return Part.HULL
+
+
+func damage_part(part: Part, amount: float) -> void:
+	if part == Part.HULL or not alive or not mortal or invulnerable > 0.0 or rampage > 0.0 or amount <= 0.0:
+		return
+	parts[part] = maxf(0.0, parts[part] - amount)
+	part_damaged.emit(part, parts[part])
+
+
+## How wrecked a part is: 0 intact .. 1 gone.
+func wear(part: Part) -> float:
+	return 1.0 - parts[part] / PART_HEALTH[part]
+
+
+func _repair_all() -> void:
+	for part: Part in PART_HEALTH:
+		parts[part] = PART_HEALTH[part]
 
 
 func damage(amount: float, attacker: Choppa) -> void:
@@ -291,10 +358,15 @@ func damage(amount: float, attacker: Choppa) -> void:
 
 
 func heal(amount: float) -> bool:
-	if not alive or health >= MAX_HEALTH:
+	var wrecked := false
+	for part: Part in PART_HEALTH:
+		wrecked = wrecked or parts[part] < PART_HEALTH[part]
+	if not alive or (health >= MAX_HEALTH and not wrecked):
 		return false
 	var before := health
 	health = minf(MAX_HEALTH, health + amount)
+	for part: Part in PART_HEALTH:  # The crate patches the machine up too.
+		parts[part] = minf(PART_HEALTH[part], parts[part] + amount)
 	healed.emit(health - before)
 	return true
 
@@ -407,6 +479,7 @@ func respawn(at: Transform3D) -> void:
 		alive = true
 		_shape.set_deferred("disabled", false)
 	health = MAX_HEALTH
+	_repair_all()
 	invulnerable = SPAWN_SHIELD
 	model.visible = true
 	reset_physics_interpolation()
@@ -457,12 +530,14 @@ func _shoot() -> void:
 func _handle_collisions(before: Vector3) -> void:
 	var impact := 0.0
 	var normal := Vector3.ZERO
+	var where := global_position
 	for k in get_slide_collision_count():
 		var collision := get_slide_collision(k)
 		var hit := -before.dot(collision.get_normal())
 		if hit > impact:
 			impact = hit
 			normal = collision.get_normal()
+			where = collision.get_position()
 	if impact <= 0.0:
 		return
 	var is_ground := normal.y > 0.7
@@ -473,7 +548,15 @@ func _handle_collisions(before: Vector3) -> void:
 		bumped.emit(impact)
 	if impact > CRASH_DAMAGE_FROM:
 		var credit := _last_attacker if clock - _last_attacker_time < CRASH_CREDIT_TIME else null
-		damage((impact - CRASH_DAMAGE_FROM) * 1.2, credit)
+		var excess := impact - CRASH_DAMAGE_FROM
+		# Whatever struck first takes the brunt: tail strikes wreck the tail rotor, and a
+		# body tilted this far has its blades in the obstacle too.
+		var part := part_at(where)
+		if part != Part.HULL:
+			damage_part(part, excess * 3.0)
+		if absf(bank_right()) > 0.6 or absf(nose_down()) > 0.6:
+			damage_part(Part.ROTOR, excess * 2.0)
+		damage(excess * CRASH_DAMAGE_PER_MS, credit)
 
 func _update_altitude() -> void:
 	var query := PhysicsRayQueryParameters3D.create(

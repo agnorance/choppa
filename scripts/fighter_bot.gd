@@ -73,7 +73,10 @@ func steer(delta: float) -> void:
 		_box_time += delta
 		if _box_time > 10.0:
 			_ignored_boxes[box] = 20.0  # Can't reach it; try another.
-	for ignored: ItemBox in _ignored_boxes.keys():
+	for ignored in _ignored_boxes.keys():
+		if not is_instance_valid(ignored):  # A fake box blew up.
+			_ignored_boxes.erase(ignored)
+			continue
 		_ignored_boxes[ignored] -= delta
 		if _ignored_boxes[ignored] <= 0.0:
 			_ignored_boxes.erase(ignored)

@@ -5,7 +5,7 @@ extends RefCounted
 
 
 ## Camera-facing soft puffs. `colors` fade over each particle's life.
-static func puffs(colors: Gradient, amount: int, lifetime: float) -> CPUParticles3D:
+static func puffs(colors: Gradient, amount: int, lifetime: float, dense := false) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
 	p.amount = amount
 	p.lifetime = lifetime
@@ -14,13 +14,14 @@ static func puffs(colors: Gradient, amount: int, lifetime: float) -> CPUParticle
 	var quad := QuadMesh.new()
 	quad.size = Vector2.ONE
 	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	# Dense smoke is lit by the sun so it reads as a solid plume; wisps stay unshaded.
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL if dense else BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.vertex_color_use_as_albedo = true
 	# BILLBOARD_PARTICLES loses the per-particle scale on the Compatibility renderer.
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	m.billboard_keep_scale = true
-	m.albedo_texture = _soft_dot()
+	m.albedo_texture = _smoke_dot() if dense else _soft_dot()
 	# Fade out where puffs cut into the ground or walls instead of a hard edge.
 	m.proximity_fade_enabled = true
 	m.proximity_fade_distance = 1.5
@@ -50,6 +51,27 @@ static func gradient(stops: Array) -> Gradient:
 ## A soft, cloudy white puff (radial falloff times noise), made once.
 static func _soft_dot() -> Texture2D:
 	return Baked.texture("puff")
+
+
+## A thick, lumpy puff for smoke plumes: nearly opaque in the middle. Baked, see Baked.
+static func _smoke_dot() -> Texture2D:
+	return Baked.texture("smoke")
+
+
+static func smoke_image() -> Image:
+	var noise := FastNoiseLite.new()
+	noise.seed = 5
+	noise.frequency = 0.06
+	noise.fractal_octaves = 3
+	var size := 128
+	var image := Image.create(size, size, true, Image.FORMAT_RGBA8)
+	for y in size:
+		for x in size:
+			var d := Vector2(x - size * 0.5, y - size * 0.5).length() / (size * 0.5)
+			var cloud := noise.get_noise_2d(x, y) * 0.5 + 0.5
+			var edge := 1.0 - smoothstep(0.45, 1.0, d + (cloud - 0.5) * 0.4)
+			image.set_pixel(x, y, Color(1.0, 1.0, 1.0, clampf(edge * (0.85 + cloud * 0.3), 0.0, 1.0)))
+	return image
 
 
 static func _soft_dot_image() -> Image:
@@ -380,7 +402,7 @@ class Explosion extends Node3D:
 		var smoke := Effects.puffs(Effects.gradient([
 			Color(0.1, 0.09, 0.08, 0.0), Color(0.1, 0.09, 0.08, 0.75), Color(0.16, 0.15, 0.14, 0.45),
 			Color(0.22, 0.21, 0.2, 0.0),
-		]), 18, 4.0)
+		]), 18, 4.0, true)
 		smoke.one_shot = true
 		smoke.explosiveness = 0.7
 		smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE

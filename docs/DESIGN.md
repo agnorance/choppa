@@ -128,8 +128,9 @@ cheap for netcode.
   the HUD bar shows it. The TURBO item is a stronger burst.
 - **Ground effect:** a little extra thrust in the last six metres.
 - **Ceiling:** no climbing above the map's ceiling.
-- Collisions bounce you off walls, stun you briefly and kill most of the spin. Hard
-  crashes cost health; a crash soon after being shot credits the shooter.
+- Collisions bounce you off walls, stun you briefly and kill most of the spin. Any
+  impact over 8 m/s costs health (2 per m/s above that); a crash soon after being shot
+  credits the shooter.
 - Rolling hard (over 2.8 rad/s) throws off bullets and shakes a missile's lock, which
   then veers wide. Pilot skill, not a button.
 
@@ -145,6 +146,23 @@ cheap for netcode.
 | Camera | V | same | Y |
 
 Touch: left half drag is the cyclic, right half yaw and collective.
+
+### Damage model
+
+Hits land somewhere. Bullets and blasts are attributed to the part of the body they
+struck (`Choppa.part_at`), collisions to the part that touched first:
+
+| Part | Health | When wrecked |
+|---|---|---|
+| Hull | 100 | Shot down. Everything else costs hull too (part hits 60 %). |
+| Main rotor | 40 | Lift down 15 %, the whole machine shakes (random pitch and roll). |
+| Tail rotor | 30 | The main rotor's torque spins you (2.2 rad/s at hover, more with collective); the pedals keep 25 % authority. |
+| Engine | 50 | Thrust down 35 %: you sink at hover collective; no afterburner. |
+
+Effects scale with wear, so a half-wrecked part is half as bad. Tail strikes wreck the
+tail rotor, and a body banked or pitched past 35 degrees has its blades in whatever
+it hits. Repair kits fix parts as well as hull. Smoke pours from a wrecked tail rotor
+and engine; the HUD shows the three parts under the hull bar.
 
 ### Bots
 

@@ -20,7 +20,7 @@ static func blast(world: Node, at: Vector3, radius: float, amount: float, owner:
 		var falloff := 1.0 - 0.5 * distance / radius
 		var away := offset.normalized() if distance > 0.1 else Vector3.UP
 		c.velocity += (away + Vector3.UP * 0.4) * 22.0 * falloff
-		c.damage(amount * falloff, owner)
+		c.blast_damage(amount * falloff, owner, at)
 
 
 ## Seeks the target it locked at launch. Barrel-roll as it closes in to shake it off.

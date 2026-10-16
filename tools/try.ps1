@@ -11,6 +11,8 @@ $scenes = [ordered]@{
 	"cockpit"  = @("--mode=free", "--map=basin", "--cam=fp")
 	"lake"     = @("--mode=free", "--map=basin", "--spawn=150,4,150,45")
 	"damaged"  = @("--mode=free", "--map=basin", "--health=20")
+	"tailrotor" = @("--mode=free", "--map=basin", "--wear=tail")
+	"engine"   = @("--mode=free", "--map=basin", "--wear=engine")
 	"touch"    = @("--mode=free", "--map=basin", "--touch")
 	"bots"     = @("--mode=battle", "--map=basin", "--autopilot=bot")
 	"missile"  = @("--mode=free", "--map=basin", "--autopilot=item:MISSILE")

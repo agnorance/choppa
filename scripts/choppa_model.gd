@@ -76,6 +76,15 @@ func _ready() -> void:
 				Vector3(0.62 * side, -0.85, z), Vector3(0.0, 0.0, -20.0 * side)
 			)
 
+	var barrel := CylinderMesh.new()
+	barrel.top_radius = 0.07
+	barrel.bottom_radius = 0.09
+	barrel.height = 1.2
+	barrel.radial_segments = 6
+	for side in [-1.0, 1.0]:
+		_part(barrel, metal, Vector3(0.9 * side, -0.5, -1.4), Vector3(90.0, 0.0, 0.0))
+		_part(_box(Vector3(0.5, 0.12, 0.3)), metal, Vector3(0.65 * side, -0.5, -1.1))
+
 	cockpit = Marker3D.new()
 	cockpit.position = Vector3(0.0, 0.4, -1.25)
 	add_child(cockpit)

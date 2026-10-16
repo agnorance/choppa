@@ -38,10 +38,16 @@ Then add two repository secrets under **Settings > Secrets and variables > Actio
 | Turn | Q E or ← → | Right stick X | Right half: drag sideways |
 | Climb / dive | Space / C or ↑ ↓ | Right stick Y | Right half: drag up/down |
 | Boost | Shift | RB | BOOST |
+| Machine gun | Ctrl or left mouse | RT | FIRE (also auto-fires when locked on) |
 | Trick (+ direction) | F | A | TRICK |
 | Use item | R | X | ITEM |
 | Camera | V | Y | CAM |
 | Respawn | Backspace | Back/Select | |
+
+The machine gun knocks other choppas around instead of damaging them. It snaps onto
+targets in a narrow cone ahead (white ring) and overheats after about two seconds of
+continuous fire. A barrel roll dodges bullets. Three training dummies hover around the
+test range to shoot at.
 
 Tricks: roll (trick + left/right), front flip (trick + forward), 180 snap (trick + back),
 pirouette (trick alone). Landing a trick close to the ground fills your boost meter

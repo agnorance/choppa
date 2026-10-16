@@ -8,6 +8,16 @@ extends Node
 ##   --touch                 show touch controls even without a touchscreen
 ##   --shot=<file.png>       save a screenshot after --frames physics ticks and quit
 ##   --frames=<n>            ticks before the screenshot (default 90)
+##   --dummies=<n>           training targets to spawn (default 3)
+
+const DUMMY_POSTS: Array[Vector3] = [
+	Vector3(-25.0, 10.0, 50.0), Vector3(25.0, 13.0, 45.0), Vector3(0.0, 17.0, 15.0),
+	Vector3(-40.0, 20.0, 0.0), Vector3(40.0, 8.0, 0.0),
+]
+const DUMMY_COLORS: Array[Color] = [
+	Color(0.2, 0.6, 0.95), Color(0.85, 0.25, 0.3), Color(0.3, 0.8, 0.35),
+	Color(0.7, 0.4, 0.9), Color(0.95, 0.85, 0.2),
+]
 
 var map: TestRange
 var choppa: Choppa
@@ -35,7 +45,11 @@ func _ready() -> void:
 	add_child(camera)
 	camera.make_current()
 
+	for n in mini(int(_args.get("dummies", "3")), DUMMY_POSTS.size()):
+		_spawn_dummy(DUMMY_POSTS[n], DUMMY_COLORS[n])
+
 	hud = Hud.new(choppa)
+	hud.camera = camera
 	add_child(hud)
 	if _args.has("touch"):
 		hud.touch.visible = true
@@ -52,6 +66,18 @@ func _ready() -> void:
 		pilot.choppa = choppa
 		pilot.touch = hud.touch
 		add_child(pilot)
+
+
+func _spawn_dummy(post: Vector3, color: Color) -> void:
+	var dummy := Choppa.new()
+	dummy.team_color = color
+	add_child(dummy)
+	# Face the player's spawn so they show their good side.
+	dummy.respawn(Transform3D(Basis(Vector3.UP, PI), post))
+	var pilot := DummyPilot.new()
+	pilot.choppa = dummy
+	pilot.home = post
+	add_child(pilot)
 
 
 func _unhandled_input(event: InputEvent) -> void:

@@ -26,6 +26,12 @@ func _run() -> void:
 		"test_turbo_item",
 		"test_item_box_gives_item_and_respawns",
 		"test_item_roll_only_returns_known_items",
+		"test_gun_fires_and_overheats",
+		"test_gun_cools_down_after_overheat",
+		"test_bullets_knock_target_back",
+		"test_aim_assist_hits_target_above",
+		"test_barrel_roll_dodges_bullets",
+		"test_bullets_stop_at_walls",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -185,3 +191,89 @@ func test_item_roll_only_returns_known_items() -> void:
 	rng.seed = 1
 	for n in 200:
 		_check(Items.POOL.has(Items.roll(rng)), "rolled a known item")
+
+
+func _bullets() -> Array:
+	return _world.get_children().filter(func(n: Node) -> bool: return n is Bullet)
+
+
+func _hold_fire(i: PilotInput, _t: int) -> void:
+	i.fire = true
+
+
+func test_gun_fires_and_overheats() -> void:
+	var choppa := _choppa(Vector3(0.0, 10.0, 0.0))
+	var overheats := []
+	choppa.gun_overheated.connect(func() -> void: overheats.append(true))
+	await _fly(choppa, 6, _hold_fire)
+	_check(_bullets().size() >= 1, "spawned bullets")
+	_check(choppa.heat > 0.0, "heat rose")
+	await _fly(choppa, 180, _hold_fire)
+	_check(overheats.size() == 1, "overheated once, got %d" % overheats.size())
+	_check(choppa.overheated, "still overheated while holding fire")
+
+
+func test_gun_cools_down_after_overheat() -> void:
+	var choppa := _choppa(Vector3(0.0, 10.0, 0.0))
+	choppa.heat = 1.0
+	choppa.overheated = true
+	await _fly(choppa, 30, _hold_fire)
+	_check(_bullets().is_empty(), "no shots while overheated")
+	choppa.input.clear()
+	await _fly(choppa, 120)
+	_check(not choppa.overheated and choppa.heat == 0.0, "cooled down, heat=%f" % choppa.heat)
+
+
+func test_bullets_knock_target_back() -> void:
+	var shooter := _choppa(Vector3(0.0, 10.0, 0.0))
+	var target := _choppa(Vector3(0.0, 10.0, -40.0))
+	var hits := []
+	shooter.scored_hit.connect(func(t: Choppa) -> void: hits.append(t))
+	for t in 60:
+		shooter.input.fire = true
+		await physics_frame
+		shooter.step(TICK)
+		target.step(TICK)
+	_check(hits.size() >= 8, "scored hits, got %d" % hits.size())
+	_check(hits.all(func(t: Choppa) -> bool: return t == target), "hit the target")
+	_check(target.velocity.z < -5.0, "pushed away from shooter, v=%s" % target.velocity)
+
+
+func test_aim_assist_hits_target_above() -> void:
+	var shooter := _choppa(Vector3(0.0, 10.0, 0.0))
+	var target := _choppa(Vector3(4.0, 18.0, -50.0))
+	_check(shooter.aim_target() == target, "locked on")
+	var hits := []
+	shooter.scored_hit.connect(func(t: Choppa) -> void: hits.append(t))
+	await _fly(shooter, 30, _hold_fire)
+	_check(hits.size() >= 3, "assisted shots hit, got %d" % hits.size())
+
+
+func test_barrel_roll_dodges_bullets() -> void:
+	var shooter := _choppa(Vector3(0.0, 30.0, 0.0))
+	var target := _choppa(Vector3(0.0, 30.0, -30.0))
+	var taken := []
+	target.hit_taken.connect(func(_i: Vector3, _s: Choppa) -> void: taken.append(true))
+	# Start rolling, then fire a burst that arrives while the roll lasts.
+	target.input.trick = true
+	target.input.move = Vector2(1.0, 0.0)
+	target.step(TICK)
+	_check(target.trick == "BARREL ROLL", "rolling")
+	target.input.clear()
+	for t in 12:
+		shooter.input.fire = t < 4
+		await physics_frame
+		shooter.step(TICK)
+		target.set("trick_time", 0.0)  # Freeze the roll so every round arrives mid-roll.
+		target.step(TICK)
+	_check(taken.is_empty(), "no hits taken while rolling, got %d" % taken.size())
+
+
+func test_bullets_stop_at_walls() -> void:
+	MapKit.block(_world, Vector3(0.0, 10.0, -20.0), Vector3(40.0, 40.0, 0.5), Color.GRAY)
+	var shooter := _choppa(Vector3(0.0, 10.0, 0.0))
+	var target := _choppa(Vector3(0.0, 10.0, -40.0))
+	var taken := []
+	target.hit_taken.connect(func(_i: Vector3, _s: Choppa) -> void: taken.append(true))
+	await _fly(shooter, 30, _hold_fire)
+	_check(taken.is_empty(), "wall blocked the bullets")

@@ -4,7 +4,7 @@ extends Node
 const DEADZONE := 0.2
 
 # action -> list of bindings. Keys are Key constants, buttons are JoyButton constants,
-# axes are [JoyAxis, direction].
+# axes are [JoyAxis, direction], mouse buttons are "mouse:<MouseButton>".
 var _bindings := {
 	"move_forward": [KEY_W, [JOY_AXIS_LEFT_Y, -1.0]],
 	"move_back": [KEY_S, [JOY_AXIS_LEFT_Y, 1.0]],
@@ -14,7 +14,8 @@ var _bindings := {
 	"yaw_right": [KEY_E, KEY_RIGHT, [JOY_AXIS_RIGHT_X, 1.0]],
 	"lift_up": [KEY_SPACE, KEY_UP, [JOY_AXIS_RIGHT_Y, -1.0]],
 	"lift_down": [KEY_C, KEY_DOWN, [JOY_AXIS_RIGHT_Y, 1.0]],
-	"boost": [KEY_SHIFT, JOY_BUTTON_RIGHT_SHOULDER, [JOY_AXIS_TRIGGER_RIGHT, 1.0]],
+	"boost": [KEY_SHIFT, JOY_BUTTON_RIGHT_SHOULDER],
+	"fire": [KEY_CTRL, "mouse:%d" % MOUSE_BUTTON_LEFT, [JOY_AXIS_TRIGGER_RIGHT, 1.0]],
 	"trick": [KEY_F, JOY_BUTTON_A],
 	"use_item": [KEY_R, JOY_BUTTON_X],
 	"toggle_camera": [KEY_V, JOY_BUTTON_Y],
@@ -32,6 +33,10 @@ func _ready() -> void:
 
 
 func _event_for(binding: Variant) -> InputEvent:
+	if binding is String:
+		var mouse := InputEventMouseButton.new()
+		mouse.button_index = (binding as String).split(":")[1].to_int()
+		return mouse
 	if binding is Array:
 		var axis := InputEventJoypadMotion.new()
 		axis.axis = binding[0]

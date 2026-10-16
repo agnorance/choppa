@@ -8,6 +8,9 @@ signal trick_landed(trick_name: String, reward: float, low: bool)
 signal trick_botched(trick_name: String)
 signal bumped(impact: float)
 signal item_changed(item_name: String)
+signal hit_taken(impulse: Vector3, shooter: Choppa)
+signal scored_hit(target: Choppa)
+signal gun_overheated
 
 ## Below this altitude a trick counts as "low" and its boost reward doubles.
 const LOW_ALTITUDE := 6.0
@@ -15,6 +18,12 @@ const LOW_ALTITUDE := 6.0
 const GROUND_CLEARANCE := 1.15
 const BOUNCE_IMPACT := 14.0
 const TRICK_COOLDOWN := 0.15
+const GUN_INTERVAL := 0.08  ## Seconds between shots.
+const GUN_HEAT_PER_SHOT := 0.035  ## About 2.3 s of continuous fire to overheat.
+const GUN_COOL_RATE := 0.6  ## Heat lost per second when not firing.
+const AIM_ASSIST_ANGLE := deg_to_rad(12.0)  ## Horizontal cone that snaps bullets.
+const AIM_ASSIST_PITCH := deg_to_rad(35.0)
+const AIM_ASSIST_RANGE := 160.0
 const TRICKS := {
 	"BARREL ROLL": {"duration": 0.55, "reward": 0.15},
 	"FRONT FLIP": {"duration": 0.6, "reward": 0.18},
@@ -45,6 +54,8 @@ var turbo_time := 0.0
 var item := ""
 var stun := 0.0
 var altitude := 500.0  ## Height of the skids above whatever is below.
+var heat := 0.0  ## Gun heat, 0..1.
+var overheated := false
 
 var trick := ""  ## Name of the trick in progress, "" when none.
 var trick_time := 0.0
@@ -57,11 +68,14 @@ var _trick_low := false
 var _snap_from := 0.0
 var _prev_trick := false
 var _prev_item := false
+var _gun_timer := 0.0
+var _gun_side := 1.0
 
 
 func _ready() -> void:
 	motion_mode = MOTION_MODE_FLOATING
 	heading = rotation.y
+	add_to_group("choppas")
 
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = 1.1
@@ -112,6 +126,7 @@ func step(delta: float) -> void:
 
 	_trick_cooldown = maxf(0.0, _trick_cooldown - delta)
 	_update_trick(delta)
+	_update_gun(i, delta)
 
 	if trick == "180 SNAP":
 		turn_rate = 0.0
@@ -152,6 +167,35 @@ func step(delta: float) -> void:
 	model.update_pose(self, delta)
 
 
+## The choppa that aim assist would shoot at right now, or null.
+func aim_target() -> Choppa:
+	var forward := facing() * Vector3.FORWARD
+	var best: Choppa = null
+	var best_angle := AIM_ASSIST_ANGLE
+	for node in get_tree().get_nodes_in_group("choppas"):
+		var other := node as Choppa
+		if other == self:
+			continue
+		var to := other.global_position - global_position
+		var flat := Vector3(to.x, 0.0, to.z)
+		if to.length() > AIM_ASSIST_RANGE or flat.length() < 0.1:
+			continue
+		var angle := forward.angle_to(flat)
+		if angle < best_angle and absf(atan2(to.y, flat.length())) < AIM_ASSIST_PITCH:
+			best = other
+			best_angle = angle
+	return best
+
+
+## Called by a bullet. Returns false when the hit is dodged.
+func take_hit(impulse: Vector3, shooter: Choppa) -> bool:
+	if trick == "BARREL ROLL":
+		return false
+	velocity += impulse
+	hit_taken.emit(impulse, shooter)
+	return true
+
+
 func give_item(item_name: String) -> bool:
 	if item != "":
 		return false
@@ -182,8 +226,47 @@ func respawn(at: Transform3D) -> void:
 	trick = ""
 	stun = 0.0
 	turbo_time = 0.0
+	heat = 0.0
+	overheated = false
 	reset_physics_interpolation()
 	_update_altitude()
+
+
+func _update_gun(i: PilotInput, delta: float) -> void:
+	_gun_timer = maxf(0.0, _gun_timer - delta)
+	if overheated:
+		heat = maxf(0.0, heat - GUN_COOL_RATE * delta)
+		overheated = heat > 0.0
+		return
+	if not i.fire:
+		heat = maxf(0.0, heat - GUN_COOL_RATE * delta)
+		return
+	if trick != "" or _gun_timer > 0.0:
+		return
+	_shoot()
+	_gun_timer = GUN_INTERVAL
+	heat += GUN_HEAT_PER_SHOT
+	if heat >= 1.0:
+		heat = 1.0
+		overheated = true
+		gun_overheated.emit()
+
+
+func _shoot() -> void:
+	var muzzle := global_position + facing() * Vector3(0.9 * _gun_side, -0.5, -2.2)
+	_gun_side = -_gun_side
+	var target := aim_target()
+	var direction := facing() * Vector3.FORWARD
+	if target:
+		direction = (target.global_position - muzzle).normalized()
+	var bullet := Bullet.new()
+	bullet.shooter = self
+	bullet.direction = direction
+	# Bullets inherit your speed so they never fall behind you while boosting.
+	bullet.speed = Bullet.SPEED + maxf(0.0, velocity.dot(direction))
+	get_parent().add_child(bullet)
+	bullet.global_position = muzzle
+	bullet.reset_physics_interpolation()
 
 
 func _start_trick(i: PilotInput) -> void:

@@ -29,11 +29,24 @@ moving fast and looking good.
 | Yaw (right stick X / Q E / arrows) | Turn. |
 | Lift (right stick Y / Space C / arrows) | Climb and dive. |
 | Boost (RB / Shift) | Burn boost meter for top speed. |
+| Fire (RT / Ctrl / mouse) | Machine gun. |
 | Trick (A / F) + direction | Pull a move (below). |
 | Item (X / R) | Use the held item. |
 | Camera (Y / V) | Toggle chase / cockpit view. |
 
 Collisions bounce you off walls and stun you briefly; no instant death from scraping a wall.
+
+### Machine gun (decided)
+
+Every choppa has a twin machine gun. It **knocks targets back instead of damaging them**:
+in a race it shoves rivals into walls, in battle it pushes them into hazards and mines.
+Items stay the real weapons.
+
+- Rapid fire (12.5 rounds/s), tracers, rounds stopped by walls.
+- Aim assist: rounds snap to a choppa inside a 12° cone ahead (lock ring on the HUD).
+- Overheats after ~2.3 s of continuous fire, then cools down.
+- A barrel roll dodges bullets.
+- On touch screens it auto-fires while locked on, since the right thumb is steering.
 
 ### Sick moves
 
@@ -116,7 +129,7 @@ fog for depth. Planned first maps:
 6. **Battle mode** and an arena map.
 7. **Internet play**, menus, choppa colors and customization.
 
-## Open questions
+## Decided after the first build
 
-- Should choppas also have a weak machine gun (knockback, no damage), or only items?
-- Simple or "pro" control scheme? Today's is drone-style: steering plus separate lift.
+- Weak machine gun with knockback: yes.
+- Control scheme: keep the current drone-style controls (steering plus separate lift).

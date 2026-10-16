@@ -30,6 +30,7 @@ func _buttons() -> Dictionary:
 	return {
 		"boost": [Vector2(w - 110.0, h - 110.0), 70.0, "BOOST"],
 		"trick": [Vector2(w - 270.0, h - 80.0), 58.0, "TRICK"],
+		"fire": [Vector2(w - 260.0, h - 230.0), 62.0, "FIRE"],
 		"use_item": [Vector2(w - 100.0, h - 270.0), 55.0, "ITEM"],
 		"toggle_camera": [Vector2(w - 60.0, 140.0), 38.0, "CAM"],
 	}

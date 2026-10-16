@@ -9,16 +9,19 @@ var skill := 1.0  ## 0..1, scales top speed and how eagerly it boosts.
 
 var rng := RandomNumberGenerator.new()
 
+var _stuck := 0.0  ## Seconds spent barely moving while wanting to.
+var _unstick := 0.0  ## Seconds left of backing up and climbing away from whatever we hit.
+
 
 func _ready() -> void:
 	process_physics_priority = -10
 
 
-func _physics_process(_delta: float) -> void:
-	steer()
+func _physics_process(delta: float) -> void:
+	steer(delta)
 
 
-func steer() -> void:
+func steer(delta := 1.0 / 60.0) -> void:
 	var i := choppa.input
 	i.clear()
 	if race == null or race.is_done(choppa):
@@ -31,7 +34,19 @@ func steer() -> void:
 	var distance := Vector2(local.x, local.z).length()
 
 	# Ease off for sharp turns so we don't overshoot the gate.
-	var speed := clampf(1.0 - absf(angle) / 1.4, 0.15, 1.0) * lerpf(0.7, 0.85, skill) * choppa.max_speed
+	var speed := clampf(1.0 - absf(angle) / 1.4, 0.15, 1.0) * lerpf(0.84, 0.9, skill) * choppa.max_speed
+	# Pinned against a wall or a tunnel mouth: back off upward for a moment, then try again.
+	if choppa.velocity.length() < 3.0 and distance > 15.0:
+		_stuck += delta
+	else:
+		_stuck = maxf(0.0, _stuck - delta)
+	if _stuck > 1.2:
+		_stuck = 0.0
+		_unstick = 1.5
+	if _unstick > 0.0:
+		_unstick -= delta
+		Autopilot.fly(choppa, i, (-to.normalized() + Vector3.UP).normalized() * 10.0, target)
+		return
 	Autopilot.fly(choppa, i, to.normalized() * speed, target)
 	i.boost = absf(angle) < 0.12 and distance > 70.0 and choppa.boost_meter > lerpf(0.6, 0.25, skill)
 	i.fire = choppa.aim_target() != null

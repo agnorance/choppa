@@ -11,7 +11,7 @@ signal race_over
 
 const COUNTDOWN := 3.0
 ## After the first finisher, the others get this long before the race ends anyway.
-const FINISH_GRACE := 30.0
+const FINISH_GRACE := 40.0
 
 var laps := 3
 var gates: Array[RingGate] = []

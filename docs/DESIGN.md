@@ -120,8 +120,9 @@ Two models, chosen on the title screen ("Flight") or in the settings:
 - **Easy** (`Choppa._step_easy`): the first build's drone, kept for newcomers. No
   gravity, hovers by itself, WASD moves and strafes, Q/E or the mouse turn, mouse Y
   aims the nose and the choppa flies where it points (so nose down plus forward
-  descends), Space/C climb and dive. The body leans into the motion. Rolling hard is
-  not a thing here, so missiles cannot be shaken off.
+  descends), Space/C climb and dive, the nose capped at about 45 degrees. The body
+  leans into the motion. Rolling hard is not a thing here, so missiles cannot be
+  shaken off.
 
 The realistic model:
 
@@ -138,7 +139,9 @@ The realistic model:
   height hold.
 - **Afterburner:** Shift / RB. About two seconds of charge, back in five when off;
   the HUD bar shows it. The TURBO item is a stronger burst.
-- **Ground effect:** a little extra thrust in the last six metres.
+- **Ground effect:** a little extra thrust in the last six metres. **Translational
+  lift:** up to 12 % more thrust at airspeed (full at 25 m/s), so a moving choppa needs
+  less collective and a hover is the hardest place to hold height.
 - **Ceiling:** no climbing above the map's ceiling.
 - Collisions bounce you off walls, stun you briefly and kill most of the spin. Any
   impact over 8 m/s costs health (2 per m/s above that), at most once every 0.4 s so

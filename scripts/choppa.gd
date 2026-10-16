@@ -29,6 +29,10 @@ const DODGE_ROLL_RATE := 2.2  ## rad/s: rolling this fast throws off bullets and
 const LEVEL_GAIN := 2.5  ## Flight assist: rate per radian of tilt that brings the body level.
 const GROUND_EFFECT := 0.08  ## Extra thrust fraction right above the ground...
 const GROUND_EFFECT_HEIGHT := 6.0  ## ...fading out by this altitude.
+## Translational lift: the rotor works better in clean air, so forward speed adds up to
+## this fraction of thrust (reached at ETL_SPEED). You need less collective once moving.
+const TRANSLATIONAL_LIFT := 0.12
+const ETL_SPEED := 25.0
 const GUN_INTERVAL := 0.08  ## Seconds between shots.
 const GUN_HEAT_PER_SHOT := 0.035  ## About 2.3 s of continuous fire to overheat.
 const GUN_COOL_RATE := 0.6  ## Heat lost per second when not firing.
@@ -86,6 +90,7 @@ var aim_assist := true  ## Guns snap onto a target in the cone; the player can t
 @export var turn_speed := 2.4  ## rad/s
 @export var turn_accel := 14.0
 @export var aim_rate := 2.0  ## rad/s the nose pitches at full stick (held where you leave it).
+@export var aim_limit := 0.8  ## rad; the easy model never points more than ~45 degrees up or down.
 
 var input := PilotInput.new()
 var heading := 0.0  ## Yaw in radians; 0 faces -Z. Derived from the body each tick.
@@ -225,6 +230,7 @@ func step(delta: float) -> void:
 	if flight_assist:
 		wanted_thrust /= clampf(b.y.y, 0.5, 1.0)  # Hold height when tilted.
 	wanted_thrust *= 1.0 + GROUND_EFFECT * clampf(1.0 - altitude / GROUND_EFFECT_HEIGHT, 0.0, 1.0)
+	wanted_thrust *= 1.0 + TRANSLATIONAL_LIFT * clampf(Vector2(velocity.x, velocity.z).length() / ETL_SPEED, 0.0, 1.0)
 	wanted_thrust *= (1.0 - 0.15 * rotor) * (1.0 - 0.35 * engine)  # Damaged lift and power.
 	_thrust = lerpf(_thrust, wanted_thrust, 1.0 - exp(-delta / thrust_lag))
 	var thrust := _thrust
@@ -262,7 +268,7 @@ func _step_easy(i: PilotInput, delta: float) -> void:
 	var yaw_wish := -i.yaw * turn_speed * (1.0 - 0.75 * tail) - TAIL_TORQUE * tail * tail
 	turn_rate = move_toward(turn_rate, yaw_wish, turn_accel * delta)
 	heading = wrapf(heading + turn_rate * delta, -PI, PI)
-	_aim = clampf(_aim + i.cyclic.y * aim_rate * delta, -1.2, 1.2)
+	_aim = clampf(_aim + i.cyclic.y * aim_rate * delta, -aim_limit, aim_limit)
 	rates = Vector3(0.0, turn_rate, 0.0)
 
 	var boosting := is_boosting() and engine < 1.0

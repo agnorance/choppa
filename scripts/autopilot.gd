@@ -33,7 +33,10 @@ static func fly(c: Choppa, i: PilotInput, want_velocity: Vector3, look_at: Vecto
 	i.cyclic.x = clampf((want_roll - c.bank_right()) * TILT_GAIN + c.rates.z * RATE_DAMPING, -1.0, 1.0)
 
 	var up := clampf(c.global_transform.basis.y.y, 0.35, 1.0)
-	var want_thrust := (Choppa.GRAVITY + want_accel.y) / up
+	# The rotor gives more at airspeed (translational lift); ask for less collective then.
+	var airspeed := Vector2(c.velocity.x, c.velocity.z).length()
+	var lift_bonus := 1.0 + Choppa.TRANSLATIONAL_LIFT * clampf(airspeed / Choppa.ETL_SPEED, 0.0, 1.0)
+	var want_thrust := (Choppa.GRAVITY + want_accel.y) / up / lift_bonus
 	i.collective = clampf((want_thrust / c.hover_thrust - 1.0) / c.collective_range, -1.0, 1.0)
 
 	var local_look := yaw_frame.inverse() * (look_at - c.global_position)

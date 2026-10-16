@@ -408,6 +408,9 @@ func test_four_bots_all_finish() -> void:
 		limit -= 1
 	var times := race.results.map(func(r: Dictionary) -> String: return "%.1f" % r.time)
 	print("    finish times %s, race time %.1fs" % [times, race.time])
+	for c in field:
+		if not race.is_done(c):
+			print("    unfinished: lap %d, next gate %d, at %s, speed %.1f" % [race.lap_of(c), race.next_gate(c).index, c.global_position, c.velocity.length()])
 	_check(race.results.size() == 4, "all four finished, got %d" % race.results.size())
 
 

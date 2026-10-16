@@ -61,7 +61,16 @@ jobs:
         run: godot --headless --path . --import
 
       - name: Run tests
-        run: godot --headless --fixed-fps 60 --path . --script res://tests/run_tests.gd
+        run: |
+          set -o pipefail
+          godot --headless --fixed-fps 60 --path . --script res://tests/run_tests.gd 2>&1 | tee test.log
+      - name: Report test failures
+        if: failure()
+        run: |
+          # Surface failures as annotations, readable without downloading logs.
+          grep -E "FAIL|check failed|SCRIPT ERROR|ERROR" test.log | head -40 | while IFS= read -r line; do
+            echo "::error::$line"
+          done
 
       - name: Export Windows
         run: |

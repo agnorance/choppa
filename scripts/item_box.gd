@@ -15,6 +15,8 @@ var _phase := randf() * TAU
 
 func _ready() -> void:
 	add_to_group("item_boxes")
+	# Seed from the position so matches (and tests) play out the same every time.
+	rng.seed = hash(Vector3i(global_position.round()))
 	var shape := CollisionShape3D.new()
 	var box_shape := BoxShape3D.new()
 	box_shape.size = Vector3.ONE * 3.0

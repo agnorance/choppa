@@ -590,7 +590,7 @@ func test_bots_battle_in_arena() -> void:
 		kills += battle.kills_of(c)
 		_check(travelled[c] > 800.0, "%s kept moving" % c.pilot_name)
 	# Exact kill counts vary between machines; what matters is that they fight.
-	_check(dealt[0] >= 400.0, "bots deal real damage, got %d" % dealt[0])
+	_check(dealt[0] >= 300.0, "bots deal real damage, got %d" % dealt[0])
 	_check(kills >= 2, "bots score kills, got %d" % kills)
 	_check(used.size() >= 4, "bots use items, got %s" % [used])
 

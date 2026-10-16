@@ -67,7 +67,8 @@ void fragment() {
 		ground_nrm(sand_normal, uv * 0.8, mixer), sand_w));
 
 	// Triplanar cliffs.
-	vec3 bw = pow(abs(n), vec3(4.0));
+	// A sharp blend: a softer one let the top-down projection smear down steep walls as streaks.
+	vec3 bw = pow(abs(n), vec3(10.0));
 	bw /= (bw.x + bw.y + bw.z);
 	vec3 p = world_pos * cliff_scale;
 	vec2 uvx = vec2(p.z, -p.y);

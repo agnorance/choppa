@@ -3,8 +3,8 @@ extends Node3D
 ## Machine gun round: light damage and a little knockback. Moves in straight steps and
 ## ray-checks each step, so it can't tunnel through thin walls.
 
-const SPEED := 180.0
-const LIFETIME := 0.9
+const SPEED := 380.0  ## Fast enough that hits land the moment you see them line up.
+const LIFETIME := 0.55  ## About 210 m of reach.
 const KNOCKBACK := 1.2  ## Velocity added to the target per hit.
 const DAMAGE := 4.0
 
@@ -22,7 +22,7 @@ var _age := 0.0
 func _ready() -> void:
 	if _mesh == null:
 		_mesh = BoxMesh.new()
-		_mesh.size = Vector3(0.07, 0.07, 3.0)
+		_mesh.size = Vector3(0.09, 0.09, 5.0)  # Long enough to read as a streak at this speed.
 		_material = StandardMaterial3D.new()
 		_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		_material.albedo_color = Color(4.0, 2.6, 1.0)  # Above 1: the glow pass makes it a streak of light.

@@ -161,13 +161,18 @@ def warning_loop():
 
 
 def gun():
-    """One machine gun round: crack, punch and a short metallic ring."""
-    s = 0.22
-    crack = highpass(noise(s), 1500.0) * env(s, 0.0005, 0.005) * 0.6
-    body = lowpass(noise(s), 900.0) * env(s, 0.001, 0.03) * 1.8
-    thump = sine(s, np.linspace(140.0, 70.0, int(s * RATE))) * env(s, 0.001, 0.045) * 1.5
-    ring = sine(s, 1830.0) * env(s, 0.002, 0.05) * 0.1
-    return lowpass(crack + body + thump + ring, 7000.0)
+    """One heavy machine gun round: sharp crack, a chesty punch, the bolt cycling and a
+    short air tail, so a burst sounds like a big gun rather than a rattle."""
+    s = 0.32
+    n = int(s * RATE)
+    crack = highpass(noise(s), 1800.0) * env(s, 0.0004, 0.004) * 0.55
+    body = lowpass(noise(s), 1100.0) * env(s, 0.001, 0.04) * 2.0
+    punch = bandpass(noise(s), 180.0, 700.0) * env(s, 0.001, 0.06) * 2.2
+    thump = sine(s, np.linspace(125.0, 55.0, n)) * env(s, 0.001, 0.06) * 1.7
+    clack = np.zeros(n)
+    place(clack, highpass(noise(0.03), 2500.0) * env(0.03, 0.0005, 0.006), 0.035, 0.22)
+    tail = lowpass(noise(s), 650.0) * env(s, 0.01, 0.11) * 0.4
+    return lowpass(crack + body + punch + thump + clack + tail, 7000.0)
 
 
 def explosion():

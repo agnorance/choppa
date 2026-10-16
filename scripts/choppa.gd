@@ -35,8 +35,11 @@ const GROUND_EFFECT_HEIGHT := 6.0  ## ...fading out by this altitude.
 const TRANSLATIONAL_LIFT := 0.12
 const ETL_SPEED := 25.0
 const GUN_INTERVAL := 0.08  ## Seconds between shots.
-const GUN_HEAT_PER_SHOT := 0.035  ## About 2.3 s of continuous fire to overheat.
+const GUN_HEAT_PER_SHOT := 0.0135  ## About 6 s of continuous fire to overheat.
 const GUN_COOL_RATE := 0.6  ## Heat lost per second when not firing.
+const GUN_SPREAD := 0.003  ## Cone half-angle (radians) with cold barrels.
+const GUN_BLOOM := 0.022  ## Extra cone at full heat: bursts beat holding the trigger.
+const GUN_RECOIL := 1.4  ## m/s per second of firing, against the nose: you feel a long burst.
 const AIM_ASSIST_ANGLE := deg_to_rad(12.0)  ## Horizontal cone that snaps bullets.
 const AIM_ASSIST_PITCH := deg_to_rad(35.0)
 const AIM_ASSIST_RANGE := 160.0
@@ -117,7 +120,7 @@ var max_health := MAX_HEALTH
 var clearance := GROUND_CLEARANCE  ## Body origin to skid bottom for this airframe.
 var gun_factor := 1.0  ## Machine-gun damage multiplier of the airframe.
 ## Rounds left: rockets, missiles, flares, mines, smoke. Refilled at service stations.
-var ammo := {"rockets": 0, "missiles": 0, "flares": 0, "mines": 0, "smoke": 0}
+var ammo := {"gun": 0, "rockets": 0, "missiles": 0, "flares": 0, "mines": 0, "smoke": 0}
 var decoy_time := 0.0  ## Seconds left that flares fool missiles.
 var invulnerable := 0.0
 var clock := 0.0  ## Simulation seconds this choppa has existed.
@@ -138,6 +141,7 @@ var _part_scale := 1.0
 var _tick := 1.0 / 60.0  ## The current step's delta, for code that runs inside it.
 var _gun_timer := 0.0
 var _gun_side := 1.0
+var _shots := 0  ## Rounds fired, for the spread pattern.
 var _shape: CollisionShape3D
 var _last_attacker: Choppa
 var _last_attacker_time := -100.0
@@ -199,6 +203,10 @@ func step(delta: float) -> void:
 	if not replaying:
 		_update_gun(i, delta)
 		_update_weapons(i, delta)
+	# Recoil, here rather than in _update_gun so a network replay (which skips the gun)
+	# still feels it and the prediction stays right.
+	if i.fire and not overheated and ammo.gun > 0:
+		velocity += global_transform.basis.z * GUN_RECOIL * delta
 	_crash_cooldown = maxf(0.0, _crash_cooldown - delta)
 	if easy:
 		_step_easy(i, delta)
@@ -478,14 +486,25 @@ func needs_repair() -> bool:
 ## Full loadout for the airframe (a service station, or a respawn).
 func restock() -> void:
 	var spec := Airframe.spec(airframe)
-	ammo = {"rockets": spec.rockets, "missiles": spec.missiles, "flares": spec.flares, "mines": 1, "smoke": 1}
+	ammo = {"gun": spec.rounds, "rockets": spec.rockets, "missiles": spec.missiles, "flares": spec.flares,
+		"mines": 1, "smoke": 1}
 	restocked.emit()
 
 
 ## Rounds the airframe carries of `weapon` when full.
 func full_ammo(weapon: String) -> int:
 	var spec := Airframe.spec(airframe)
+	if weapon == "gun":
+		return spec.rounds
 	return spec.get(weapon, 1) if weapon in ["rockets", "missiles", "flares"] else 1
+
+
+## Anything short of a full loadout (what an ammo station fixes).
+func needs_ammo() -> bool:
+	for weapon: String in ammo:
+		if ammo[weapon] < full_ammo(weapon):
+			return true
+	return false
 
 
 ## Turns this choppa into one of the Airframe classes: numbers, hull, loadout, size.
@@ -660,11 +679,12 @@ func _update_gun(i: PilotInput, delta: float) -> void:
 		heat = maxf(0.0, heat - GUN_COOL_RATE * delta)
 		overheated = heat > 0.0
 		return
-	if not i.fire:
+	if not i.fire or ammo.gun <= 0:
 		heat = maxf(0.0, heat - GUN_COOL_RATE * delta)
 		return
 	if _gun_timer > 0.0:
 		return
+	ammo.gun -= 1
 	_shoot()
 	_gun_timer = GUN_INTERVAL
 	heat += GUN_HEAT_PER_SHOT
@@ -685,6 +705,14 @@ func _shoot() -> void:
 	var direction := -global_transform.basis.z
 	if target:
 		direction = (target.global_position - muzzle).normalized()
+	# Bloom: the hotter the barrels, the wider the cone. A fixed spiral rather than random
+	# numbers, so server and client agree on every round.
+	_shots += 1
+	var cone := GUN_SPREAD + GUN_BLOOM * heat
+	var angle := _shots * 2.39996
+	var off := sqrt(fposmod(_shots * 0.618034, 1.0)) * cone
+	var side := direction.cross(Vector3.UP if absf(direction.y) < 0.99 else Vector3.RIGHT).normalized()
+	direction = (direction + (side * cos(angle) + side.cross(direction) * sin(angle)) * off).normalized()
 	last_shot_time = clock
 	var bullet := Bullet.new()
 	bullet.shooter = self

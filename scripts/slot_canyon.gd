@@ -40,6 +40,7 @@ func _ready() -> void:
 	terrain = Terrain.new()
 	terrain.size = SIZE
 	terrain.resolution = [140, 280, 550][Graphics.quality]  # 2 m cells on desktop.
+	terrain.normal_reach = 2 if Graphics.at_least(Graphics.Quality.HIGH) else 1
 	terrain.height_fn = _height
 	terrain.material = MapKit.terrain_material(RIVER_LEVEL + 0.5)
 	add_child(terrain)
@@ -197,7 +198,7 @@ func _near_feature(at: Vector3) -> bool:
 	for z: float in [120.0, -60.0, 40.0, -180.0, 260.0, -330.0]:
 		if absf(at.z - z) < (60.0 if z == 120.0 else 14.0):
 			return true
-	for s: Vector3 in _station_spots():
+	for s: Vector3 in _station_spots() + _ammo_spots():
 		if Vector2(at.x - s.x, at.z - s.z).length() < 14.0:
 			return true
 	return false
@@ -211,9 +212,20 @@ func _station_spots() -> Array[Vector3]:
 	return out
 
 
+## Ammo-only stations, between the repair pads and clear of the power lines.
+func _ammo_spots() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for entry: Array in [[-110.0, 0.35], [190.0, -0.3]]:
+		var z: float = entry[0]
+		out.append(Vector3(center_x(z) + entry[1] * half_width(z), 0.0, z))
+	return out
+
+
 func _stations_and_spawns() -> void:
 	for at in _station_spots():
 		MapKit.station(self, at, _ground)
+	for at in _ammo_spots():
+		MapKit.station(self, at, _ground, true)
 	# Spawns spread along the canyon, alternating sides, facing up or down it.
 	for k in 8:
 		var z := lerpf(-LENGTH * 0.4, LENGTH * 0.4, k / 7.0)

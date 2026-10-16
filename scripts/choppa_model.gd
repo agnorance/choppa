@@ -31,6 +31,7 @@ var _tail_sparks: CPUParticles3D  ## Where the tail rotor was.
 var _flashes: Array[Node3D] = []  ## Left, right.
 var _flash_lights: Array[OmniLight3D] = []
 var _casings: Array[CPUParticles3D] = []
+var _barrel_smoke: Array[CPUParticles3D] = []  ## Hot barrels smoke between bursts.
 var _haze: Array[CPUParticles3D] = []
 var _downwash: MeshInstance3D
 var _downwash_material: ShaderMaterial
@@ -83,6 +84,7 @@ func set_airframe(id: String) -> void:
 	_flashes.clear()
 	_flash_lights.clear()
 	_casings.clear()
+	_barrel_smoke.clear()
 	_cracks.clear()
 	_build()
 
@@ -163,12 +165,15 @@ func _build() -> void:
 
 	# Rotor downwash kicking up dust (or spray over water) when flying low.
 	_dust_colors = Effects.gradient([
-		Color(0.8, 0.77, 0.7, 0.0), Color(0.8, 0.77, 0.7, 0.55), Color(0.78, 0.75, 0.68, 0.0),
+		Color(0.66, 0.58, 0.46, 0.0), Color(0.66, 0.58, 0.46, 0.32), Color(0.64, 0.57, 0.47, 0.0),
 	])
 	_spray_colors = Effects.gradient([
 		Color(0.9, 0.95, 1.0, 0.0), Color(0.88, 0.94, 1.0, 0.6), Color(0.85, 0.92, 1.0, 0.0),
 	])
-	_dust = Effects.puffs(_dust_colors, 48, 1.4)
+	# Lit and earth-coloured: unlit pale puffs glowed like separate white blobs on grass.
+	_dust = Effects.puffs(_dust_colors, 72, 1.8, true)
+	# Lit, but with the soft dot: the dense smoke texture showed each puff as a disc.
+	((_dust.mesh as QuadMesh).material as StandardMaterial3D).albedo_texture = Effects._soft_dot()
 	_dust.top_level = true
 	_dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
 	_dust.emission_ring_axis = Vector3.UP
@@ -183,8 +188,8 @@ func _build() -> void:
 	_dust.damping_min = 3.0
 	_dust.damping_max = 4.0
 	_dust.gravity = Vector3(0.0, 3.0, 0.0)  # Billows up and out.
-	_dust.scale_amount_min = 1.5
-	_dust.scale_amount_max = 3.0
+	_dust.scale_amount_min = 2.5
+	_dust.scale_amount_max = 5.0
 	_dust.emitting = false
 	add_child(_dust)
 
@@ -281,7 +286,7 @@ func update_pose(c: Choppa, delta: float) -> void:
 	if c.last_shot_time != _last_shot and c.last_shot_time > _last_shot:
 		_last_shot = c.last_shot_time
 		var muzzle := global_transform * (_flashes[1 if c.last_shot_side > 0.0 else 0].position)
-		Sounds.play_at(get_tree().current_scene, "gun", muzzle, -6.0, randf_range(0.92, 1.08))
+		Sounds.play_at(get_tree().current_scene, "gun", muzzle, -3.0 if own else -6.0, randf_range(0.94, 1.06))
 
 	_parts.visible = c.invulnerable <= 0.0 or fmod(c.invulnerable, 0.2) > 0.08
 	if cockpit_view:  # Blinks with the hull in chase view; always there from the seat.
@@ -296,6 +301,8 @@ func update_pose(c: Choppa, delta: float) -> void:
 		_flashes[k].visible = on
 		_flash_lights[k].visible = on
 		_casings[k].emitting = c.alive and c.clock - c.last_shot_time < Choppa.GUN_INTERVAL * 1.5
+		_barrel_smoke[k].emitting = c.alive and (c.overheated or c.heat > 0.45) \
+			and c.clock - c.last_shot_time > Choppa.GUN_INTERVAL * 2.0
 	for haze in _haze:
 		haze.emitting = c.alive
 	var visible_cracks := clampi(floori((Choppa.MAX_HEALTH - c.health) / 12.0), 0, _cracks.size()) if c.alive else 0
@@ -393,6 +400,20 @@ func _build_guns(model: Node3D) -> void:
 		shells.emitting = false
 		add_child(shells)
 		_casings.append(shells)
+
+		var smoke := Effects.puffs(Effects.gradient([
+			Color(0.75, 0.75, 0.75, 0.0), Color(0.7, 0.7, 0.72, 0.35), Color(0.7, 0.7, 0.72, 0.0)]), 14, 1.1)
+		smoke.position = at
+		smoke.direction = Vector3.UP
+		smoke.spread = 25.0
+		smoke.initial_velocity_min = 0.4
+		smoke.initial_velocity_max = 1.0
+		smoke.gravity = Vector3(0.0, 1.2, 0.0)
+		smoke.scale_amount_min = 0.25
+		smoke.scale_amount_max = 0.5
+		smoke.emitting = false
+		add_child(smoke)
+		_barrel_smoke.append(smoke)
 
 
 ## Cracks in the canopy glass at the "crack_*" markers; more show as the hull takes

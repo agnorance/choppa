@@ -5,6 +5,9 @@ extends StaticBody3D
 
 var size := 1200.0
 var resolution := 120  ## Cells per side.
+## Normals from heights this many cells apart. Above 1 smooths the shading of
+## near-vertical walls, where neighbouring columns of thin triangles lit as stripes.
+var normal_reach := 1
 ## (x, z) -> height.
 var height_fn: Callable
 var material: Material
@@ -33,9 +36,10 @@ func _ready() -> void:
 			var k := j * n + i
 			vertices[k] = _vertex(i, j)
 			# Central differences give smooth per-vertex normals.
-			var dx := _h(i - 1, j) - _h(i + 1, j)
-			var dz := _h(i, j - 1) - _h(i, j + 1)
-			normals[k] = Vector3(dx, 2.0 * _step, dz).normalized()
+			var r := normal_reach
+			var dx := _h(i - r, j) - _h(i + r, j)
+			var dz := _h(i, j - r) - _h(i, j + r)
+			normals[k] = Vector3(dx, 2.0 * r * _step, dz).normalized()
 	var indices := PackedInt32Array()
 	indices.resize(resolution * resolution * 6)
 	var w := 0

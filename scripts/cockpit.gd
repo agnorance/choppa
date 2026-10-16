@@ -115,7 +115,7 @@ func _process(delta: float) -> void:
 		var color := Color(0.9, 0.15, 0.05).lerp(Color(0.25, 1.0, 0.3), smoothstep(0.2, 0.7, level))
 		_health_cells[k].material_override = _cell_material(color) if on else _cell_off
 
-	_item_label.text = "R%d  M%d  F%d" % [choppa.ammo.rockets, choppa.ammo.missiles, choppa.ammo.flares]
+	_item_label.text = "G%d R%d M%d F%d" % [choppa.ammo.gun, choppa.ammo.rockets, choppa.ammo.missiles, choppa.ammo.flares]
 	_item_label.modulate = AMBER * (2.0 if choppa.ammo.rockets + choppa.ammo.missiles > 0 else 0.6)
 
 	var blink := fmod(_clock, 0.5) < 0.3

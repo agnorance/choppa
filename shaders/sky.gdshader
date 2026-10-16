@@ -10,8 +10,12 @@ uniform vec3 ground_color : source_color = vec3(0.28, 0.22, 0.18);
 uniform float cloud_coverage : hint_range(0.0, 1.0) = 0.52;
 uniform float cloud_speed = 0.0015;
 
+// A hash without sin(): sin() of large arguments loses precision on GPUs, and the
+// noise turned into hard-edged blocks across the sky (seen on NVIDIA).
 float hash(vec2 p) {
-	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+	p3 += dot(p3, p3.yzx + 33.33);
+	return fract((p3.x + p3.y) * p3.z);
 }
 
 float noise(vec2 p) {

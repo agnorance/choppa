@@ -9,6 +9,8 @@ const SIZE := 760.0
 const PLAY_RADIUS := 260.0
 const LAKE := Vector2(150.0, 150.0)
 const WATER_LEVEL := -2.5
+## Ammo-only stations, east and west on the station ring.
+const AMMO_STATIONS: Array[Vector3] = [Vector3(112.0, 0.0, 0.0), Vector3(-112.0, 0.0, 0.0)]
 
 var terrain: Terrain
 
@@ -116,6 +118,8 @@ func _ready() -> void:
 		var angle := TAU * k / 4.0 + PI * 0.25
 		MapKit.station(self, Vector3(cos(angle), 0.0, sin(angle)) * 112.0, _ground)
 	MapKit.station(self, Vector3(_trench_center(-120.0), 0.0, -120.0), _ground)
+	for at: Vector3 in AMMO_STATIONS:
+		MapKit.station(self, at, _ground, true)
 
 	for k in 8:
 		var angle := TAU * k / 8.0 + 0.2
@@ -137,6 +141,9 @@ func _trench_center(z: float) -> float:
 
 func _clear_of_structures(at: Vector3) -> bool:
 	var flat := Vector2(at.x, at.z)
+	for s: Vector3 in AMMO_STATIONS:
+		if flat.distance_to(Vector2(s.x, s.z)) < 14.0:
+			return false
 	if flat.length() < 85.0:  # Mesa.
 		return false
 	if absf(flat.length() - 150.0) < 18.0:  # Arch ring.
@@ -152,7 +159,12 @@ func _height(x: float, z: float) -> float:
 	var h := n * 14.0 * smoothstep(70.0, 160.0, r)
 	# Cliffs all around, always taller than the flight ceiling.
 	var rim := smoothstep(PLAY_RADIUS - 20.0, PLAY_RADIUS + 70.0, r + (n - 0.5) * 50.0)
-	h += rim * (125.0 + _noise.get_noise_2d(x * 2.0, z * 2.0) * 25.0)
+	var cliff := rim * (125.0 + _noise.get_noise_2d(x * 2.0, z * 2.0) * 25.0)
+	# Sandstone ledges: the cliffs climb in steps, steep faces between shelves, so they
+	# read as layered rock rather than a smooth ramp.
+	var t := (cliff + (n - 0.5) * 10.0) / 21.0
+	var stepped := (floorf(t) + smoothstep(0.55, 1.0, fposmod(t, 1.0))) * 21.0
+	h += lerpf(cliff, stepped, 0.85 * smoothstep(0.05, 0.3, rim))
 	# Winding trench on the west side.
 	var trench := 1.0 - smoothstep(9.0, 24.0, absf(x - _trench_center(z)))
 	h -= trench * 20.0 * (1.0 - smoothstep(200.0, 240.0, absf(z)))

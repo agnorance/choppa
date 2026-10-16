@@ -14,6 +14,7 @@ var _root: Control
 var _speed: Label
 var _altitude: Label
 var _fps: Label
+var _gun: Label
 var _loadout: Label
 var _loadout_extra: Label
 var _effects: Label
@@ -98,6 +99,9 @@ func _ready() -> void:
 	var item_caption := UiKit.outlined(UiKit.caption(Airframe.spec(choppa.airframe).name, 14))
 	item_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	item_column.add_child(item_caption)
+	_gun = UiKit.outlined(UiKit.display("", 26))
+	_gun.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	item_column.add_child(_gun)
 	_loadout = UiKit.outlined(UiKit.display("", 26))
 	_loadout.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	item_column.add_child(_loadout)
@@ -228,13 +232,15 @@ func _process(delta: float) -> void:
 	_smoke.color.a = move_toward(_smoke.color.a, 0.82 if choppa.in_smoke() else 0.0, delta * 3.0)
 	_warning.text = "MISSILE  -  FLARES!" if choppa.ammo.flares > 0 and _missile_hunting() and fmod(choppa.clock, 0.4) < 0.25 else "MISSILE  -  ROLL!" if _missile_hunting() and fmod(choppa.clock, 0.4) < 0.25 else ""
 	var a := choppa.ammo
+	_gun.text = "GUN %d" % a.gun if a.gun > 0 else "GUN EMPTY"
+	_gun.add_theme_color_override("font_color", UiKit.DANGER if a.gun < choppa.full_ammo("gun") * 0.2 else UiKit.TEXT)
 	_loadout.text = "RKT %d   MSL %d   FLR %d" % [a.rockets, a.missiles, a.flares]
 	_loadout_extra.text = "MINE %d   SMOKE %d" % [a.mines, a.smoke]
 	_loadout.add_theme_color_override("font_color", UiKit.DANGER if a.rockets + a.missiles == 0 else UiKit.TEXT)
 	var effects := PackedStringArray()
 	var station := _my_station()
 	if station:
-		effects.append("SERVICING  %d%%" % roundi(station.progress() * 100.0))
+		effects.append("%s  %d%%" % ["REARMING" if station.ammo_only else "SERVICING", roundi(station.progress() * 100.0)])
 	elif a.missiles > 0 and choppa.missile_target():
 		effects.append("MISSILE LOCK")
 	if choppa.decoy_time > 0.0:

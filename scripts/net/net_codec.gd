@@ -44,6 +44,7 @@ static func write_choppa(buf: StreamPeerBuffer, c: Choppa) -> void:
 			c.decoy_time, c.invulnerable, c.health,
 			c.parts[Choppa.Part.ROTOR], c.parts[Choppa.Part.TAIL], c.parts[Choppa.Part.ENGINE]]:
 		buf.put_float(v)
+	buf.put_u16(c.ammo.gun)
 	for weapon: String in ["rockets", "missiles", "flares", "mines", "smoke"]:
 		buf.put_u8(c.ammo[weapon])
 	var flags := (1 if c.alive else 0) | (2 if c.overheated else 0) | (4 if c.input.fire else 0) \
@@ -55,7 +56,7 @@ static func read_choppa(buf: StreamPeerBuffer) -> Dictionary:
 	var f := []
 	for k in 27:
 		f.append(buf.get_float())
-	var ammo := {}
+	var ammo := {"gun": buf.get_u16()}
 	for weapon: String in ["rockets", "missiles", "flares", "mines", "smoke"]:
 		ammo[weapon] = buf.get_u8()
 	var flags := buf.get_u8()

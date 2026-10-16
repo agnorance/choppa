@@ -120,7 +120,7 @@ static func backdrop(parent: Node3D, inner_radius: float, seed_value := 1) -> vo
 	ridges.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	ridges.fractal_type = FastNoiseLite.FRACTAL_RIDGED
 	ridges.fractal_octaves = 6
-	ridges.frequency = 0.0011
+	ridges.frequency = 0.0008  # Broad ranges: narrow ones peeked over the cliffs as white spikes.
 	var terrain := Terrain.new()
 	terrain.size = 7000.0
 	terrain.resolution = [140, 220, 350][Graphics.quality]
@@ -129,9 +129,9 @@ static func backdrop(parent: Node3D, inner_radius: float, seed_value := 1) -> vo
 		var r := Vector2(x, z).length()
 		var rise := smoothstep(inner_radius, inner_radius + 1600.0, r)
 		var ridge := ridges.get_noise_2d(x, z) * 0.5 + 0.5
-		return -60.0 + rise * (120.0 + pow(ridge, 1.8) * 620.0)
+		return -60.0 + rise * (160.0 + pow(ridge, 1.4) * 700.0)
 	var material := terrain_material(-1000.0, "rock")
-	material.set_shader_parameter("snow_height", 330.0)
+	material.set_shader_parameter("snow_height", 480.0)
 	material.set_shader_parameter("cliff_slope", 0.3)
 	material.set_shader_parameter("cliff_scale", 0.02)
 	material.set_shader_parameter("ground_scale", 0.03)
@@ -324,15 +324,16 @@ static func ring(parent: Node3D, center: Vector3, yaw: float, radius := 5.0) -> 
 
 
 ## A row of item boxes across the local X axis.
-## A service station centred at `at` (x, z). `ground` gives the terrain height; the pad
+## A service station (or an ammo-only one) centred at `at` (x, z). `ground` gives the terrain height; the pad
 ## sits on the highest point under it so no terrain pokes through.
-static func station(parent: Node3D, at: Vector3, ground: Callable) -> ServiceStation:
+static func station(parent: Node3D, at: Vector3, ground: Callable, ammo_only := false) -> ServiceStation:
 	var top := -INF
 	for k in 9:
 		var a := TAU * k / 8.0
 		var r := 0.0 if k == 8 else ServiceStation.PAD_RADIUS
 		top = maxf(top, ground.call(at.x + cos(a) * r, at.z + sin(a) * r))
 	var s := ServiceStation.new()
+	s.ammo_only = ammo_only
 	s.position = Vector3(at.x, top - 0.1, at.z)
 	parent.add_child(s)
 	return s

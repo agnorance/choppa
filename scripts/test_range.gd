@@ -42,6 +42,7 @@ func _ready() -> void:
 	MapKit.mesa_tunnel(self, Vector3(0.0, 0.0, -180.0), 0.0, 120.0, 110.0, 45.0, 22.0, 16.0)
 	MapKit.station(self, Vector3(40.0, 0.0, 70.0), func(_x: float, _z: float) -> float: return 0.0)
 	MapKit.station(self, Vector3(-40.0, 0.0, 70.0), func(_x: float, _z: float) -> float: return 0.0)
+	MapKit.station(self, Vector3(0.0, 0.0, 55.0), func(_x: float, _z: float) -> float: return 0.0, true)
 
 	# A narrower, longer tunnel to the west running east-west.
 	MapKit.mesa_tunnel(self, Vector3(-200.0, 0.0, -60.0), PI * 0.5, 160.0, 70.0, 35.0, 16.0, 12.0)

@@ -170,7 +170,8 @@ func _use_weapons(angle: float, distance: float) -> void:
 	i.smoke = a.smoke > 0 and _under_fire > 0.0 and choppa.health < choppa.max_health * 0.5
 
 
-## The nearest ready station when hurt or out of rockets and missiles, else null. Gives
+## The nearest ready station when hurt or low on ammo, else null (an ammo-only one does
+## not help when hurt). Gives
 ## up on one it cannot reach in 20 s.
 func _station_if_needed(delta: float) -> ServiceStation:
 	for ignored in _ignored_stations.keys():
@@ -180,7 +181,7 @@ func _station_if_needed(delta: float) -> ServiceStation:
 	if _station and _station.occupant == choppa:
 		return _station  # Already on the pad: stay until it is done.
 	var worn := choppa.wear(Choppa.Part.TAIL) > 0.5 or choppa.wear(Choppa.Part.ENGINE) > 0.5 or choppa.wear(Choppa.Part.ROTOR) > 0.6
-	var dry: bool = choppa.ammo.rockets + choppa.ammo.missiles == 0
+	var dry: bool = choppa.ammo.rockets + choppa.ammo.missiles == 0 or choppa.ammo.gun < choppa.full_ammo("gun") * 0.2
 	var hurt := choppa.health < choppa.max_health * 0.45
 	if not (worn or dry or hurt):
 		_station = null
@@ -197,6 +198,8 @@ func _station_if_needed(delta: float) -> ServiceStation:
 	for node in choppa.get_tree().get_nodes_in_group("stations"):
 		var st := node as ServiceStation
 		var d := choppa.global_position.distance_to(st.global_position)
+		if st.ammo_only and (worn or hurt):
+			continue
 		if st.is_ready() and st.occupant == null and d < best_distance and not _ignored_stations.has(st):
 			_station = st
 			best_distance = d

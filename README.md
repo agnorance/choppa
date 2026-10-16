@@ -18,6 +18,8 @@ Pick a map in the menu (Mesa Basin, Slot Canyon or Test Range), then:
 
 - **Battle vs 3 bots** (Easy / Normal / Hard on the title screen): free-for-all. First to 8 kills, or the leader after 5 minutes.
   You respawn 3 s after being shot down, with a short spawn shield and a full loadout.
+- **Stations:** land on a green pad to repair and rearm (4 s, then it is down for
+  45 s), or on a blue ammo pad to rearm only (2 s, back after 20 s).
 - **Free flight:** explore the map with three training dummies to shoot.
 - **Race (test range):** 3 laps through both tunnels against bots. No damage in races.
 

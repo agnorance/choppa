@@ -23,6 +23,7 @@ func _run() -> void:
 		"test_boost_is_faster_and_drains_meter",
 		"test_wall_hit_bounces_and_stuns",
 		"test_gun_fires_and_overheats",
+		"test_gun_runs_dry_and_a_restock_fills_it",
 		"test_gun_cools_down_after_overheat",
 		"test_bullets_knock_target_back",
 		"test_aim_assist_hits_target_above",
@@ -60,6 +61,8 @@ func _run() -> void:
 		"test_flares_break_a_missile_lock",
 		"test_station_repairs_and_rearms_then_powers_down",
 		"test_station_needs_a_landing",
+		"test_ammo_station_rearms_but_does_not_repair",
+		"test_gun_spread_blooms_with_heat",
 		"test_airframes_differ",
 		"test_hurt_bot_lands_at_a_station",
 		"test_power_line_wrecks_a_rotor",
@@ -195,7 +198,9 @@ func test_gun_fires_and_overheats() -> void:
 	await _fly(choppa, 6, _hold_fire)
 	_check(_bullets().size() >= 1, "spawned bullets")
 	_check(choppa.heat > 0.0, "heat rose")
-	await _fly(choppa, 180, _hold_fire)
+	await _fly(choppa, 174, _hold_fire)
+	_check(overheats.is_empty() and not choppa.overheated, "three seconds of fire do not overheat it")
+	await _fly(choppa, 240, _hold_fire)
 	_check(overheats.size() == 1, "overheated once, got %d" % overheats.size())
 	_check(choppa.overheated, "still overheated while holding fire")
 
@@ -242,8 +247,8 @@ func test_rolling_hard_dodges_bullets() -> void:
 	var taken := []
 	target.hit_taken.connect(func(_i: Vector3, _s: Choppa) -> void: taken.append(true))
 	# Full roll stick: the rate builds up over a few ticks, then the burst arrives mid-roll.
-	for t in 30:
-		shooter.input.fire = t >= 12 and t < 16
+	for t in 40:
+		shooter.input.fire = t >= 20 and t < 24
 		target.input.cyclic.x = 1.0
 		await physics_frame
 		shooter.step(TICK)
@@ -876,9 +881,10 @@ func test_flares_break_a_missile_lock() -> void:
 
 
 ## A flat ground and a station on it at the origin.
-func _station_on_ground() -> ServiceStation:
+func _station_on_ground(ammo_only := false) -> ServiceStation:
 	_ground()
 	var station := ServiceStation.new()
+	station.ammo_only = ammo_only
 	_world.add_child(station)
 	return station
 
@@ -1369,3 +1375,57 @@ func test_net_rounds_follow_each_other() -> void:
 	_check(pair.mirror.kills_of(pair.own) == 0 and pair.battle.kills_of(pair.seat) == 0, "with the scores back at zero")
 	_check(pair.own.alive and pair.remote.alive, "and everyone flying")
 	await _net_close(pair)
+
+
+func test_gun_runs_dry_and_a_restock_fills_it() -> void:
+	var choppa := _choppa(Vector3(0.0, 10.0, 0.0))
+	_check(choppa.ammo.gun == choppa.full_ammo("gun") and choppa.ammo.gun > 100, "a full belt, %d rounds" % choppa.ammo.gun)
+	choppa.ammo.gun = 5
+	await _fly(choppa, 60, _hold_fire)
+	_check(choppa.ammo.gun == 0, "fired the last rounds")
+	var fired := _bullets().size()
+	await _fly(choppa, 20, _hold_fire)
+	_check(_bullets().size() <= fired, "and then nothing comes out")
+	choppa.restock()
+	_check(choppa.ammo.gun == choppa.full_ammo("gun"), "a restock fills the belt")
+
+
+func test_ammo_station_rearms_but_does_not_repair() -> void:
+	var station := _station_on_ground(true)
+	var choppa := _choppa(Vector3(0.0, station.pad_top() + Choppa.GROUND_CLEARANCE + 0.5, 0.0))
+	choppa.damage(40.0, null)
+	choppa.ammo.gun = 0
+	choppa.ammo.rockets = 0
+	var served := []
+	station.served.connect(func(c: Choppa) -> void: served.append(c))
+	var hurt := choppa.health
+	for t in 60 * 4:
+		choppa.input.collective = -0.2
+		await physics_frame
+		choppa.step(TICK)
+		station.tick(TICK)
+	_check(served == [choppa], "rearmed once, got %s" % [served])
+	_check(not choppa.needs_ammo(), "with a full loadout, gun %d" % choppa.ammo.gun)
+	_check(choppa.health == hurt, "but no repairs, hp=%f" % choppa.health)
+	_check(station.cooldown > 0.0 and station.cooldown <= ServiceStation.AMMO_COOLDOWN, "and back soon, in %.0f s" % station.cooldown)
+
+
+## Cold barrels group tightly; hot ones spray. The pattern is fixed, not random, so a
+## network client and the server agree.
+func test_gun_spread_blooms_with_heat() -> void:
+	var spreads := []
+	for hot in [0.0, 0.9]:
+		var choppa := _choppa(Vector3(0.0, 40.0, 0.0))
+		var worst := 0.0
+		for k in 12:
+			choppa.heat = hot
+			choppa._shoot()
+		for b: Bullet in _bullets():
+			if b.shooter == choppa:
+				worst = maxf(worst, b.direction.angle_to(-choppa.global_transform.basis.z))
+		spreads.append(worst)
+		for b: Bullet in _bullets():
+			b.free()
+		choppa.free()
+	_check(spreads[0] < 0.004, "cold: tight, %.4f rad" % spreads[0])
+	_check(spreads[1] > 0.012 and spreads[1] < 0.03, "hot: wider, %.4f rad" % spreads[1])

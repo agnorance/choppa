@@ -17,6 +17,9 @@ var _ready_to_follow := false
 var _trauma := 0.0  ## Camera shake, 0..1; decays. Felt as its square.
 var _shake_noise := FastNoiseLite.new()
 var _shake_time := 0.0
+var _kick := 0.0  ## Recoil from our own gun: a short punch per round, gone in a blink.
+var _last_shot := -10.0
+var _fov := 70.0  ## The field of view before the recoil punch.
 
 
 func _ready() -> void:
@@ -36,11 +39,13 @@ func shake_from(at: Vector3, size: float) -> void:
 
 
 func _apply_shake(delta: float) -> void:
+	var setting: float = Settings.SHAKE_AMOUNTS[Settings.choice("camera_shake")]
+	rotate_object_local(Vector3.RIGHT, _kick * 0.0045 * setting)  # The nose bucks up per round.
 	_trauma = maxf(0.0, _trauma - delta * 1.4)
 	if _trauma <= 0.0:
 		return
 	_shake_time += delta * 30.0
-	var amount: float = _trauma * _trauma * Settings.SHAKE_AMOUNTS[Settings.choice("camera_shake")]
+	var amount: float = _trauma * _trauma * setting
 	rotate_object_local(Vector3.RIGHT, _shake_noise.get_noise_1d(_shake_time) * 0.06 * amount)
 	rotate_object_local(Vector3.UP, _shake_noise.get_noise_1d(_shake_time + 100.0) * 0.06 * amount)
 	rotate_object_local(Vector3.BACK, _shake_noise.get_noise_1d(_shake_time + 200.0) * 0.08 * amount)
@@ -56,7 +61,15 @@ func _process(delta: float) -> void:
 		return
 	var speed_ratio := clampf(target.velocity.length() / target.boost_speed, 0.0, 1.2)
 	var wanted := base_fov if showcase else Settings.number("fov")
-	fov = lerpf(fov, wanted + speed_fov * speed_ratio, 1.0 - exp(-4.0 * delta))
+	_fov = lerpf(_fov, wanted + speed_fov * speed_ratio, 1.0 - exp(-4.0 * delta))
+	# Every round punches the view: instant, then gone within a tenth of a second, so
+	# the gun feels heavy without blurring your aim. A long burst adds a rumble.
+	if target.last_shot_time > _last_shot:
+		_last_shot = target.last_shot_time
+		_kick = minf(_kick + 1.0, 2.0)
+		_trauma = minf(_trauma + 0.05, 0.38)
+	_kick *= exp(-22.0 * delta)
+	fov = _fov + _kick * 1.1 * Settings.SHAKE_AMOUNTS[Settings.choice("camera_shake")]
 
 	if target.model.cockpit_view:
 		target.model.cockpit_view.reticle.visible = first_person

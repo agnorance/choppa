@@ -194,9 +194,16 @@ knockback** (25 hits from full health); in races it only pushes. Items are meant
 the big hitters.
 
 - Rapid fire (12.5 rounds/s, 4 damage each), tracers, rounds stopped by walls.
+- **Snappy but heavy** (owner, 2026-10-17): rounds fly at 380 m/s (about 210 m reach),
+  so hits land as you line up. Every round punches the camera (a short kick and FOV
+  pulse, scaled by the camera shake setting), a long burst rumbles and drags the
+  choppa back a little (recoil), and the spread blooms as the barrels heat up (from
+  0.2° cold to about 1.4° hot), so bursts beat holding the trigger. Hot barrels smoke.
+  The spread is a fixed spiral, not random, so server and clients agree.
+- A belt of rounds per class (Scout 300, Gunship 400, Heavy 500), refilled at stations.
 - Aim assist (setting, **off by default** on desktop): rounds snap to a choppa inside a
   12° cone ahead (lock ring on the HUD). Bots use it.
-- Overheats after ~2.3 s of continuous fire, then cools down.
+- Overheats after ~6 s of continuous fire (owner: 2.3 s was far too soon), then cools down.
 - Rolling hard dodges bullets.
 
 ### Moves
@@ -231,7 +238,7 @@ stations**: lit helipads with a mast.
 
 | Weapon | Ammo | What it does |
 |---|---|---|
-| Machine gun | unlimited | 12.5 rounds/s, 4 damage, overheats (see Machine gun). |
+| Machine gun | 300 / 400 / 500 | 12.5 rounds/s, 4 damage, overheats (see Machine gun). |
 | Rockets | 8 / 14 / 20 | Unguided, fast, 12 damage plus a small blast, hit the part they strike. Alternate pods. |
 | Missiles | 1 / 2 / 3 | Lock on in a 45° cone, chase the target, 35 damage and a big shove. |
 | Flares | 3 / 2 / 4 | Break every missile lock on you; the missile flies wide. Rolling hard also works. |
@@ -241,7 +248,11 @@ stations**: lit helipads with a mast.
 - Keys: LMB / Ctrl gun, RMB rockets, F missile, X flares, R mine, G smoke (gamepad:
   RT gun, LT rockets, RB missile, B flares, X mine, D-pad down smoke; afterburner moves to
   LB / Shift).
-- Bots land at a station when hurt or out of ammunition, fire rockets at close range,
+- **Ammo stations** (owner's request): blue lamp and rim, crates by the mast. They only
+  rearm (no repairs), in 2 s, and are back after 20 s. Two per battle map, between the
+  repair pads, and one on the test range.
+- Bots land at a station when hurt or low on ammunition (an ammo station only when not
+  hurt), fire rockets at close range,
   missiles with a lock, flares when a missile closes in.
 - Gone with the item boxes: turbo, fake box, scrambler, shield, GET TO THE CHOPPA (the
   name stays as the battle cry). Health crates are replaced by stations too.

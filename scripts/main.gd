@@ -16,7 +16,7 @@ extends Node
 ##   --frames=<n>             ticks before the screenshot (default 90)
 ##   --dummies=<n>            training targets in free flight (default 3)
 ##   --health=<n>             start with this much health (to see damage effects)
-##   --explode=<tick>         set off an explosion 22 m ahead of you at that tick
+##   --explode=<tick>         set off an explosion 26 m ahead of you at that tick
 
 const RIVALS := [
 	["Hawk", Color(0.2, 0.6, 0.95), 1.0],
@@ -263,7 +263,7 @@ func _physics_process(_delta: float) -> void:
 	if _args.has("explode") and _ticks == int(_args.explode) and choppa:
 		var boom := Effects.Explosion.new()
 		add_child(boom)
-		boom.global_position = choppa.global_position + choppa.facing() * Vector3(0.0, 2.0, -22.0)
+		boom.global_position = choppa.global_position + choppa.facing() * Vector3(0.0, 9.0, -26.0)
 	if _args.has("shot") and _ticks == int(_args.get("frames", "90")):
 		_save_screenshot.call_deferred(_args.shot)
 

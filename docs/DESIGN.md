@@ -91,6 +91,28 @@ moving fast and looking good.
 Collisions bounce you off walls and stun you briefly. Hard crashes cost health; if you
 crash soon after being shot, the kill goes to whoever shot you.
 
+### Physics ideas (proposal, not built yet)
+
+Today the flight is purely kinematic (`Choppa.step`): velocity eases toward the wished
+velocity at a fixed acceleration, lift is a target climb rate with no gravity, and the
+body tilt is only visual. Easy, predictable and good for netcode, but shallow. Ideas
+for the feel pass, keeping the auto-hover and aim assist so the first minute stays easy:
+
+1. **Momentum and drift:** sideways speed bleeds off slowly, so experts slide round
+   corners and juke; beginners barely notice.
+2. **Thrust from tilt:** the choppa has to lean before it accelerates, like a real one;
+   heavier, more mechanical feel.
+3. **Gravity and energy:** without lift it sinks a little; dive for speed, trade speed
+   for a zoom climb.
+4. **Ground effect:** a little extra lift and speed close to the ground, matching the
+   double boost for low tricks.
+5. **Outside forces:** blasts and other choppas' downwash push you; missile hits send
+   you spinning.
+6. **Skid suspension:** soft, springy landings.
+
+Recommended first: 1, 3 and 4, tuned with a gamepad on real hardware. Keep the model
+deterministic and cheap so client-side prediction stays simple for multiplayer.
+
 ### Machine gun (decided)
 
 Every choppa has a twin machine gun. In battle it does **light damage plus a little

@@ -18,7 +18,7 @@ twist, heavy atmosphere, strong lighting and post-processing.
 
 - **Target hardware: desktop with an RTX 3060 or better** (`Graphics.Quality.HIGH`):
   Forward+ with SDFGI, SSIL, SSAO, SSR, volumetric fog, glow, AgX tone mapping, dense
-  terrain. Android gets a reduced MEDIUM preset on the Mobile renderer.
+  terrain. MEDIUM and LOW presets for weaker PCs.
 - Materials are tileable PBR textures generated in Blender (`tools/blender/`), terrain is
   splatted by slope and height in `shaders/terrain.gdshader`.
 - Done: sculpted rock formations (`make_rocks.py`), golden-hour sky and snowy backdrop.
@@ -41,7 +41,7 @@ twist, heavy atmosphere, strong lighting and post-processing.
   needle-spray cards with crown-shaped normals, swaying in the wind
   (`shaders/foliage.gdshader`).
 - Grass (`scripts/grass.gd`): tufts of real blades in MultiMesh chunks on flat dry
-  ground, fading out at 110 m (55 m and sparser on phones, none on LOW). Gusts roll
+  ground, fading out at 110 m (55 m and sparser on MEDIUM, none on LOW). Gusts roll
   across it and rotor downwash blows it flat around a low choppa.
 - Water (`scripts/water.gd`, `shaders/water.gdshader`): scrolling ripple normals over a
   swell, refraction of the lake bed, colour by depth, sky sheen at grazing angles, shore
@@ -76,7 +76,7 @@ cockpit's), dark translucent panels with 1 px lines, thin bars, no gradients or 
   grass ("Auto" follows the preset; `Settings.apply_environment` flips the live
   Environment, the preset and the grass wait for the next map). Gameplay: FOV, camera
   shake, default view, HUD size, damage flash, aim assist, controls overlay. Controls:
-  mouse steering, sensitivity, invert, gamepad deadzone, touch controls; key bindings
+  mouse steering, sensitivity, invert, gamepad deadzone; key bindings
   beside them on desktop. Audio: master and effects (bus "Effects"). Saved by
   `Settings` (one dictionary, `DEFAULTS` lists every key) in `user://settings.cfg`.
 - **HUD:** speed and altitude top left, item top right, kills/rank/time top centre,
@@ -86,7 +86,6 @@ cockpit's), dark translucent panels with 1 px lines, thin bars, no gradients or 
 - **Pause** (Esc / Start): resume, settings, restart, main menu, quit; the match stops.
 - **Mouse flying:** pitch and roll (or pitch and yaw, a setting), captured while
   flying and released in menus and on the results screen.
-- **Touch:** translucent discs with thin rings; a held button fills amber.
 
 ## Game feel (decided)
 
@@ -103,12 +102,15 @@ cockpit's), dark translucent panels with 1 px lines, thin bars, no gradients or 
 
 ## Platform and tech (decided)
 
-- **Engine:** Godot 4.7, GDScript. Forward+ renderer on desktop, Mobile renderer on
-  Android, automatic fallback to Compatibility on devices without Vulkan.
-- **Targets:** Windows desktop and Android (sideloaded APK). Gamepad, keyboard and touch.
+- **PC only (decided).** Windows first; the owner dropped phones. Keyboard and mouse,
+  and gamepads.
+- **Engine:** Godot 4.7, GDScript, Forward+ (Vulkan or D3D12), automatic fallback to the
+  Compatibility renderer on machines without Vulkan.
 - **Camera:** third person from right behind the choppa, with a first-person cockpit view
   toggle.
-- **Builds:** GitHub Actions exports a Windows zip and an Android APK on every push.
+- **Builds:** GitHub Actions runs the tests and exports a Windows build on every push.
+- **Distribution (proposal):** Steam. It gives accounts, friends, purchases and
+  anti-tamper for free, and PC players expect it.
 
 ## Flight model (decided)
 
@@ -162,8 +164,6 @@ The realistic model:
 | Item | R | same | X |
 | Camera | V | same | Y |
 
-Touch: left half drag is the cyclic, right half yaw and collective.
-
 ### Damage model
 
 Hits land somewhere. Bullets and blasts are attributed to the part of the body they
@@ -195,10 +195,9 @@ the big hitters.
 
 - Rapid fire (12.5 rounds/s, 4 damage each), tracers, rounds stopped by walls.
 - Aim assist (setting, **off by default** on desktop): rounds snap to a choppa inside a
-  12° cone ahead (lock ring on the HUD). Bots and touch players use it.
+  12° cone ahead (lock ring on the HUD). Bots use it.
 - Overheats after ~2.3 s of continuous fire, then cools down.
 - Rolling hard dodges bullets.
-- On touch screens it auto-fires while locked on, since the right thumb is steering.
 
 ### Moves
 
@@ -291,37 +290,134 @@ placement. Every map has service stations.
 - **Tunnels**, arches, bridges *(exist)*.
 - Later: moving obstacles (trains, blast doors), destructible towers, night variants.
 
-## Multiplayer
+## Multiplayer (decided: internet from the start)
 
-- **Host-authoritative listen server** with Godot's high-level multiplayer over ENet (UDP).
-  One player hosts, the others join; clients send inputs, the host simulates and
-  broadcasts state.
-- Own choppa is predicted on the client for responsive controls; other players are
-  interpolated.
-- **Phase 1:** LAN with automatic discovery (same Wi-Fi: PC and phones together).
-- **Phase 2:** internet play via a small relay/lobby server or Steam networking, so nobody
-  has to open ports.
-- Optional local split-screen on Windows with gamepads.
-- Code is structured for this from day one: a choppa only ever reads a `PilotInput`, so it
-  can come from the keyboard, the network or a bot.
+No LAN-first detour: the owner wants internet play from the beginning. Ranked play and
+the world #1 skin need a server nobody can tamper with, so the server is authoritative.
+
+- **Dedicated servers.** A headless Godot build of the game runs the simulation on a
+  Linux server; players are clients. Private matches can also run on a player's PC
+  (listen server) for testing and friends, with the same code.
+- **Transport:** UDP via Godot's ENet (`ENetMultiplayerPeer`), one channel reliable for
+  events (kills, stations, chat), one unreliable for inputs and snapshots.
+- **Tick:** the server simulates at 60 Hz. Clients send their `PilotInput` every tick,
+  stamped with the tick number. The server sends snapshots at 30 Hz (positions,
+  attitudes, velocities, health, parts, ammo, weapon objects), delta-compressed
+  against the last snapshot the client acknowledged.
+- **Own choppa:** predicted on the client (it runs `Choppa.step` on its own inputs) and
+  reconciled when the server's snapshot disagrees: rewind to the server state, replay
+  the unacknowledged inputs. This is why the simulation only reads `PilotInput` and
+  stays independent of visuals.
+- **Other choppas:** interpolated about 100 ms in the past between snapshots.
+- **Hits:** decided on the server, with lag compensation for the gun and rockets
+  (rewind the targets to what the shooter saw, capped at 200 ms).
+- **Backend** (accounts, matchmaking, parties, leaderboards, progression, store):
+  [Nakama](https://heroiclabs.com/nakama/) (open source, self-hostable, has a Godot
+  client), or Steam's services once the game is on Steam. Accounts: Steam login, or a
+  device account during development.
+- **Matchmaking:** casual battles (bots fill empty slots) and ranked battles (skill
+  rating, no bots). Regions: Europe first, the owner's.
+- **Cheating:** the server owns everything that matters (hits, damage, XP, unlocks,
+  purchases); the client only renders and predicts.
+
+Steps:
+1. Determinism audit: every random number in the simulation from seeded generators,
+   fixed 60 Hz tick, input and state serialization for a choppa and every weapon
+   object. Tests that a replayed input log gives the same match.
+2. Headless server and direct connect (IP and port), prediction and interpolation,
+   tested with simulated latency and packet loss (`--lag=120 --loss=2`).
+3. Backend: accounts, matchmaking, server browser for private matches.
+4. Progression on the server (below), then ranked, then the store.
+
+## Progression, camos and the store (plan)
+
+Two tiers, as the owner wants: **skill earns the rarest looks; money buys style, never
+power.** Nothing that changes how a helicopter flies or fights is ever for sale.
+
+### Pilot level
+
+- XP per battle: 100 per kill, 40 per assist (damage within 5 s of the kill), 25 for
+  wrecking a part (tail rotor, rotor, engine), 1 per point of damage dealt, 50 for a
+  station you denied (served while an enemy was within 150 m), 100 for finishing the
+  match, 200 for winning it. First win of the day doubles that match's XP.
+- Levels 1 to 100. XP from level n to n + 1: 1000 + 50 x (n - 1), so a level takes
+  about one match early on and about four near the top; level 100 is around 250
+  matches. Past 100, every further 10 000 XP adds an **Ace star** (shown next to the
+  name, no cap).
+- Per class, a **class mastery** level (XP earned in that class) unlocks class insignia
+  and nose art.
+- Ranked play has a separate **skill rating** (Glicko-2), reset softly each season.
+
+### Earned camos (cannot be bought)
+
+Military patterns that say how long and how well you have flown. Each works on every
+class.
+
+| Camo | Unlocked by |
+|---|---|
+| Factory olive | Level 1 |
+| Desert | Level 5 |
+| Woodland | Level 10 |
+| Tiger stripe | Level 20 |
+| Splinter | Level 30 |
+| Digital | Level 40 |
+| Arctic | Level 50 |
+| Night ops | Level 60 |
+| Veteran (worn steel, kill tallies) | Level 75 |
+| Centurion (gold leaf) | Level 100 |
+| Ace (black with one gold star per Ace star) | First Ace star |
+| Challenge camos (e.g. Butcher: 100 tail-rotor kills) | Challenges |
+
+### Paid packs (style only)
+
+Bright liveries in a different visual family from the earned camos, so nobody mistakes
+one for the other.
+
+- **Hangar Pack** (tier 1, about 5 euro): four liveries (Racing, Shark mouth, Sunset,
+  Checkerboard), eight paint colours for any camo, two nose arts.
+- **Collector Pack** (tier 2, about 15 euro): everything in the Hangar Pack, plus
+  metallic and pearl finishes, coloured rotor tips, a coloured smoke trail, a cockpit
+  trinket and a name plate on the boom.
+- Packs are cosmetic only: no XP boosts, no weapons, no stats.
+
+### The Apex skin (one player in the world)
+
+- **Apex**: black chrome with molten-gold panel lines, gold rotor tips, a crown on the
+  tail and a faint gold heat shimmer. Only one player can wear it: whoever is **#1 on
+  the global ranked leaderboard** right now.
+- The server grants it as a signed entitlement and takes it back when the player is
+  dethroned. Former holders keep a small "Former Apex" badge with the season and date.
+- Shown to everyone in the match, so the whole lobby knows who the best pilot is.
+
+### What exists now (built, offline)
+
+The profile, level curve, XP awards, camo catalogue, unlock rules and the hangar are in
+the game and tested: `Progression` and `Profile` (scripts/progression.gd), the camos in
+the hull shader, the HANGAR screen on the title, XP and level-ups on the results
+screen. Until the server exists the profile lives in `user://profile.cfg` and counts
+as offline progress (it will not carry over to the online profile). Paid packs and
+Apex are entitlements the server grants; offline they can only be previewed
+(`--entitle=hangar,collector,apex` for testing).
 
 ## Milestones
 
-1. **Foundation** *(done)*: project, flight model, cameras, gun, touch, tests, CI.
+1. **Foundation** *(done)*: project, flight model, cameras, gun, tests, CI.
 2. **Battle mode and first arena** *(done)*: Mesa Basin, bots, effects.
-3. **Items** *(done, being replaced by 9)*.
-4. **Load times** *(done)*: measured with `--timing`; grass on worker threads, baked
-   procedural textures. Map 1.7 s to 1.1 s, first frame 4.1 s to 3.6 s on the owner's PC.
+3. **Items** *(done, replaced by 9)*.
+4. **Load times** *(done)*: grass on worker threads, baked procedural textures.
 5. **UI overhaul** *(done)*: UiKit theme, tabbed settings, pause menu, HUD.
-6. **Flight and damage** *(done)*: easy and realistic flight models, modular damage
-   (rotor, tail rotor, engine, hull), safe landings, bot difficulty.
-7. **Plan after the owner's second playtest** *(this list)*.
+6. **Flight and damage** *(done)*: easy and realistic flight models, modular damage.
+7. **Plan after the second playtest** *(done)*.
 8. **Helicopter classes** *(done)*: Scout, Gunship, Heavy, with Blender models.
-9. **Service stations and loadout** *(done)*: rockets, missiles, flares, mine, smoke;
-   bots land at stations and use every weapon.
+9. **Service stations and loadout** *(done)*.
 10. **Slot Canyon** *(done)* with power lines, wind and Blender props.
-11. **Feel pass** on real hardware: flight numbers, sound mix, hit markers, music.
-12. **LAN multiplayer**, then more arenas, internet play, colours and customization.
+11. **PC only** *(done)*: phones dropped (owner's decision).
+12. **Polish**: weapon and hazard sounds, hit markers and part callouts, visible damage
+    on the models, music.
+13. **Progression foundation** *(offline, see above)*: levels, XP, earned camos, hangar.
+14. **Internet multiplayer**, steps 1 to 4 above.
+15. **Ranked, store and Apex** on the backend.
+16. Feel pass on the owner's PC throughout; more arenas and battle variants after.
 
 Every step comes with tests (owner's rule: so we know where something broke).
 

@@ -46,8 +46,7 @@ func _ready() -> void:
 	_button(box, "Settings", _open_settings)
 	_button(box, "Restart match", func() -> void: restart_requested.emit())
 	_button(box, "Main menu", func() -> void: menu_requested.emit())
-	if OS.get_name() != "Android":
-		_button(box, "Quit game", func() -> void: get_tree().quit())
+	_button(box, "Quit game", func() -> void: get_tree().quit())
 
 	_settings = SettingsMenu.new()
 	_settings.visible = false

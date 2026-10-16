@@ -1,6 +1,6 @@
 class_name LocalPilot
 extends Node
-## Feeds keyboard, mouse, gamepad and on-screen touch controls into a choppa's PilotInput.
+## Feeds keyboard, mouse and gamepad into a choppa's PilotInput.
 ##
 ## Realistic model: two mouse layouts (Settings "mouse_mode"), 0 pitch and roll on the
 ## mouse with yaw on A/D, 1 pitch and yaw on the mouse with roll on A/D; arrows and the
@@ -11,7 +11,6 @@ extends Node
 const MOUSE_GAIN := 0.012
 
 var choppa: Choppa
-var touch: TouchControls
 
 var _mouse := Vector2.ZERO  ## Mouse travel since the last tick, in pixels.
 
@@ -71,16 +70,3 @@ func _physics_process(_delta: float) -> void:
 			i.yaw = clampf(i.yaw + mouse.x * gain, -1.0, 1.0)
 		else:
 			i.cyclic.x = clampf(i.cyclic.x + mouse.x * gain, -1.0, 1.0)
-	if touch and touch.visible:
-		if choppa.easy:
-			i.move = (i.move + touch.cyclic).limit_length(1.0)
-		else:
-			i.cyclic = (i.cyclic + touch.cyclic).limit_length(1.0)
-		i.yaw = clampf(i.yaw + touch.look.x, -1.0, 1.0)
-		i.collective = clampf(i.collective + touch.look.y, -1.0, 1.0)
-		i.boost = i.boost or touch.is_pressed("boost")
-		# Your right thumb is busy steering, so touch fires by itself once locked on.
-		i.fire = i.fire or touch.is_pressed("fire") or choppa.aim_target() != null
-		i.rockets = i.rockets or touch.is_pressed("rockets")
-		i.missile = i.missile or touch.is_pressed("missile")
-		i.flares = i.flares or touch.is_pressed("flares")

@@ -1,5 +1,5 @@
 # The whole check in one go: import, tests, and the standard set of screenshots into
-# build\shots\ (title, every settings tab, HUD, pause, cockpit, race, touch, results).
+# build\shots\ (title, every settings tab, HUD, pause, cockpit, race, classes, canyon).
 # Usage: tools\check.ps1 [-NoShots]
 param([switch]$NoShots)
 . "$PSScriptRoot\godot.ps1"
@@ -24,7 +24,6 @@ $shots = [ordered]@{
 	"pause"           = "--mode=battle --map=basin --autopilot=bot --pause=200"
 	"cockpit"         = "--map=basin --cam=fp --autopilot=hover --frames=40"
 	"race"            = "--mode=race --autopilot=bot --frames=300"
-	"touch"           = "--map=basin --autopilot=forward --touch --frames=120"
 	"showcase"        = "--map=basin --cam=showcase --autopilot=hover --frames=150 --dummies=0"
 	"gunship"         = "--map=basin --airframe=gunship --cam=showcase --autopilot=hover --frames=150 --dummies=0"
 	"heavy"           = "--map=basin --airframe=heavy --cam=showcase --autopilot=hover --frames=150 --dummies=0"

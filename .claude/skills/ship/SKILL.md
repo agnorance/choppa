@@ -22,5 +22,5 @@ description: Finish a change in choppa - run tests, update docs, commit without 
    `gh run watch <id> -R agnorance/choppa --exit-status`. If it fails, read the
    annotations (`gh api repos/agnorance/choppa/check-runs/<id>/annotations`); fix and
    push again.
-7. **Report** to the owner what changed, what they should try on their PC/phone, and
+7. **Report** to the owner what changed, what they should try on their PC, and
    anything not verified.

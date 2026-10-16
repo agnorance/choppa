@@ -12,7 +12,7 @@ stations and loadout"). Every weapon should be readable at a glance and countera
    (`scripts/choppa.gd`), and to `restock()`. Per-class amounts go in `Airframe.TABLE`
    (`scripts/airframe.gd`) and `full_ammo()`.
 2. **Input:** a bool in `PilotInput` (and `copy_from`), an action in `Controls._bindings`
-   and `cheat_sheet`, `LocalPilot` reads it, a touch button if it matters on phones.
+   and `cheat_sheet`, `LocalPilot` reads it.
 3. **Firing:** a `fire_x()` / `drop_x()` in `Choppa` that calls `_take("x")` and places
    the object with `_drop(thing, offset, along_body)`; `_update_weapons` calls it.
 4. **The object:** a class in `scripts/weapons.gd` (see `Rocket`, `Missile`, `Mine`).

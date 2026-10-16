@@ -28,7 +28,7 @@ centre line) are the reference implementations.
    for race maps, and `menu_center` / `menu_orbit` for the title-screen camera.
 4. **Register:** `GameMap.catalog()` (menu name + id) and `GameMap.create()`.
 5. **Performance:** use `Graphics.quality` for terrain resolution, grass density and
-   view distance (phones are MEDIUM).
+   view distance (MEDIUM and LOW are settings for weaker PCs).
 6. **Check:** tests (`tools/test.ps1` / `tools/test.sh`), then screenshots with
    `--map=<id>` from several spawns, and a bot battle
    (`--mode=battle --map=<id> --autopilot=bot`) to see that bots don't get stuck.

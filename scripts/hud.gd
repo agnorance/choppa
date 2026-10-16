@@ -1,14 +1,13 @@
 class_name Hud
 extends CanvasLayer
 ## Speed, altitude, afterburner, heat, hull, loadout and call-outs for one choppa, the controls
-## overlay (settings or F1) and the touch controls on phones. Flat text and thin bars;
+## overlay (settings or F1). Flat text and thin bars;
 ## the cockpit view hides most of it because the instruments show the same.
 
 const CALLOUT_TIME := 1.2
 
 var choppa: Choppa
 var camera: Camera3D
-var touch: TouchControls
 
 var _root: Control
 var _speed: Label
@@ -165,10 +164,6 @@ func _ready() -> void:
 	_place(_controls, Vector2(1, 1), Vector2(-28, -26))
 	_root.add_child(_controls)
 
-	touch = TouchControls.new()
-	touch.anchor_right = 1.0
-	touch.anchor_bottom = 1.0
-	_root.add_child(touch)
 	refresh_settings()
 
 	choppa.scored_hit.connect(func(_target: Choppa) -> void: _hit_flash = 0.12)
@@ -193,12 +188,11 @@ func toggle_help() -> void:
 
 ## Re-reads the settings that change what the HUD shows.
 func refresh_settings() -> void:
-	touch.visible = Settings.touch_visible()
 	_controls.queue_free()  # Rebuilt: the mouse notes follow the mouse steering setting.
 	_controls = _controls_sheet()
 	_place(_controls, Vector2(1, 1), Vector2(-28, -26))
 	_root.add_child(_controls)
-	_controls.visible = Settings.flag("show_controls") and not touch.visible
+	_controls.visible = Settings.flag("show_controls")
 	_fps.visible = Settings.flag("show_fps")
 
 

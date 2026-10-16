@@ -87,8 +87,7 @@ func _ready() -> void:
 		Settings.save())
 	_home.add_child(bots_row)
 	_button("Settings", open_settings)
-	if OS.get_name() != "Android":
-		_button("Quit", func() -> void: get_tree().quit())
+	_button("Quit", func() -> void: get_tree().quit())
 
 	var version := UiKit.label("v%s  ·  Godot %s" % [ProjectSettings.get_setting("application/config/version"),
 		Engine.get_version_info().string.split(" ")[0]], 13, UiKit.FAINT)
@@ -99,18 +98,17 @@ func _ready() -> void:
 	version.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	root.add_child(version)
 	_chrome.append(version)
-	if not DisplayServer.is_touchscreen_available():
-		var hint := UiKit.label("Up / down  select      Enter  confirm      Esc  back", 13, UiKit.FAINT)
-		hint.anchor_left = 1.0
-		hint.anchor_right = 1.0
-		hint.anchor_top = 1.0
-		hint.anchor_bottom = 1.0
-		hint.offset_right = -110.0
-		hint.offset_top = -40.0
-		hint.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-		hint.grow_vertical = Control.GROW_DIRECTION_BEGIN
-		root.add_child(hint)
-		_chrome.append(hint)
+	var hint := UiKit.label("Up / down  select      Enter  confirm      Esc  back", 13, UiKit.FAINT)
+	hint.anchor_left = 1.0
+	hint.anchor_right = 1.0
+	hint.anchor_top = 1.0
+	hint.anchor_bottom = 1.0
+	hint.offset_right = -110.0
+	hint.offset_top = -40.0
+	hint.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	hint.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	root.add_child(hint)
+	_chrome.append(hint)
 
 	_settings = SettingsMenu.new()
 	_settings.visible = false

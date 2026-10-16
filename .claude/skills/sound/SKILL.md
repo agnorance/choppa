@@ -18,7 +18,7 @@ and committed as `assets/sounds/<name>.wav` (mono, 16-bit, 22050 Hz).
    over the loop, and name them `*_loop`. Their `.import` must say `edit/loop_mode=2`
    (Godot writes 0 on first import: fix it, then re-import).
 3. Run `python tools/audio/make_sounds.py <name>`, re-import, run the tests.
-4. Keep energy in the 250-2000 Hz range for anything that must carry on phone speakers
+4. Keep energy in the 250-2000 Hz range for anything that must carry on laptop speakers
    (a pure sub-bass rumble is inaudible there). A quick check: the power-weighted
    spectral centroid with numpy's FFT.
 5. Nobody can listen in a cloud session. Say what the sound is meant to be like and ask

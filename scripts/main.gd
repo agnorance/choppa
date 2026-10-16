@@ -13,7 +13,6 @@ extends Node
 ##                            "bot" lets the mode's AI fly you
 ##   --spawn=x,y,z[,yaw]      start position, yaw in degrees (free flight)
 ##   --cam=fp|showcase        start in first-person view / a fixed front view of the choppa
-##   --touch                  show touch controls even without a touchscreen
 ##   --shot=<file.png>        save a screenshot after --frames physics ticks and quit
 ##   --frames=<n>             ticks before the screenshot (default 90)
 ##   --dummies=<n>            training targets in free flight (default 3)
@@ -131,10 +130,6 @@ func _start() -> void:
 	hud = Hud.new(choppa)
 	hud.camera = camera
 	add_child(hud)
-	if _args.has("touch"):
-		hud.touch.visible = true
-		hud.refresh_settings()
-	hud.touch.camera_pressed.connect(chase.toggle_mode)
 
 	match mode:
 		"race":
@@ -158,7 +153,6 @@ func _start() -> void:
 	else:
 		var pilot := LocalPilot.new()
 		pilot.choppa = choppa
-		pilot.touch = hud.touch
 		add_child(pilot)
 	_update_mouse()
 
@@ -293,7 +287,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _notification(what: int) -> void:
-	# Android back button: pause, or quit from the menu.
+	# The window's back request (e.g. a gamepad's back button mapped by the OS).
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		if mode == "":
 			get_tree().quit()
@@ -371,5 +365,5 @@ func _on_match_over() -> void:
 ## The mouse is captured while you steer with it, and free whenever there is something
 ## to click: menus, the results, the pause screen.
 func _update_mouse() -> void:
-	var flying := mode != "" and Settings.flag("mouse_steer") and pause == null and not _over and not hud.touch.visible
+	var flying := mode != "" and Settings.flag("mouse_steer") and pause == null and not _over
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if flying else Input.MOUSE_MODE_VISIBLE

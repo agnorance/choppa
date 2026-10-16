@@ -18,14 +18,12 @@ var _pages: Array[Control] = []
 var _page_holder: Control
 var _keys: Control
 var _current := 0
-var _touch := false
 
 
 func _ready() -> void:
 	anchor_right = 1.0
 	anchor_bottom = 1.0
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_touch = DisplayServer.is_touchscreen_available()
 
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 16)
@@ -81,9 +79,8 @@ func _ready() -> void:
 	reset.pressed.connect(_reset)
 	bottom.add_child(reset)
 
-	if not _touch:
-		_keys = _bindings()
-		columns.add_child(_keys)
+	_keys = _bindings()
+	columns.add_child(_keys)
 	_show_tab(0)
 
 
@@ -161,11 +158,10 @@ func _build_pages() -> void:
 
 
 func _build_video(page: VBoxContainer) -> void:
-	if OS.get_name() != "Android":
-		_pick(page, "Window", ["Windowed", "Fullscreen", "Exclusive fullscreen"], "window")
-		var sizes := Settings.resolutions()
-		_row(page, "Resolution", sizes, sizes.find(Settings.value("resolution")),
-			func(i: int) -> void: Settings.set_value("resolution", sizes[i]))
+	_pick(page, "Window", ["Windowed", "Fullscreen", "Exclusive fullscreen"], "window")
+	var sizes := Settings.resolutions()
+	_row(page, "Resolution", sizes, sizes.find(Settings.value("resolution")),
+		func(i: int) -> void: Settings.set_value("resolution", sizes[i]))
 	_pick(page, "V-Sync", ["Off", "On", "Adaptive"], "vsync")
 	var limits := [0, 30, 60, 90, 120, 144, 165, 240]
 	var limit_names := PackedStringArray(["Unlimited"])
@@ -210,20 +206,18 @@ func _build_gameplay(page: VBoxContainer) -> void:
 	_toggle(page, "Aim assist", "aim_assist")
 	_pick(page, "Flight model", ["Easy", "Realistic"], "flight_model")
 	_toggle(page, "Flight assist", "flight_assist")
-	if not _touch:
-		_toggle(page, "Controls overlay", "show_controls")
+	_toggle(page, "Controls overlay", "show_controls")
 
 
 func _build_controls(page: VBoxContainer) -> void:
-	if not _touch:
-		_toggle(page, "Mouse steering", "mouse_steer")
-		_pick(page, "Mouse controls", ["Pitch & roll", "Pitch & yaw"], "mouse_mode")
-		var levels := PackedStringArray()
-		for k in 10:
-			levels.append(str(k + 1))
-		_row(page, "Mouse sensitivity", levels, Settings.choice("mouse_sensitivity") - 1,
-			func(i: int) -> void: Settings.set_value("mouse_sensitivity", i + 1))
-		_toggle(page, "Invert mouse", "invert_mouse")
+	_toggle(page, "Mouse steering", "mouse_steer")
+	_pick(page, "Mouse controls", ["Pitch & roll", "Pitch & yaw"], "mouse_mode")
+	var levels := PackedStringArray()
+	for k in 10:
+		levels.append(str(k + 1))
+	_row(page, "Mouse sensitivity", levels, Settings.choice("mouse_sensitivity") - 1,
+		func(i: int) -> void: Settings.set_value("mouse_sensitivity", i + 1))
+	_toggle(page, "Invert mouse", "invert_mouse")
 	var zones := [0.1, 0.15, 0.2, 0.25, 0.3, 0.4]
 	var zone_names := PackedStringArray()
 	for z: float in zones:
@@ -233,11 +227,7 @@ func _build_controls(page: VBoxContainer) -> void:
 		if is_equal_approx(zones[k], Settings.number("deadzone")):
 			zone = k
 	_row(page, "Gamepad deadzone", zone_names, zone, func(i: int) -> void: Settings.set_value("deadzone", zones[i]))
-	_pick(page, "Touch controls", ["Auto", "Off", "On"], "touch_controls", 1)
-	if _touch:
-		_note(page, "Left half flies, right half turns and climbs.")
-	else:
-		_note(page, "Key bindings are listed on the right; a gamepad follows the same actions.")
+	_note(page, "Key bindings are listed on the right; a gamepad follows the same actions.")
 
 
 func _build_audio(page: VBoxContainer) -> void:

@@ -1,11 +1,10 @@
 # choppa: instructions for Claude
 
 Arcade helicopter arena shooter (multiplayer planned), started 2026-10-16. Godot 4.7.2
-(GDScript; Forward+ on desktop, Mobile on Android), targets Windows (RTX 3060+) first,
-then Android. Design, art direction and roadmap: docs/DESIGN.md (read it before
+(GDScript, Forward+), PC only: Windows (RTX 3060+). Phones were dropped. Design, art direction and roadmap: docs/DESIGN.md (read it before
 changing gameplay or looks; it records what the owner decided).
 
-- The owner plays and tests on Windows (desktop, RTX 5080) and Android (sideloaded APK).
+- The owner plays and tests on Windows (desktop, RTX 5080).
   They write in German or English; answer in the language they use.
 - **No AI attribution anywhere in git or GitHub** (owner's explicit, repeated wish):
   no Co-Authored-By, "Generated with Claude Code", session links or similar in commit
@@ -23,9 +22,9 @@ synthesized sound effects. All of that is on `main` (PR #1). New work continues 
 `godot-foundation`; open a PR to `main` when a chunk is done. Merging is the owner's
 call: they merge on GitHub (with "Create a merge commit").
 Done so far: load times, the UI, two flight models, the damage model, helicopter
-classes (Scout, Gunship, Heavy), service stations with a loadout, Slot Canyon with
-power lines and wind. Next per DESIGN.md "Milestones": the feel pass on real hardware,
-then LAN multiplayer. Every feature gets tests (owner's rule). Each session: check `git log` and the roadmap, then confirm the next step.
+classes, service stations with a loadout, Slot Canyon, PC only. Plan (DESIGN.md
+"Milestones"): polish, the progression foundation, internet multiplayer, then ranked,
+store and the Apex skin. Every feature gets tests (owner's rule). Each session: check `git log` and the roadmap, then confirm the next step.
 
 ## Commands
 
@@ -51,7 +50,7 @@ Godot must be 4.7.2. Two environments:
   leaving effect timing checks to the owner's PC.
 - Game arguments go after `--`; the list is at the top of `scripts/main.gd` (mode, map,
   autopilot, cam, spawn, health, explode, shot, frames, dummies...).
-- CI (`.github/workflows/build.yml`) runs the tests and exports Windows + Android builds
+- CI (`.github/workflows/build.yml`) runs the tests and exports a Windows build
   on every push. Check with `gh run list -R agnorance/choppa -b <branch>`.
 
 ## Skills (`.claude/skills/`)
@@ -66,7 +65,7 @@ Godot must be 4.7.2. Two environments:
 ## Code rules
 
 - A choppa only reads a `PilotInput` (cyclic, yaw, collective, boost, fire, item); keep
-  input sources (keyboard, touch, network, bots) out of `choppa.gd` so multiplayer stays
+  input sources (keyboard, mouse, gamepad, network, bots) out of `choppa.gd` so multiplayer stays
   straightforward. Bots go through `Autopilot.fly()`, which turns a wanted velocity and
   look point into stick inputs. The flight model is force-based (DESIGN.md, "Flight
   model"); no scripted moves, no auto-level unless `flight_assist`. The simulation (`Choppa.step`)
@@ -84,7 +83,7 @@ Godot must be 4.7.2. Two environments:
   GPUs (NVIDIA and AMD Vulkan); the cloud's software Vulkan hides it, so after a shader
   change check a screenshot on the owner's PC.
 - `Graphics.quality` (LOW / MEDIUM / HIGH) decides how much detail to spend. Headless
-  runs are LOW (no grass), the Compatibility renderer is LOW, phones MEDIUM, desktop HIGH.
+  runs are LOW (no grass), the Compatibility renderer is LOW, desktop HIGH (MEDIUM is a setting).
 - Sounds come from `tools/audio/make_sounds.py` (numpy only): synthesized, committed as
   `assets/sounds/*.wav`. Loops (`*_loop`) need `edit/loop_mode=2` in their `.import`.
   Play them through `Sounds` (`scripts/sounds.gd`). Nobody can listen in the cloud:

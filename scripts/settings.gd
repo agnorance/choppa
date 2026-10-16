@@ -47,7 +47,6 @@ const DEFAULTS := {
 	"mouse_sensitivity": 5,  ## 1..10
 	"invert_mouse": false,  ## Mouse forward pulls the nose up instead of pushing it down.
 	"deadzone": 0.2,  ## Gamepad sticks, 0.1..0.4.
-	"touch_controls": AUTO,  ## 0 off, 1 on, AUTO = when a touchscreen is present.
 	# Audio
 	"volume": 8,  ## Master, 0..10.
 	"effects_volume": 10,  ## Sound effects, 0..10 (everything today; music comes later).
@@ -93,12 +92,6 @@ static func reset() -> void:
 static func feature(key: String, by_quality: bool) -> bool:
 	var c := choice(key)
 	return by_quality if c == AUTO else c == 1
-
-
-## Whether the on-screen touch controls show.
-static func touch_visible() -> bool:
-	var c := choice("touch_controls")
-	return DisplayServer.is_touchscreen_available() if c == AUTO else c == 1
 
 
 ## Reads the file once per run and applies what applies at once.
@@ -206,8 +199,6 @@ static func resolutions() -> PackedStringArray:
 
 
 static func _apply_window() -> void:
-	if OS.get_name() == "Android":
-		return  # Phones are always full screen.
 	match choice("window"):
 		0:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)

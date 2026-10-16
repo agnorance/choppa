@@ -4,31 +4,13 @@ GET TO THE CHOPPA! An arcade helicopter arena shooter: battle your friends throu
 tunnels, trenches and ruins in three classes of helicopter, with rockets, missiles and
 flares, and fight over the service stations that patch you up.
 
-Made with [Godot 4.7](https://godotengine.org). Runs on Windows and Android. Design and
+Made with [Godot 4.7](https://godotengine.org). PC only (Windows). Design and
 roadmap: [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Play
 
-Every push builds a Windows zip and an Android APK in GitHub Actions: open the run under
-the **Actions** tab and download them from **Artifacts**.
-
-- **Windows:** unzip and run `choppa.exe`.
-- **Android:** install the APK (allow installs from unknown sources).
-
-### Stable Android signing (one-time setup)
-
-Android only installs a new APK over an old one if both are signed with the same key.
-Until this is set up, CI signs with a throwaway key and you must uninstall before each
-update. To fix it, create a key once (`keytool` ships with any Java JDK):
-
-```
-keytool -genkeypair -keystore choppa.keystore -alias choppa -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=choppa"
-```
-
-Then add two repository secrets under **Settings > Secrets and variables > Actions**:
-`ANDROID_KEYSTORE_BASE64` (the file base64-encoded; on Windows:
-`certutil -encodehex -f choppa.keystore out.txt 0x40000001`) and
-`ANDROID_KEYSTORE_PASSWORD`. Keep the keystore file safe and out of the repo.
+Every push builds a Windows zip in GitHub Actions: open the run under the **Actions**
+tab, download it from **Artifacts**, unzip and run `choppa.exe`.
 
 ## Modes
 
@@ -39,7 +21,7 @@ Pick a map in the menu (Mesa Basin, Slot Canyon or Test Range), then:
 - **Free flight:** explore the map with three training dummies to shoot.
 - **Race (test range):** 3 laps through both tunnels against bots. No damage in races.
 
-Esc (or Start, or the Android back button) pauses: resume, settings, restart the match,
+Esc (or Start) pauses: resume, settings, restart the match,
 back to the title.
 
 ## Settings
@@ -56,27 +38,27 @@ mouse, Q / E or the shoulder buttons.
 - **Gameplay:** field of view, camera shake, default view (chase or cockpit), HUD size,
   damage flash, aim assist, flight assist, controls overlay.
 - **Controls:** mouse steering, mouse controls (pitch & roll / pitch & yaw), sensitivity,
-  invert, gamepad deadzone, touch controls (auto, off, on); key bindings beside them.
+  invert, gamepad deadzone; key bindings beside them.
 - **Audio:** master and effects volume.
 - **Reset to defaults** at the bottom.
 
 ## Controls
 
-| Action | Keyboard + mouse | Gamepad | Touch |
-|---|---|---|---|
-| Pitch and roll | Mouse (or arrow keys) | Left stick | Left half: drag |
-| Turn (yaw) | A D (or Q E) | Right stick X | Right half: drag sideways |
-| Collective (climb / descend) | W S (or Space / C) | Right stick Y | Right half: drag up/down |
-| Afterburner | Shift | RB | BURN |
-| Machine gun | Ctrl or left mouse | RT | FIRE (also auto-fires when locked on) |
-| Rockets (hold) | Right mouse | LT | RKT |
-| Missile (locks on) | F | RB | MSL |
-| Flares | X | B | FLR |
-| Mine / smoke | R / G | X / D-pad down | |
-| Camera: chase view / cockpit | V | Y | CAM |
-| Respawn (race: at your last gate; not in battle) | Backspace | Back/Select | |
-| Pause | Esc | Start | Back button |
-| Controls overlay on/off | F1 | | |
+| Action | Keyboard + mouse | Gamepad |
+|---|---|---|
+| Pitch and roll | Mouse (or arrow keys) | Left stick |
+| Turn (yaw) | A D (or Q E) | Right stick X |
+| Collective (climb / descend) | W S (or Space / C) | Right stick Y |
+| Afterburner | Shift | LB |
+| Machine gun | Ctrl or left mouse | RT |
+| Rockets (hold) | Right mouse | LT |
+| Missile (locks on) | F | RB |
+| Flares | X | B |
+| Mine / smoke | R / G | X / D-pad down |
+| Camera: chase view / cockpit | V | Y |
+| Respawn (race: at your last gate; not in battle) | Backspace | Back/Select |
+| Pause | Esc | Start |
+| Controls overlay on/off | F1 | |
 
 Two flight models, chosen on the title screen. **Realistic** (default): the mouse flies
 the choppa, push forward to put the nose down and accelerate, pull back to climb or
@@ -104,7 +86,7 @@ parts, big loadout, slow and sluggish).
 
 ## Develop
 
-Full Windows setup (Godot, Git, tests, local Windows/Android builds, Blender asset
+Full Windows setup (Godot, Git, tests, local Windows builds, Blender asset
 scripts): [docs/SETUP_WINDOWS.md](docs/SETUP_WINDOWS.md).
 
 1. Install Godot 4.7.2 (standard build, not .NET).
@@ -133,7 +115,7 @@ godot --path . -- --mode=free --map=basin --autopilot=hover --cam=showcase --exp
 ```powershell
 tools\try.ps1              # lists the scenes
 tools\try.ps1 settings     # straight into a scene: menu, settings, battle, free, easy, race, cockpit,
-                           # lake, damaged, tailrotor, engine, touch, bots, missile, rockets,
+                           # lake, damaged, tailrotor, engine, bots, missile, rockets,
                            # gunship, heavy, canyon, canyonbattle, explode
 tools\check.ps1            # import, all tests, and screenshots of every screen into build\shots\
 ```

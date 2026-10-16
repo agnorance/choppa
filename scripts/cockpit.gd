@@ -52,6 +52,7 @@ func _ready() -> void:
 	_gauges.altitude = _add_gauge(shell, "altitude", "ALTITUDE", "m", 0.0, 100.0, 5)
 	_gauges.boost = _add_gauge(shell, "boost", "BOOST", "%", 0.0, 100.0, 4)
 	_gauges.heat = _add_gauge(shell, "heat", "GUN TEMP", "", 0.0, 100.0, 4, 0.75)
+	_gauges.rpm = _add_gauge(shell, "rpm", "ROTOR", "rpm", 0.0, 500.0, 5, 0.85)
 	_build_radar(_mount(shell, "radar"))
 	_build_nixies(_mount(shell, "kills"))
 	_build_health(_mount(shell, "health"))
@@ -80,6 +81,7 @@ func _process(delta: float) -> void:
 	(_gauges.altitude as Gauge).value = choppa.altitude
 	(_gauges.boost as Gauge).value = choppa.boost_meter * 100.0
 	(_gauges.heat as Gauge).value = choppa.heat * 100.0
+	(_gauges.rpm as Gauge).value = 330.0 + choppa.input.lift * 50.0 + (70.0 if choppa.is_boosting() else 0.0)
 
 	var i := choppa.input
 	if _stick:

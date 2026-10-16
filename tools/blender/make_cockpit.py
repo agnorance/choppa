@@ -207,6 +207,30 @@ def build():
                              ["speed", "altitude", "boost", "heat"]):
         shell += bezel(x, yu, 0.054)
         mount(name, x, yu, 0.026)
+    # Lower panel, angled on down toward the floor so no gap opens under the main panel
+    # when the view widens at speed: rotor gauge, switch rows and placards.
+    lower = -hh - 0.15
+    shell.append(panel_prim("cube", "paint", 0, lower, -0.005, (hw - 0.03, 0.022, 0.15), bevel_width=0.01))
+    shell.append(panel_prim("cube", "dark", 0, lower - 0.15, 0.015, (hw - 0.02, 0.03, 0.012), bevel_width=0.006))
+    for k in range(4):
+        for x in (-hw + 0.05, hw - 0.05):
+            shell.append(panel_prim("uv_sphere", "metal", x, lower - 0.1 + k * 0.065, 0.02, (0.006, 0.006, 0.006),
+                                    segments=8, ring_count=4))
+    shell += bezel(-0.27, lower + 0.02, 0.054)
+    mount("rpm", -0.27, lower + 0.02, 0.026)
+    for row in range(2):
+        for k in range(6):
+            x = 0.04 + k * 0.055
+            yu = lower + 0.06 - row * 0.09
+            shell.append(panel_prim("cylinder", "metal", x, yu, 0.025, (1, 1, 1), rotation=(math.pi / 2, 0, 0),
+                                    vertices=12, radius=0.01, depth=0.012))
+            shell.append(panel_prim("cylinder", "metal", x, yu + 0.012, 0.04, (1, 1, 1),
+                                    rotation=(math.pi / 2 - 0.5 + (0.9 if (k + row) % 3 == 0 else 0.0), 0, 0),
+                                    vertices=8, radius=0.0035, depth=0.035))
+            shell.append(panel_prim("cube", "brass", x, yu - 0.022, 0.022, (0.018, 0.003, 0.006)))
+    shell.append(panel_prim("cube", "dark", -0.08, lower + 0.04, 0.02, (0.06, 0.012, 0.035), bevel_width=0.004))
+    shell.append(panel_prim("cube", "brass", -0.08, lower - 0.07, 0.02, (0.07, 0.006, 0.025), bevel_width=0.003))
+
     # Centre: the radar in its own hooded housing, below the gunsight.
     shell.append(panel_prim("cube", "dark", 0.0, -0.012, 0.04, (0.11, 0.05, 0.11), bevel_width=0.02))
     shell.append(panel_prim("torus", "metal", 0.0, -0.012, 0.09, (1, 1, 1), rotation=(math.pi / 2, 0, 0),

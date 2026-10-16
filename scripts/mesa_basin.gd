@@ -37,6 +37,7 @@ func _ready() -> void:
 	terrain.height_fn = _height
 	terrain.material = MapKit.terrain_material(WATER_LEVEL)
 	add_child(terrain)
+	MapKit.backdrop(self, 420.0, 7)
 
 	MapKit.cross_mesa(self, Vector3(0.0, -2.0, 0.0), 110.0, 42.0, 22.0, 17.0, Color(0.76, 0.47, 0.31))
 	MapKit.item_row(self, Vector3(0.0, 45.0, 0.0), 0.0, 2, 10.0)

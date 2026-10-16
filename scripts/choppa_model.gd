@@ -75,7 +75,7 @@ func _ready() -> void:
 	_blur_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_blur_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_blur_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_blur_material.albedo_color = Color(0.9, 0.9, 0.9, 0.0)
+	_blur_material.albedo_color = Color(0.35, 0.35, 0.36, 0.0)
 	_part(disc, _blur_material, Vector3(0.0, 1.3, 0.0))
 
 	for side in [-1.0, 1.0]:
@@ -130,8 +130,8 @@ func _ready() -> void:
 	_dust.damping_min = 3.0
 	_dust.damping_max = 4.0
 	_dust.gravity = Vector3(0.0, 3.0, 0.0)  # Billows up and out.
-	_dust.scale_amount_min = 3.5
-	_dust.scale_amount_max = 6.0
+	_dust.scale_amount_min = 1.5
+	_dust.scale_amount_max = 3.0
 	_dust.emitting = false
 	add_child(_dust)
 
@@ -227,7 +227,7 @@ func update_pose(c: Choppa, delta: float) -> void:
 	_rotor_speed = lerpf(_rotor_speed, target_rotor, 1.0 - exp(-3.0 * delta))
 	_rotor.rotate_y(_rotor_speed * delta)
 	_tail_rotor.rotate_x(_rotor_speed * 1.6 * delta)
-	_blur_material.albedo_color.a = clampf((_rotor_speed - 8.0) / 60.0, 0.0, 0.22)
+	_blur_material.albedo_color.a = clampf((_rotor_speed - 8.0) / 80.0, 0.0, 0.1)
 
 	_parts.visible = c.invulnerable <= 0.0 or fmod(c.invulnerable, 0.2) > 0.08
 	for flash in _flashes:

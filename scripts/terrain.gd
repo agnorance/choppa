@@ -8,6 +8,7 @@ var resolution := 120  ## Cells per side.
 ## (x, z) -> height.
 var height_fn: Callable
 var material: Material
+var collide := true  ## False for far-away scenery nobody can reach.
 
 var _heights := PackedFloat32Array()
 var _step := 0.0
@@ -59,6 +60,8 @@ func _ready() -> void:
 	instance.material_override = material
 	add_child(instance)
 
+	if not collide:
+		return
 	# HeightMapShape3D has 1 m spacing; scale it uniformly and shrink heights to match.
 	var data := PackedFloat32Array()
 	data.resize(n * n)

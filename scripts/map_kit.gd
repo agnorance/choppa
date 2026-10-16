@@ -13,7 +13,7 @@ static var _meshes := {}  ## Shared meshes and materials, built on first use.
 
 
 ## Sky, sun, haze and post-processing. How much of it runs depends on Graphics.quality.
-static func environment(parent: Node3D, sun_rotation := Vector3(-27.0, -40.0, 0.0)) -> void:
+static func environment(parent: Node3D, sun_rotation := Vector3(-19.0, 70.0, 0.0)) -> void:
 	var high := Graphics.at_least(Graphics.Quality.HIGH)
 	var medium := Graphics.at_least(Graphics.Quality.MEDIUM)
 	var sky_material := ShaderMaterial.new()
@@ -27,16 +27,16 @@ static func environment(parent: Node3D, sun_rotation := Vector3(-27.0, -40.0, 0.
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.9
+	env.ambient_light_energy = 1.0
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.tonemap_exposure = 1.05
 
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.7, 0.72, 0.76)
-	env.fog_sun_scatter = 0.2
-	env.fog_density = 0.0006
-	env.fog_aerial_perspective = 0.5
+	env.fog_light_color = Color(0.78, 0.66, 0.56)
+	env.fog_sun_scatter = 0.45
+	env.fog_density = 0.00045
+	env.fog_aerial_perspective = 0.75
 	env.fog_sky_affect = 0.15
 	env.fog_height = 6.0
 	env.fog_height_density = 0.004
@@ -70,8 +70,8 @@ static func environment(parent: Node3D, sun_rotation := Vector3(-27.0, -40.0, 0.
 		env.volumetric_fog_ambient_inject = 0.35
 		env.volumetric_fog_sky_affect = 0.4
 	env.adjustment_enabled = true
-	env.adjustment_contrast = 1.08
-	env.adjustment_saturation = 1.08
+	env.adjustment_contrast = 1.1
+	env.adjustment_saturation = 1.05
 
 	var world_env := WorldEnvironment.new()
 	world_env.environment = env
@@ -80,8 +80,8 @@ static func environment(parent: Node3D, sun_rotation := Vector3(-27.0, -40.0, 0.
 	# Low afternoon sun: warm light, long soft shadows.
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = sun_rotation
-	sun.light_color = Color(1.0, 0.9, 0.78)
-	sun.light_energy = 1.7
+	sun.light_color = Color(1.0, 0.8, 0.6)
+	sun.light_energy = 2.0
 	sun.light_angular_distance = 0.6
 	sun.shadow_enabled = true
 	sun.shadow_blur = 1.2
@@ -116,11 +116,39 @@ static func surface(color: Color) -> Material:
 	return m
 
 
-## The splat material for Terrain and flat ground.
-static func terrain_material(water_level := -100.0) -> ShaderMaterial:
+## Distant mountain ranges with snow caps all around the arena: scenery only, no
+## collision, mostly peeking over the arena's own cliffs.
+static func backdrop(parent: Node3D, inner_radius: float, seed_value := 1) -> void:
+	var ridges := FastNoiseLite.new()
+	ridges.seed = seed_value
+	ridges.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	ridges.fractal_type = FastNoiseLite.FRACTAL_RIDGED
+	ridges.fractal_octaves = 6
+	ridges.frequency = 0.0011
+	var terrain := Terrain.new()
+	terrain.size = 7000.0
+	terrain.resolution = [140, 220, 350][Graphics.quality]
+	terrain.collide = false
+	terrain.height_fn = func(x: float, z: float) -> float:
+		var r := Vector2(x, z).length()
+		var rise := smoothstep(inner_radius, inner_radius + 1600.0, r)
+		var ridge := ridges.get_noise_2d(x, z) * 0.5 + 0.5
+		return -60.0 + rise * (120.0 + pow(ridge, 1.8) * 620.0)
+	var material := terrain_material(-1000.0, "rock")
+	material.set_shader_parameter("snow_height", 330.0)
+	material.set_shader_parameter("cliff_slope", 0.3)
+	material.set_shader_parameter("cliff_scale", 0.02)
+	material.set_shader_parameter("ground_scale", 0.03)
+	terrain.material = material
+	parent.add_child(terrain)
+
+
+## The splat material for Terrain and flat ground. `cliff` is the texture for steep
+## slopes: "sandstone" or "rock".
+static func terrain_material(water_level := -100.0, cliff := "sandstone") -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = load("res://shaders/terrain.gdshader")
-	for slot: Array in [["grass", "grass"], ["dirt", "dirt"], ["sand", "sand"], ["cliff", "sandstone"]]:
+	for slot: Array in [["grass", "grass"], ["dirt", "dirt"], ["sand", "sand"], ["cliff", cliff]]:
 		m.set_shader_parameter(slot[0] + "_albedo", load("res://assets/textures/%s_albedo.png" % slot[1]))
 		m.set_shader_parameter(slot[0] + "_normal", load("res://assets/textures/%s_normal.png" % slot[1]))
 	var noise := FastNoiseLite.new()

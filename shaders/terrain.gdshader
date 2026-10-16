@@ -18,6 +18,8 @@ uniform float cliff_scale = 0.08;
 uniform float water_level = -2.5;
 uniform float cliff_slope = 0.38;  // 1 - normal.y where rock takes over.
 uniform vec3 strata_tint : source_color = vec3(0.86, 0.72, 0.66);
+uniform float snow_height = 100000.0;  // Snow above this height (on flatter slopes).
+uniform vec3 snow_color : source_color = vec3(0.92, 0.94, 0.98);
 
 varying vec3 world_pos;
 varying vec3 world_normal;
@@ -92,7 +94,12 @@ void fragment() {
 	vec3 flat_wn = normalize(vec3(flat_n.x + n.x, abs(flat_n.z) * n.y, flat_n.y + n.z));
 
 	vec3 wn = normalize(mix(flat_wn, cliff_wn, rock_w));
-	ALBEDO = mix(flat_col, cliff, rock_w);
-	ROUGHNESS = mix(0.92, 0.85, rock_w);
+	vec3 albedo = mix(flat_col, cliff, rock_w);
+	// Snow caps: settles on flatter faces, thins out on steep ones, ragged edge.
+	float snow_line = snow_height + (macro - 0.5) * 120.0 + (macro2 - 0.5) * 40.0;
+	float snow = smoothstep(snow_line, snow_line + 30.0, world_pos.y) * (1.0 - smoothstep(0.45, 0.75, slope));
+	albedo = mix(albedo, snow_color, snow);
+	ALBEDO = albedo;
+	ROUGHNESS = mix(mix(0.92, 0.85, rock_w), 0.6, snow);
 	NORMAL = normalize((VIEW_MATRIX * vec4(wn, 0.0)).xyz);
 }

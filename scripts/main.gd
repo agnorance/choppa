@@ -63,6 +63,7 @@ func _ready() -> void:
 func _show_menu() -> void:
 	camera = Camera3D.new()
 	camera.fov = 60.0
+	camera.far = 8000.0
 	add_child(camera)
 	camera.make_current()
 	var menu := Menu.new()

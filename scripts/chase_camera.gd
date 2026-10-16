@@ -17,7 +17,7 @@ var _ready_to_follow := false
 
 func _ready() -> void:
 	near = 0.1
-	far = 1500.0
+	far = 8000.0  # The mountain backdrop is kilometres away.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 
 

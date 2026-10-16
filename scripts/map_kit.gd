@@ -433,41 +433,38 @@ static func cross_mesa(
 	root.add_child(middle)
 
 
-## Low-poly pine with a solid trunk-and-crown collider.
+## Pine from assets/models/trees (tools/blender/make_trees.py) with a solid
+## trunk-and-crown collider. `variant` picks the model and a slightly different green.
 static func tree(parent: Node3D, base: Vector3, size: float, variant: int) -> void:
-	if not _meshes.has("trunk"):
-		var trunk := CylinderMesh.new()
-		trunk.top_radius = 0.25
-		trunk.bottom_radius = 0.4
-		trunk.height = 3.0
-		trunk.radial_segments = 6
-		trunk.rings = 1
-		_meshes.trunk = trunk
-		var crown := CylinderMesh.new()
-		crown.top_radius = 0.0
-		crown.bottom_radius = 2.4
-		crown.height = 4.5
-		crown.radial_segments = 7
-		crown.rings = 1
-		_meshes.crown = crown
+	if not _meshes.has("pines"):
+		var scene: Node3D = (load("res://assets/models/trees/trees.glb") as PackedScene).instantiate()
+		_meshes.pine_meshes = []
+		for k in 3:
+			_meshes.pine_meshes.append((scene.find_child("pine_%d" % (k + 1)) as MeshInstance3D).mesh)
+		scene.free()
 		var bark := StandardMaterial3D.new()
 		bark.albedo_texture = load("res://assets/textures/bark_albedo.png")
 		bark.normal_enabled = true
 		bark.normal_texture = load("res://assets/textures/bark_normal.png")
-		bark.uv1_triplanar = true
-		bark.uv1_scale = Vector3(1.5, 0.6, 1.5)
+		bark.roughness = 0.9
 		_meshes.bark = bark
-		_meshes.pines = PINE.map(func(c: Color) -> StandardMaterial3D: return material(c))
+		var needles: Texture2D = load("res://assets/textures/needles_albedo.png")
+		_meshes.pines = PINE.map(func(c: Color) -> ShaderMaterial:
+			var m := ShaderMaterial.new()
+			m.shader = preload("res://shaders/foliage.gdshader")
+			m.set_shader_parameter("needles", needles)
+			m.set_shader_parameter("tint", c.lightened(0.55) * 1.6)
+			return m)
 	var body := StaticBody3D.new()
 	body.position = base
 	body.rotation.y = randf() * TAU
 	body.scale = Vector3.ONE * size
 	parent.add_child(body)
-	_mesh_child(body, _meshes.trunk, _meshes.bark, Vector3(0.0, 1.5, 0.0))
-	var pine: Material = _meshes.pines[variant % 3]
-	for k in 3:
-		var crown := _mesh_child(body, _meshes.crown, pine, Vector3(0.0, 4.2 + k * 2.2, 0.0))
-		crown.scale = Vector3.ONE * (1.0 - k * 0.25)
+	var mesh := MeshInstance3D.new()
+	mesh.mesh = _meshes.pine_meshes[variant % 3]
+	mesh.set_surface_override_material(0, _meshes.bark)
+	mesh.set_surface_override_material(1, _meshes.pines[(variant / 3) % 3])
+	body.add_child(mesh)
 	var shape := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = 1.6

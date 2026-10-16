@@ -37,7 +37,13 @@ twist, heavy atmosphere, strong lighting and post-processing.
 - Choppa effects: star muzzle flashes with light from the gun that fired, brass casings,
   heat shimmer behind the exhausts, a downwash ring on the ground (spray over water),
   and canopy cracks that spread as the hull takes damage (seen from inside too).
-- Next: proper trees, dense grass, water, effects polish.
+- Pines (`make_trees.py`): tapered bark trunks with whorls of drooping branches, crossed
+  needle-spray cards with crown-shaped normals, swaying in the wind
+  (`shaders/foliage.gdshader`).
+- Grass (`scripts/grass.gd`): tufts of real blades in MultiMesh chunks on flat dry
+  ground, fading out at 110 m (55 m and sparser on phones, none on LOW). Gusts roll
+  across it and rotor downwash blows it flat around a low choppa.
+- Next: water, more effects polish.
 
 ## Game feel (decided)
 

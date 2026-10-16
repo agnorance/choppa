@@ -84,6 +84,16 @@ func _ready() -> void:
 			continue
 		MapKit.tree(self, Vector3(at.x, ground - 0.3, at.z), _rng.randf_range(0.9, 1.6), planted)
 		planted += 1
+	if Graphics.at_least(Graphics.Quality.MEDIUM):
+		var grass := Grass.new()
+		grass.terrain = terrain
+		grass.radius = PLAY_RADIUS
+		grass.inner_radius = 80.0  # Under the mesa.
+		grass.water_level = WATER_LEVEL
+		grass.density = 2.6 if Graphics.at_least(Graphics.Quality.HIGH) else 0.6
+		grass.view_distance = 110.0 if Graphics.at_least(Graphics.Quality.HIGH) else 55.0
+		grass.patches = _detail
+		add_child(grass)
 	for k in 45:
 		var at := Vector3(_rng.randf_range(-260.0, 260.0), 0.0, _rng.randf_range(-260.0, 260.0))
 		if _clear_of_structures(at):

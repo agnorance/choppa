@@ -21,7 +21,7 @@ then Android. Design, art direction and roadmap: docs/DESIGN.md.
   The software renderer here is slow (~1 fps with Forward+), so long screenshots take
   minutes. Forward+ needs Vulkan: `apt-get install -y mesa-vulkan-drivers` (lavapipe).
 - Textures/models come from Blender scripts in `tools/blender/` (`pip install bpy==5.2.2`):
-  `make_textures.py`, `make_rocks.py`, `make_choppa.py`, `make_cockpit.py`.
+  `make_textures.py`, `make_rocks.py`, `make_choppa.py`, `make_cockpit.py`, `make_trees.py`.
   `--cam=showcase` frames the choppa for model screenshots, `--cam=fp` shows the cockpit.
   `make_choppa.py --preview DIR [views]` renders Cycles previews without exporting (fast
   model iteration). Canopy geometry lives in `choppa_shared.py`, used by both choppa

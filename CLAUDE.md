@@ -37,6 +37,8 @@ Godot must be 4.7.2. Two environments:
 | Screenshot | `tools\shot.ps1 out.png --cam=showcase --frames=150` | `tools/shot.sh out.png --cam=showcase --frames=150` |
 | Re-import | `& $env:GODOT --headless --path . --import` | `godot --headless --path . --import` |
 | Bake textures | `tools\bake.ps1` | `tools/bake.sh` |
+| Try a scene | `tools\try.ps1 settings` (no name lists them) | `godot --path . -- --menu --settings=0` |
+| Full check | `tools\check.ps1` (tests + every screen into `build\shots\`) | `tools/test.sh` |
 
 - Windows scripts find Godot via `$env:GODOT` (path to `Godot_v4.7.2-stable_win64_console.exe`),
   the PATH, or `C:\Tools\Godot\`. Setup: docs/SETUP_WINDOWS.md.
@@ -97,7 +99,9 @@ Godot must be 4.7.2. Two environments:
   (an audio playback still registered when the headless run quits).
 - 2D UI: every control goes through `UiKit` (theme, colours, fonts, `Bar`, `keycap`,
   `panel`, `button`) so the look stays one thing (DESIGN.md, "UI"). A new player
-  setting is a static var in `Settings` (plus `_defaults`, `_get_key`, `_set_key`) and a
-  `SettingRow` in `SettingsMenu`; `--settings` and `--pause=<tick>` screenshot them.
+  setting is a key in `Settings.DEFAULTS`, read with `Settings.flag/choice/number`, and a
+  row in the right `SettingsMenu._build_*` tab; things that can change live are pushed
+  in `Settings.apply`. `--settings=<tab>` and `--pause=<tick>` screenshot them, and
+  `tools\check.ps1` shoots every screen.
 - Match the surrounding code: GDScript with static types, `##` doc comments on classes
   and public members, comments explain why rather than what.

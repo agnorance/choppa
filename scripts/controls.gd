@@ -22,6 +22,8 @@ var _bindings := {
 	"respawn": [KEY_BACKSPACE, JOY_BUTTON_BACK],
 	"toggle_help": [KEY_F1],
 	"pause": [KEY_ESCAPE, JOY_BUTTON_START],
+	"tab_left": [KEY_Q, JOY_BUTTON_LEFT_SHOULDER],  # Menus: previous tab.
+	"tab_right": [KEY_E, JOY_BUTTON_RIGHT_SHOULDER],
 }
 
 

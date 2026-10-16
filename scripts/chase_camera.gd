@@ -40,7 +40,7 @@ func _apply_shake(delta: float) -> void:
 	if _trauma <= 0.0:
 		return
 	_shake_time += delta * 30.0
-	var amount := _trauma * _trauma
+	var amount: float = _trauma * _trauma * Settings.SHAKE_AMOUNTS[Settings.choice("camera_shake")]
 	rotate_object_local(Vector3.RIGHT, _shake_noise.get_noise_1d(_shake_time) * 0.06 * amount)
 	rotate_object_local(Vector3.UP, _shake_noise.get_noise_1d(_shake_time + 100.0) * 0.06 * amount)
 	rotate_object_local(Vector3.BACK, _shake_noise.get_noise_1d(_shake_time + 200.0) * 0.08 * amount)
@@ -55,7 +55,8 @@ func _process(delta: float) -> void:
 	if target == null:
 		return
 	var speed_ratio := clampf(target.velocity.length() / target.boost_speed, 0.0, 1.2)
-	fov = lerpf(fov, base_fov + speed_fov * speed_ratio, 1.0 - exp(-4.0 * delta))
+	var wanted := base_fov if showcase else Settings.number("fov")
+	fov = lerpf(fov, wanted + speed_fov * speed_ratio, 1.0 - exp(-4.0 * delta))
 
 	if target.model.cockpit_view:
 		target.model.cockpit_view.reticle.visible = first_person

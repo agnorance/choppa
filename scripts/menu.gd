@@ -98,11 +98,11 @@ func _ready() -> void:
 
 
 ## Shows the settings screen in place of the title.
-func open_settings() -> void:
+func open_settings(tab := 0) -> void:
 	_home.visible = false
 	for c in _chrome:
 		c.visible = false
-	_settings.open()
+	_settings.open(tab)
 
 
 func _close_settings() -> void:

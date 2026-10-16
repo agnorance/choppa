@@ -36,10 +36,10 @@ func _physics_process(_delta: float) -> void:
 	i.fire = Input.is_action_pressed("fire")
 	i.trick = Input.is_action_pressed("trick")
 	i.use_item = Input.is_action_pressed("use_item")
-	if Settings.mouse_steer and _mouse != Vector2.ZERO:
-		var gain := Settings.mouse_sensitivity * MOUSE_GAIN
+	if Settings.flag("mouse_steer") and _mouse != Vector2.ZERO:
+		var gain := Settings.choice("mouse_sensitivity") * MOUSE_GAIN
 		i.yaw = clampf(i.yaw + _mouse.x * gain, -1.0, 1.0)
-		var climb := -_mouse.y * gain * (-1.0 if Settings.invert_mouse else 1.0)
+		var climb := -_mouse.y * gain * (-1.0 if Settings.flag("invert_mouse") else 1.0)
 		i.lift = clampf(i.lift + climb, -1.0, 1.0)
 	_mouse = Vector2.ZERO
 	if touch and touch.visible:

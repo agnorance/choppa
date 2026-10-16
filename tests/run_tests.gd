@@ -59,6 +59,7 @@ func _run() -> void:
 		"test_canopy_cracks_follow_damage",
 		"test_settings_roundtrip",
 		"test_mouse_steers",
+		"test_aim_assist_can_be_turned_off",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -787,21 +788,22 @@ func test_canopy_cracks_follow_damage() -> void:
 
 func test_settings_roundtrip() -> void:
 	var path := "user://settings_test.cfg"
-	var sensitivity := Settings.mouse_sensitivity
-	Settings.mouse_sensitivity = 7
-	Settings.invert_mouse = true
-	Settings.render_scale = 0.8
+	Settings.set_value("mouse_sensitivity", 7)
+	Settings.set_value("invert_mouse", true)
+	Settings.set_value("render_scale", 0.8)
+	Settings.set_value("resolution", "1920x1080")
 	Settings.save(path)
-	Settings.mouse_sensitivity = 1
-	Settings.invert_mouse = false
-	Settings.render_scale = 1.0
+	Settings.reset()
+	_check(Settings.choice("mouse_sensitivity") == 5, "reset restores the default")
 	Settings.read(path)
-	_check(Settings.mouse_sensitivity == 7, "sensitivity read back: %d" % Settings.mouse_sensitivity)
-	_check(Settings.invert_mouse, "invert flag read back")
-	_check(is_equal_approx(Settings.render_scale, 0.8), "render scale read back: %f" % Settings.render_scale)
-	Settings.mouse_sensitivity = sensitivity
-	Settings.invert_mouse = false
-	Settings.render_scale = 1.0
+	_check(Settings.choice("mouse_sensitivity") == 7, "sensitivity read back: %d" % Settings.choice("mouse_sensitivity"))
+	_check(Settings.flag("invert_mouse"), "invert flag read back")
+	_check(is_equal_approx(Settings.number("render_scale"), 0.8), "render scale read back")
+	_check(Settings.value("resolution") == "1920x1080", "resolution read back")
+	_check(Settings.feature("gi", true) and not Settings.feature("gi", false), "Auto follows the quality")
+	Settings.set_value("gi", 0)
+	_check(not Settings.feature("gi", true), "an explicit Off wins over the quality")
+	Settings.reset()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
@@ -812,22 +814,31 @@ func test_mouse_steers() -> void:
 	pilot.choppa = choppa
 	pilot.set_physics_process(false)  # Stepped by hand below.
 	_world.add_child(pilot)
-	Settings.mouse_steer = true
-	Settings.invert_mouse = false
-	Settings.mouse_sensitivity = 5
+	Settings.reset()
 	pilot.feed_mouse(Vector2(40.0, -40.0))  # Right, and forward (up the screen).
 	pilot._physics_process(TICK)
 	_check(choppa.input.yaw > 0.5, "mouse right yaws right: %f" % choppa.input.yaw)
 	_check(choppa.input.lift > 0.5, "mouse forward climbs: %f" % choppa.input.lift)
 	pilot._physics_process(TICK)
 	_check(choppa.input.yaw == 0.0 and choppa.input.lift == 0.0, "mouse travel is used up each tick")
-	Settings.invert_mouse = true
+	Settings.set_value("invert_mouse", true)
 	pilot.feed_mouse(Vector2(0.0, -40.0))
 	pilot._physics_process(TICK)
 	_check(choppa.input.lift < -0.5, "inverted: mouse forward dives: %f" % choppa.input.lift)
-	Settings.invert_mouse = false
-	Settings.mouse_steer = false
+	Settings.set_value("invert_mouse", false)
+	Settings.set_value("mouse_steer", false)
 	pilot.feed_mouse(Vector2(40.0, 0.0))
 	pilot._physics_process(TICK)
 	_check(choppa.input.yaw == 0.0, "mouse steering off: the mouse does nothing")
-	Settings.mouse_steer = true
+	Settings.reset()
+
+
+func test_aim_assist_can_be_turned_off() -> void:
+	_ground()
+	var shooter := _choppa(Vector3(0.0, 10.0, 0.0))
+	var target := _choppa(Vector3(0.0, 10.0, -30.0))
+	await physics_frame
+	await physics_frame
+	_check(shooter.aim_target() == target, "the guns lock onto a choppa straight ahead")
+	shooter.aim_assist = false
+	_check(shooter.aim_target() == null, "with aim assist off nothing locks on")

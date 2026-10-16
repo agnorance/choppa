@@ -156,7 +156,6 @@ func _ready() -> void:
 	touch = TouchControls.new()
 	touch.anchor_right = 1.0
 	touch.anchor_bottom = 1.0
-	touch.visible = DisplayServer.is_touchscreen_available()
 	_root.add_child(touch)
 	refresh_settings()
 
@@ -165,7 +164,8 @@ func _ready() -> void:
 	choppa.item_changed.connect(func(_name: String) -> void: _update_item())
 	choppa.scored_hit.connect(func(_target: Choppa) -> void: _hit_flash = 0.12)
 	choppa.damaged.connect(func(amount: float, _attacker: Choppa) -> void:
-		_vignette.modulate.a = minf(1.0, _vignette.modulate.a + amount / 20.0))
+		if Settings.flag("damage_flash"):
+			_vignette.modulate.a = minf(1.0, _vignette.modulate.a + amount / 20.0))
 	choppa.scrambled_by.connect(func(by: Choppa) -> void:
 		_show_callout("SCRAMBLED BY %s" % by.pilot_name.to_upper(), Color(0.8, 0.4, 1.0)))
 	choppa.item_used.connect(func(item_name: String) -> void:
@@ -177,15 +177,20 @@ func _ready() -> void:
 
 ## F1: flips the controls overlay setting.
 func toggle_help() -> void:
-	Settings.show_controls = not Settings.show_controls
+	Settings.set_value("show_controls", not Settings.flag("show_controls"))
 	Settings.save()
 	refresh_settings()
 
 
 ## Re-reads the settings that change what the HUD shows.
 func refresh_settings() -> void:
-	_controls.visible = Settings.show_controls and not touch.visible
-	_fps.visible = Settings.show_fps
+	touch.visible = Settings.touch_visible()
+	_controls.queue_free()  # Rebuilt: the mouse notes follow the mouse steering setting.
+	_controls = _controls_sheet()
+	_place(_controls, Vector2(1, 1), Vector2(-28, -26))
+	_root.add_child(_controls)
+	_controls.visible = Settings.flag("show_controls") and not touch.visible
+	_fps.visible = Settings.flag("show_fps")
 
 
 func _process(delta: float) -> void:
@@ -288,7 +293,7 @@ func _controls_sheet() -> Control:
 	grid.add_theme_constant_override("h_separation", 18)
 	grid.add_theme_constant_override("v_separation", 5)
 	box.add_child(grid)
-	for row: Array in Controls.cheat_sheet(Settings.mouse_steer):
+	for row: Array in Controls.cheat_sheet(Settings.flag("mouse_steer")):
 		var what := UiKit.label(row[0], 15, UiKit.MUTED)
 		what.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		grid.add_child(what)

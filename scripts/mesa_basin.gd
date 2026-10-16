@@ -90,14 +90,17 @@ func _ready() -> void:
 		MapKit.tree(self, Vector3(at.x, ground - 0.3, at.z), _rng.randf_range(0.9, 1.6), planted)
 		planted += 1
 	GameMap.report("basin: trees", t0)
-	if Graphics.at_least(Graphics.Quality.MEDIUM):
+	var grass_level := Settings.choice("grass")
+	if grass_level == Settings.AUTO:
+		grass_level = 2 if Graphics.at_least(Graphics.Quality.HIGH) else (1 if Graphics.at_least(Graphics.Quality.MEDIUM) else 0)
+	if grass_level > 0:
 		var grass := Grass.new()
 		grass.terrain = terrain
 		grass.radius = PLAY_RADIUS
 		grass.inner_radius = 80.0  # Under the mesa.
 		grass.water_level = WATER_LEVEL
-		grass.density = 2.6 if Graphics.at_least(Graphics.Quality.HIGH) else 0.6
-		grass.view_distance = 110.0 if Graphics.at_least(Graphics.Quality.HIGH) else 55.0
+		grass.density = 2.6 if grass_level == 2 else 0.6
+		grass.view_distance = 110.0 if grass_level == 2 else 55.0
 		grass.patches = _detail
 		add_child(grass)
 	for k in 45:

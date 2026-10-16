@@ -67,11 +67,18 @@ cockpit's), dark translucent panels with 1 px lines, thin bars, no gradients or 
 
 - **Title:** the arena orbits behind a left-aligned column: modes, map selector,
   settings, quit. Version bottom left, navigation hints bottom right.
-- **Settings** (`SettingsMenu`, shared by title and pause menu): rows of
-  `SettingRow` (name left, value right, left/right to change; mouse, keyboard and
-  gamepad). Graphics: quality, window, v-sync, render scale, FPS counter. Controls:
-  mouse steering, sensitivity, invert, controls overlay. Audio: volume. Key bindings
-  listed beside them on desktop. Saved by `Settings` in `user://settings.cfg`.
+- **Settings** (`SettingsMenu`, shared by title and pause menu): tabs Video,
+  Graphics, Gameplay, Controls, Audio (Q/E or LB/RB switch), each a column of
+  `SettingRow`s (name left, value right, left/right to change; mouse, keyboard and
+  gamepad), plus Reset to defaults. Video: window mode, resolution, v-sync, FPS limit,
+  render scale and upscaler, anti-aliasing, brightness, FPS counter. Graphics:
+  quality preset, shadows, GI, ambient occlusion, reflections, volumetric fog, bloom,
+  grass ("Auto" follows the preset; `Settings.apply_environment` flips the live
+  Environment, the preset and the grass wait for the next map). Gameplay: FOV, camera
+  shake, default view, HUD size, damage flash, aim assist, controls overlay. Controls:
+  mouse steering, sensitivity, invert, gamepad deadzone, touch controls; key bindings
+  beside them on desktop. Audio: master and effects (bus "Effects"). Saved by
+  `Settings` (one dictionary, `DEFAULTS` lists every key) in `user://settings.cfg`.
 - **HUD:** speed and altitude top left, item top right, kills/rank/time top centre,
   hull bottom left, boost (heat as a hairline) bottom centre. Call-outs in amber.
   The controls overlay (key caps) sits bottom right, toggled in settings or with F1.

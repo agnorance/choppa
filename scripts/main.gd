@@ -5,7 +5,7 @@ extends Node
 ##   --mode=battle|free|race  skip the menu (default with --shot/--autopilot: free)
 ##   --map=basin|range        which map (race always uses range)
 ##   --menu                   show the menu even with --shot
-##   --settings               open the settings screen on the menu (for screenshots)
+##   --settings=<tab>         open the settings screen on the menu, tab 0-4 (for screenshots)
 ##   --pause=<tick>           open the pause menu at that tick (the --shot is taken then)
 ##   --laps=<n>               race laps (default 3)
 ##   --kills=<n>              battle kill limit (default 8)
@@ -88,12 +88,13 @@ func _show_menu() -> void:
 	menu.mode_chosen.connect(_restart_in)
 	add_child(menu)
 	if _args.has("settings"):
-		menu.open_settings()
+		menu.open_settings(int(_args.settings))
 
 
 func _start() -> void:
 	var slot := RACE_GRID_SLOT if mode == "race" else 0
 	choppa = _new_choppa("You", Color(0.95, 0.5, 0.1), map.spawn_points[slot], true)
+	choppa.aim_assist = Settings.flag("aim_assist")
 	if mode == "free" and _args.has("spawn"):
 		choppa.respawn(_spawn_arg())
 	if _args.has("health"):
@@ -101,7 +102,7 @@ func _start() -> void:
 
 	var chase := ChaseCamera.new()
 	chase.target = choppa
-	chase.first_person = _args.get("cam", "") == "fp"
+	chase.first_person = _args.get("cam", "") == "fp" or (not _args.has("cam") and Settings.flag("cockpit_view"))
 	chase.showcase = _args.get("cam", "") == "showcase"
 	add_child(chase)
 	chase.make_current()
@@ -334,6 +335,7 @@ func _toggle_pause() -> void:
 
 func _on_settings_changed() -> void:
 	hud.refresh_settings()
+	choppa.aim_assist = Settings.flag("aim_assist")
 	_update_mouse()
 
 
@@ -345,5 +347,5 @@ func _on_match_over() -> void:
 ## The mouse is captured while you steer with it, and free whenever there is something
 ## to click: menus, the results, the pause screen.
 func _update_mouse() -> void:
-	var flying := mode != "" and Settings.mouse_steer and pause == null and not _over and not hud.touch.visible
+	var flying := mode != "" and Settings.flag("mouse_steer") and pause == null and not _over and not hud.touch.visible
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if flying else Input.MOUSE_MODE_VISIBLE

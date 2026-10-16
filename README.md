@@ -80,6 +80,13 @@ everybody. **Loadout** (refilled only at stations): rockets (unguided, hit the p
 strike), homing missiles (flares or a hard roll shake them off), flares, one mine, one
 smoke screen.
 
+**Hangar** (title screen): your pilot level and XP, and a camo per helicopter. Earned
+camos unlock with level (Desert at 5 up to Centurion at 100, Ace past it) and can never
+be bought; the Hangar and Collector packs are style only; Apex is worn only by the
+world's #1 ranked pilot. XP comes from battles: kills, assists, wrecked parts, damage,
+stations taken from under an enemy's nose, finishing and winning. Offline for now
+(`user://profile.cfg`); the store and Apex open with online play.
+
 **Helicopters** (title screen): Scout (light, fast, 100 hull, few rockets), Gunship
 (130 hull, more rockets, two missiles, harder-hitting guns), Heavy (170 hull, tough
 parts, big loadout, slow and sluggish).
@@ -104,6 +111,7 @@ godot --path . -- --mode=free --map=basin --autopilot=hover --cam=showcase --exp
 - `--mode=battle|free|race`, `--map=basin|range`: skip the menu.
 - `--autopilot=hover|shoot|bot|weapon:missile`: let a script or bot fly (`weapon:` rockets, missile, flares, mine, smoke).
 - `--airframe=scout|gunship|heavy`: fly that class.
+- `--camo=<id>`, `--level=<n>`, `--entitle=hangar,collector,apex`, `--hangar`: try camos, levels and packs without touching your saved profile.
 - `--cam=fp|showcase`: start in the cockpit, or with a fixed front view of the choppa.
 - `--health=30`: start damaged (cracked canopy, smoke); `--wear=tail,engine`: start with wrecked parts.
 - `--explode=60`: set off an explosion ahead of you at physics tick 60.

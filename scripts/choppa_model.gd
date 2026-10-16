@@ -7,7 +7,11 @@ extends Node3D
 ## Render layer bit for the local player's own choppa, hidden from the cockpit camera.
 const OWN_LAYER := 1 << 1
 
-var color := Color(0.95, 0.5, 0.1)
+var color := Color(0.95, 0.5, 0.1)  ## The pilot's colour: roundels and the tail marking.
+var camo := "factory"  ## Progression.CAMOS id for the hull paint.
+var silent := false  ## No engine sounds (the hangar turntable).
+var _paint: ShaderMaterial  ## The hull material the camo lives on.
+var _tips: ShaderMaterial  ## Rotor tips and hazard stripes (Apex paints them gold).
 var own := false  ## Set before adding to the tree to put meshes on OWN_LAYER.
 var pilot: Choppa  ## The choppa this model shows; feeds the cockpit instruments.
 var cockpit: Marker3D  ## First-person camera mount.
@@ -48,6 +52,20 @@ func _ready() -> void:
 	_build()
 
 
+## Repaints the hull with a camo (Progression.CAMOS id).
+func set_camo(id: String) -> void:
+	camo = id
+	if _paint:
+		_apply_camo()
+
+
+func _apply_camo() -> void:
+	Progression.apply_camo(_paint, camo)
+	var tips: Color = Progression.CAMOS.get(camo, {}).get("tips", Color(0.85, 0.62, 0.12))
+	_tips.set_shader_parameter("paint", tips)
+	_tips.set_shader_parameter("paint_metal", 0.9 if camo == "apex" else 0.15)
+
+
 ## Swaps the model for another airframe's (rebuilds everything the model owns).
 func set_airframe(id: String) -> void:
 	if id == airframe:
@@ -72,7 +90,12 @@ func _build() -> void:
 	add_child(_parts)
 	var model: Node3D = _scene(airframe).instantiate()
 	_parts.add_child(model)
-	var materials := part_materials(color.lerp(Color(0.36, 0.38, 0.3), 0.42))
+	var materials := part_materials(Color(0.36, 0.38, 0.27))
+	# The pilot's colour on the roundels, so rivals stay recognisable whatever their camo.
+	materials.marking_red = _hull(color, Vector2(1.35, 0.75))
+	_paint = materials.paint
+	_tips = materials.hazard
+	_apply_camo()
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D"):
 		for k in mesh.mesh.get_surface_count():
 			var source := mesh.mesh.surface_get_material(k)
@@ -124,14 +147,15 @@ func _build() -> void:
 		_haze.append(_build_haze(_marker(model, exhaust)))
 	_build_downwash()
 
-	# Rotor slap carries furthest; the engine and boost roar are closer up.
-	_rotor_sound = Sounds.loop_on(self, "rotor_loop", -4.0, 1.4)
-	_rotor_sound.position = _rotor.position
-	_engine_sound = Sounds.loop_on(self, "engine_loop", -8.0)
-	_engine_sound.position = _rotor.position * Vector3(1.0, 0.6, 1.0)
-	_boost_sound = Sounds.loop_on(self, "boost_loop", -6.0)
-	_boost_sound.position = _engine_sound.position + Vector3(0.0, 0.0, 1.0)
-	_boost_sound.stream_paused = true
+	if not silent:
+		# Rotor slap carries furthest; the engine and boost roar are closer up.
+		_rotor_sound = Sounds.loop_on(self, "rotor_loop", -4.0, 1.4)
+		_rotor_sound.position = _rotor.position
+		_engine_sound = Sounds.loop_on(self, "engine_loop", -8.0)
+		_engine_sound.position = _rotor.position * Vector3(1.0, 0.6, 1.0)
+		_boost_sound = Sounds.loop_on(self, "boost_loop", -6.0)
+		_boost_sound.position = _engine_sound.position + Vector3(0.0, 0.0, 1.0)
+		_boost_sound.stream_paused = true
 	if own and pilot and not pilot.restocked.is_connected(_on_restocked):
 		pilot.restocked.connect(_on_restocked)
 

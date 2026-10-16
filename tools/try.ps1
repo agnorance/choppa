@@ -5,6 +5,8 @@ param([string]$Scene = "", [Parameter(ValueFromRemainingArguments = $true)][stri
 $scenes = [ordered]@{
 	"menu"     = @("--menu", "--map=basin")
 	"settings" = @("--menu", "--settings=0", "--map=basin")
+	"hangar"   = @("--menu", "--hangar", "--map=basin")
+	"hangarmax" = @("--menu", "--hangar", "--map=basin", "--level=100", "--entitle=collector,apex")
 	"battle"   = @("--mode=battle", "--map=basin")
 	"free"     = @("--mode=free", "--map=basin")
 	"canyon"   = @("--mode=free", "--map=canyon")

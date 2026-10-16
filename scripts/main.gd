@@ -20,6 +20,10 @@ extends Node
 ##   --wear=tail,rotor,engine start with these parts wrecked (spin, shaking, weak engine)
 ##   --easy                   fly the easy model whatever the setting says
 ##   --airframe=scout|gunship|heavy  fly that class whatever the setting says
+##   --camo=<id>              wear that camo (Progression.CAMOS)
+##   --level=<n>              play as a pilot of that level (not saved)
+##   --entitle=hangar,collector,apex  own those packs for this run (not saved)
+##   --hangar                 open the hangar on the title screen
 ##   --explode=<tick>         set off an explosion 26 m ahead of you at that tick
 ##   --timing                 print how long the map build and the first frame took
 
@@ -33,6 +37,7 @@ const RIVALS := [
 const RACE_GRID_SLOT := 3  ## Start the race in the second row, like the underdog you are.
 ## Bot skill multiplier per difficulty (Settings "bot_difficulty"): easy, normal, hard.
 const BOT_SKILL := [0.55, 1.0, 1.2]
+const BOT_CAMOS := ["factory", "desert", "woodland", "tiger", "splinter", "digital", "arctic", "night"]
 
 ## Survive reload_current_scene() so "again" skips the menu.
 static var next_mode := ""
@@ -60,6 +65,7 @@ func _ready() -> void:
 	_parse_args()
 	Settings.keep_window = _args.has("shot")
 	Settings.load_once(get_tree())
+	_profile_args()
 	var first_start := not started
 	started = true
 	mode = _args.get("mode", next_mode) if first_start else next_mode
@@ -101,12 +107,15 @@ func _show_menu() -> void:
 	add_child(menu)
 	if _args.has("settings"):
 		menu.open_settings(int(_args.settings))
+	elif _args.has("hangar"):
+		menu.open_hangar()
 
 
 func _start() -> void:
 	var slot := RACE_GRID_SLOT if mode == "race" else 0
 	var mine: String = _args.get("airframe", Airframe.ORDER[Settings.choice("airframe")])
-	choppa = _new_choppa("You", Color(0.95, 0.5, 0.1), map.spawn_points[slot], true, mine)
+	choppa = _new_choppa("You", Color(0.95, 0.5, 0.1), map.spawn_points[slot], true, mine,
+		_args.get("camo", Progression.profile().camo_for(mine)))
 	choppa.aim_assist = Settings.flag("aim_assist")
 	choppa.flight_assist = Settings.flag("flight_assist")
 	choppa.easy = Settings.choice("flight_model") == 0 or _args.has("easy")
@@ -158,9 +167,12 @@ func _start() -> void:
 
 
 ## A choppa in the world. Rivals fly a class picked from their name, so a match mixes them.
-func _new_choppa(pilot_name: String, color: Color, at: Transform3D, local := false, airframe := "") -> Choppa:
+func _new_choppa(pilot_name: String, color: Color, at: Transform3D, local := false, airframe := "",
+		camo := "") -> Choppa:
 	var c := Choppa.new()
 	c.local_player = local  # Must be set before _ready: it decides the cockpit and layers.
+	# Rivals wear an earned camo picked from their name.
+	c.camo = camo if camo != "" else BOT_CAMOS[hash(pilot_name + "camo") % BOT_CAMOS.size()]
 	c.airframe = airframe if airframe != "" else Airframe.ORDER[hash(pilot_name) % Airframe.ORDER.size()]
 	c.pilot_name = pilot_name
 	c.team_color = color
@@ -224,6 +236,14 @@ func _start_battle() -> void:
 	battle_hud.menu_requested.connect(_restart_in.bind("", next_map))
 	add_child(battle_hud)
 	battle.match_over.connect(_on_match_over)
+	var stats := MatchStats.new()
+	stats.pilot = choppa
+	stats.battle = battle
+	add_child(stats)
+	battle_hud.xp_provider = func() -> Dictionary:
+		var result := Progression.profile().add_battle(stats.result())
+		Progression.profile().save()
+		return result
 
 
 func _add_racer_bot(target: Choppa, skill: float) -> void:
@@ -367,3 +387,17 @@ func _on_match_over() -> void:
 func _update_mouse() -> void:
 	var flying := mode != "" and Settings.flag("mouse_steer") and pause == null and not _over
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if flying else Input.MOUSE_MODE_VISIBLE
+
+
+## Testing aids: --level=N plays as a pilot of that level, --entitle=hangar,collector,apex
+## grants packs. Neither is saved; the real profile stays as it was.
+func _profile_args() -> void:
+	var profile := Progression.profile()
+	profile.testing = _args.has("level") or _args.has("entitle") or _args.has("camo")
+	if _args.has("level"):
+		profile.xp = Progression.total_xp_for(int(_args.level))
+	if _args.has("entitle"):
+		profile.entitlements = PackedStringArray((_args.entitle as String).split(","))
+	if _args.has("camo"):  # Shown in the hangar too (for screenshots).
+		for id: String in Airframe.ORDER:
+			profile.camos[id] = _args.camo

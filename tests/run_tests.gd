@@ -65,6 +65,11 @@ func _run() -> void:
 		"test_power_line_wrecks_a_rotor",
 		"test_wind_pushes_choppas",
 		"test_bots_battle_in_canyon",
+		"test_level_curve",
+		"test_camo_unlock_rules",
+		"test_battle_xp_and_profile",
+		"test_match_stats_count_what_you_did",
+		"test_camo_reaches_the_hull",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -995,3 +1000,103 @@ func test_wind_pushes_choppas() -> void:
 		outside.step(TICK)
 	_check(inside.global_position.x > 3.0, "the wind pushed it along +X, x=%f" % inside.global_position.x)
 	_check(absf(outside.global_position.x) < 0.1, "nothing outside the zone")
+
+
+func test_level_curve() -> void:
+	_check(Progression.level_for(0) == 1, "everyone starts at level 1")
+	_check(Progression.level_for(999) == 1 and Progression.level_for(1000) == 2, "1000 XP for level 2")
+	_check(Progression.xp_for_level(2) == 1050, "each level costs 50 more")
+	var top := Progression.total_xp_for(Progression.MAX_LEVEL)
+	_check(Progression.level_for(top) == 100 and Progression.level_for(top - 1) == 99, "level 100 at %d XP" % top)
+	_check(Progression.level_for(top * 3) == 100, "capped at 100")
+	_check(Progression.ace_stars(top + Progression.ACE_STAR_XP * 2 + 5) == 2, "Ace stars past 100")
+	_check(is_equal_approx(Progression.level_progress(Progression.total_xp_for(10) + 525), 525.0 / 1450.0), "progress in a level")
+	for id: String in Progression.ORDER:
+		_check(Progression.CAMOS.has(id), "%s is in the catalogue" % id)
+
+
+func test_camo_unlock_rules() -> void:
+	var none := PackedStringArray()
+	_check(Progression.unlocked("factory", 0, none), "factory olive for everyone")
+	_check(not Progression.unlocked("tiger", Progression.total_xp_for(19), none), "tiger needs level 20")
+	_check(Progression.unlocked("tiger", Progression.total_xp_for(20), none), "and has it at 20")
+	var maxed := Progression.total_xp_for(100) + Progression.ACE_STAR_XP
+	for id: String in Progression.ORDER:
+		var tier: String = Progression.CAMOS[id].tier
+		var earned := Progression.unlocked(id, maxed, none)
+		_check(earned == (tier == "level" or tier == "ace"), "%s: no amount of XP buys a %s camo" % [id, tier])
+	_check(Progression.unlocked("racing", 0, PackedStringArray(["hangar"])), "the Hangar Pack has Racing at level 1")
+	_check(not Progression.unlocked("chrome", 0, PackedStringArray(["hangar"])), "but not the Collector finishes")
+	_check(Progression.unlocked("racing", 0, PackedStringArray(["collector"])), "the Collector Pack includes the Hangar Pack")
+	_check(not Progression.unlocked("apex", maxed, PackedStringArray(["hangar", "collector"])), "Apex cannot be bought or earned")
+	_check(Progression.unlocked("apex", 0, PackedStringArray(["apex"])), "only the apex entitlement")
+	var profile := Progression.Profile.new()
+	_check(not profile.choose(Airframe.SCOUT, "tiger"), "a level 1 pilot cannot pick tiger")
+	_check(profile.camo_for(Airframe.SCOUT) == "factory", "and keeps factory olive")
+	profile.camos[Airframe.HEAVY] = "apex"  # A tampered save file.
+	_check(profile.camo_for(Airframe.HEAVY) == "factory", "a saved camo you do not own is not worn")
+
+
+func test_battle_xp_and_profile() -> void:
+	var award := Progression.award({"kill": 3, "assist": 1, "part": 2, "damage": 240, "finished": true, "won": true})
+	_check(award.total == 300 + 40 + 50 + 240 + 100 + 200, "XP adds up, got %d" % award.total)
+	var profile := Progression.Profile.new()
+	profile.xp = Progression.total_xp_for(4) + 900
+	var result := profile.add_battle({"kill": 3, "assist": 1, "part": 2, "damage": 240, "finished": true, "won": true})
+	_check(result.total == award.total * 2, "first win of the day doubles it, got %d" % result.total)
+	_check(result.level_before == 4 and result.level_after > 4, "level up %d > %d" % [result.level_before, result.level_after])
+	_check(result.unlocked.has("desert"), "level 5 unlocks Desert, got %s" % [result.unlocked])
+	var second := profile.add_battle({"kill": 1, "finished": true, "won": true})
+	_check(second.total == 400, "the second win today is not doubled, got %d" % second.total)
+	_check(profile.stats.matches == 2 and profile.stats.wins == 2 and profile.stats.kills == 4, "stats counted")
+	var path := "user://profile_test.cfg"
+	profile.choose(Airframe.GUNSHIP, "desert")
+	profile.save(path)
+	var loaded := Progression.Profile.new()
+	loaded.load_from(path)
+	_check(loaded.xp == profile.xp and loaded.camo_for(Airframe.GUNSHIP) == "desert", "saved and loaded")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	var tester := Progression.Profile.new()
+	tester.testing = true
+	tester.xp = 12345
+	tester.save(path)
+	_check(not FileAccess.file_exists(path), "a --level / --entitle run never saves")
+
+
+func test_match_stats_count_what_you_did() -> void:
+	var me := _choppa(Vector3(0.0, 20.0, 0.0))
+	var a := _choppa(Vector3(0.0, 20.0, -40.0))
+	var b := _choppa(Vector3(30.0, 20.0, -40.0))
+	var battle := Battle.new()
+	_world.add_child(battle)
+	battle.setup([me, a, b] as Array[Choppa], [Transform3D(Basis(), Vector3(0, 20, 0))] as Array[Transform3D], 3)
+	var stats := MatchStats.new()
+	stats.pilot = me
+	stats.battle = battle
+	_world.add_child(stats)
+	a.damage(30.0, me)
+	a.damage(80.0, me)  # Our kill.
+	b.damage(20.0, me)
+	b.damage(90.0, a)  # Someone else finishes b: our assist.
+	var c := _choppa(Vector3(0.0, 20.0, 60.0))
+	c.damage_part(Choppa.Part.TAIL, 100.0, me)
+	_check(stats.stats.kill == 1, "one kill, got %d" % stats.stats.kill)
+	_check(stats.stats.assist == 1, "one assist, got %d" % stats.stats.assist)
+	_check(stats.stats.damage >= 120, "damage counted, got %d" % stats.stats.damage)
+	_check(stats.stats.part == 0, "parts are only counted on battle pilots (c is not in it)")
+	var part_hits := []
+	a.respawn(Transform3D(Basis(), Vector3(0.0, 20.0, -40.0)))
+	a.invulnerable = 0.0
+	a.part_wrecked.connect(func(p: Choppa.Part, by: Choppa) -> void: part_hits.append([p, by]))
+	a.damage_part(Choppa.Part.TAIL, 100.0, me)
+	_check(part_hits == [[Choppa.Part.TAIL, me]] and stats.stats.part == 1, "wrecking a rival's tail rotor counts")
+
+
+func test_camo_reaches_the_hull() -> void:
+	var c := Choppa.new()
+	c.camo = "tiger"
+	_world.add_child(c)
+	var hull := (c.model.find_child("body", true, false) as MeshInstance3D).get_surface_override_material(0) as ShaderMaterial
+	_check(hull.get_shader_parameter("pattern") == Progression.CAMOS.tiger.pattern, "the hull wears the tiger pattern")
+	c.model.set_camo("apex")
+	_check(hull.get_shader_parameter("seam_glow") > 0.0, "apex lights the seams")

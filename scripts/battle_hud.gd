@@ -10,6 +10,9 @@ const FEED_TIME := 6.0
 
 var battle: Battle
 var choppa: Choppa
+## Called once when the results show: adds the battle to the profile and returns
+## Profile.add_battle's result (XP lines, levels, unlocks). Empty: no XP section.
+var xp_provider: Callable
 
 var _root: Control
 var _kills: Label
@@ -169,6 +172,8 @@ func _show_results() -> void:
 		grid.add_child(UiKit.label(str(battle.kills_of(pilot)), 24, color, "condensed"))
 		grid.add_child(UiKit.label(str(battle.deaths_of(pilot)), 24, color, "condensed"))
 		place += 1
+	if xp_provider.is_valid():
+		_xp_section(box, xp_provider.call())
 
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 12)
@@ -204,3 +209,34 @@ func _readout(parent: Control, caption: String) -> Label:
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(value)
 	return value
+
+
+## XP earned, the level bar and anything just unlocked.
+func _xp_section(box: VBoxContainer, result: Dictionary) -> void:
+	box.add_child(UiKit.rule())
+	var head := HBoxContainer.new()
+	box.add_child(head)
+	var earned := UiKit.display("+%d XP" % result.total, 30, UiKit.ACCENT)
+	earned.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(earned)
+	var profile := Progression.profile()
+	var level_text := "LEVEL %d" % result.level_after
+	if result.level_after > result.level_before:
+		level_text = "LEVEL UP  %d > %d" % [result.level_before, result.level_after]
+	head.add_child(UiKit.display(level_text, 24, UiKit.GOOD if result.level_after > result.level_before else UiKit.TEXT))
+	var bar := UiKit.Bar.new(0.0, 5.0)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.set_value(Progression.level_progress(profile.xp))
+	box.add_child(bar)
+	var lines := VBoxContainer.new()
+	lines.add_theme_constant_override("separation", 0)
+	box.add_child(lines)
+	for line: Array in result.lines:
+		var row := HBoxContainer.new()
+		var what := UiKit.label(line[0], 16, UiKit.MUTED)
+		what.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(what)
+		row.add_child(UiKit.label("+%d" % line[1], 16, UiKit.TEXT, "condensed"))
+		lines.add_child(row)
+	for camo: String in result.unlocked:
+		box.add_child(UiKit.label("Unlocked camo: %s" % Progression.CAMOS[camo].name, 18, UiKit.GOOD, "condensed"))

@@ -10,6 +10,7 @@ static var map_index := 0  ## Remembered across menu visits.
 var _home: VBoxContainer
 var _chrome: Array[Control] = []  ## Version and hints, hidden with the title.
 var _settings: SettingsMenu
+var _hangar: Hangar
 var _battle: Button
 var _blurb: Label  ## One line about the chosen helicopter.
 
@@ -86,7 +87,13 @@ func _ready() -> void:
 		Settings.set_value("bot_difficulty", i)
 		Settings.save())
 	_home.add_child(bots_row)
-	_button("Settings", open_settings)
+	var pair := HBoxContainer.new()
+	pair.add_theme_constant_override("separation", 6)
+	_home.add_child(pair)
+	for entry: Array in [["Hangar", open_hangar], ["Settings", open_settings]]:
+		var b := UiKit.button(entry[0], 187.0)
+		b.pressed.connect(entry[1])
+		pair.add_child(b)
 	_button("Quit", func() -> void: get_tree().quit())
 
 	var version := UiKit.label("v%s  ·  Godot %s" % [ProjectSettings.get_setting("application/config/version"),
@@ -114,6 +121,10 @@ func _ready() -> void:
 	_settings.visible = false
 	_settings.closed.connect(_close_settings)
 	root.add_child(_settings)
+	_hangar = Hangar.new()
+	_hangar.visible = false
+	_hangar.closed.connect(_close_hangar)
+	root.add_child(_hangar)
 	_battle.grab_focus()
 
 
@@ -144,3 +155,19 @@ func _gap(height: float) -> Control:
 	var c := Control.new()
 	c.custom_minimum_size.y = height
 	return c
+
+
+## Shows the hangar (level, camos, store) in place of the title.
+func open_hangar() -> void:
+	_home.visible = false
+	for c in _chrome:
+		c.visible = false
+	_hangar.open()
+
+
+func _close_hangar() -> void:
+	_hangar.visible = false
+	_home.visible = true
+	for c in _chrome:
+		c.visible = true
+	_battle.grab_focus()

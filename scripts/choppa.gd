@@ -12,6 +12,7 @@ signal scored_hit(target: Choppa)
 signal gun_overheated
 signal damaged(amount: float, attacker: Choppa)
 signal part_damaged(part: Part, left: float)  ## A rotor, the tail rotor or the engine took a hit.
+signal part_wrecked(part: Part, by: Choppa)  ## It just reached zero; `by` did it (or null).
 signal died(killer: Choppa)
 signal healed(amount: float)
 signal restocked
@@ -110,6 +111,7 @@ var alive := true
 var mortal := true  ## False in races: hits still push, but never hurt.
 ## The helicopter class (Airframe). Set before adding the choppa, or with set_airframe().
 var airframe := Airframe.SCOUT
+var camo := "factory"  ## Progression.CAMOS id; set before adding the choppa, or model.set_camo().
 var max_health := MAX_HEALTH
 var clearance := GROUND_CLEARANCE  ## Body origin to skid bottom for this airframe.
 var gun_factor := 1.0  ## Machine-gun damage multiplier of the airframe.
@@ -156,6 +158,7 @@ func _ready() -> void:
 	model.own = local_player
 	model.pilot = self
 	model.airframe = airframe
+	model.camo = camo
 	add_child(model)
 	set_airframe(airframe)
 
@@ -364,7 +367,7 @@ func take_hit(impulse: Vector3, shooter: Choppa, amount := 0.0, at := Vector3.IN
 	if part == Part.HULL:
 		damage(amount, shooter)
 	else:
-		damage_part(part, amount)
+		damage_part(part, amount, shooter)
 		damage(amount * 0.6, shooter)
 	return true
 
@@ -373,7 +376,7 @@ func take_hit(impulse: Vector3, shooter: Choppa, amount := 0.0, at := Vector3.IN
 func blast_damage(amount: float, attacker: Choppa, from: Vector3) -> void:
 	var part := part_at(from)
 	if part != Part.HULL:
-		damage_part(part, amount * 0.8)
+		damage_part(part, amount * 0.8, attacker)
 	damage(amount, attacker)
 
 
@@ -391,11 +394,14 @@ func part_at(at: Vector3) -> Part:
 	return Part.HULL
 
 
-func damage_part(part: Part, amount: float) -> void:
+func damage_part(part: Part, amount: float, by: Choppa = null) -> void:
 	if part == Part.HULL or not alive or not mortal or invulnerable > 0.0 or amount <= 0.0:
 		return
+	var before: float = parts[part]
 	parts[part] = maxf(0.0, parts[part] - amount)
 	part_damaged.emit(part, parts[part])
+	if before > 0.0 and parts[part] <= 0.0:
+		part_wrecked.emit(part, by)
 
 
 ## How wrecked a part is: 0 intact .. 1 gone.
@@ -701,9 +707,9 @@ func _handle_collisions(before: Vector3) -> void:
 		# body tilted this far has its blades in the obstacle too.
 		var part := part_at(where)
 		if part != Part.HULL:
-			damage_part(part, excess * 3.0)
+			damage_part(part, excess * 3.0, credit)
 		if absf(bank_right()) > 0.6 or absf(nose_down()) > 0.6:
-			damage_part(Part.ROTOR, excess * 2.0)
+			damage_part(Part.ROTOR, excess * 2.0, credit)
 		damage(excess * CRASH_DAMAGE_PER_MS, credit)
 
 func _update_altitude() -> void:

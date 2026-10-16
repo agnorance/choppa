@@ -373,7 +373,7 @@ class.
 Bright liveries in a different visual family from the earned camos, so nobody mistakes
 one for the other.
 
-- **Hangar Pack** (tier 1, about 5 euro): four liveries (Racing, Shark mouth, Sunset,
+- **Hangar Pack** (tier 1, about 5 euro): four liveries (Racing, Hornet, Sunset,
   Checkerboard), eight paint colours for any camo, two nose arts.
 - **Collector Pack** (tier 2, about 15 euro): everything in the Hangar Pack, plus
   metallic and pearl finishes, coloured rotor tips, a coloured smoke trail, a cockpit

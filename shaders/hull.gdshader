@@ -1,5 +1,7 @@
 // Painted metal hull: panel seams and rivet rows in object space (no UVs needed),
 // chipped paint showing bare metal, grime toward the belly, soot behind the exhausts.
+// Camos (Progression.CAMOS) pick a pattern and up to four colours; finishes set how
+// metallic and glossy the paint is; Apex lights the seams. Object space: -Z is the nose.
 shader_type spatial;
 
 uniform vec3 paint : source_color = vec3(0.42, 0.45, 0.3);
@@ -7,6 +9,17 @@ uniform vec3 bare_metal : source_color = vec3(0.6, 0.6, 0.58);
 uniform vec3 grime : source_color = vec3(0.18, 0.15, 0.12);
 uniform float wear : hint_range(0.0, 1.0) = 0.28;
 uniform vec2 panel_size = vec2(1.35, 0.75);  // Along the length, around the body (metres).
+// 0 solid, 1 blotches, 2 tiger stripes, 3 splinter, 4 digital, 5 racing stripes,
+// 6 hornet stripes, 7 sunset, 8 checkerboard.
+uniform int pattern = 0;
+uniform vec3 camo_b : source_color = vec3(0.3, 0.32, 0.22);
+uniform vec3 camo_c : source_color = vec3(0.2, 0.18, 0.14);
+uniform vec3 camo_d : source_color = vec3(0.55, 0.5, 0.38);
+uniform float pattern_scale = 1.0;
+uniform float paint_metal : hint_range(0.0, 1.0) = 0.15;
+uniform float paint_gloss : hint_range(0.0, 1.0) = 0.38;
+uniform vec3 seam_color : source_color = vec3(0.0);
+uniform float seam_glow = 0.0;
 
 varying vec3 obj_pos;
 varying vec3 obj_normal;
@@ -34,6 +47,69 @@ float fbm(vec3 p) {
 		a *= 0.5;
 	}
 	return v;
+}
+
+// The camo colour at an object-space point.
+vec3 camo(vec3 p, vec3 base) {
+	vec3 q = p / pattern_scale;
+	if (pattern == 1) {
+		// Blotches: two noise thresholds give three overlapping shapes on the base.
+		float a = fbm(q * 0.9);
+		float b = fbm(q * 0.9 + vec3(7.3, 1.7, 3.1));
+		vec3 col = mix(base, camo_b, step(0.52, a));
+		col = mix(col, camo_c, step(0.56, b) * step(a, 0.6));
+		return mix(col, camo_d, step(0.62, fbm(q * 1.6 + 11.0)));
+	}
+	if (pattern == 2) {
+		// Tiger: wavy dark stripes across the body.
+		float s = sin((q.z + fbm(q * 1.2) * 1.4) * 4.2);
+		vec3 col = mix(base, camo_b, smoothstep(0.35, 0.45, s));
+		return mix(col, camo_c, smoothstep(0.82, 0.88, s));
+	}
+	if (pattern == 3) {
+		// Splinter: straight-edged polygons from a few hashed half-planes.
+		vec3 cell = floor(q * 0.8);
+		float h = hash(cell);
+		vec3 f = fract(q * 0.8);
+		float cut1 = step(f.x + f.z * 0.6, 0.8 + h * 0.4);
+		float cut2 = step(f.y - f.z * 0.4, 0.3 + hash(cell + 3.0) * 0.5);
+		vec3 col = h < 0.33 ? base : (h < 0.66 ? camo_b : camo_c);
+		col = mix(col, camo_d, cut1 * cut2);
+		return mix(col, camo_b, (1.0 - cut1) * step(0.7, hash(cell + 9.0)));
+	}
+	if (pattern == 4) {
+		// Digital: blotches sampled on a 12 cm grid.
+		vec3 g = floor(q / 0.12) * 0.12;
+		float a = fbm(g * 0.9);
+		float b = fbm(g * 0.9 + vec3(7.3, 1.7, 3.1));
+		vec3 col = mix(base, camo_b, step(0.5, a));
+		col = mix(col, camo_c, step(0.55, b));
+		return mix(col, camo_d, step(0.64, fbm(g * 1.7 + 4.0)));
+	}
+	if (pattern == 5) {
+		// Racing: two stripes over the top along the length, a thin pinstripe beside.
+		float x = abs(p.x);
+		vec3 col = mix(base, camo_b, step(x, 0.16) * step(0.06, x));
+		return mix(col, camo_c, step(abs(x - 0.26), 0.02) * step(0.0, p.y + 0.2));
+	}
+	if (pattern == 6) {
+		// Hornet: diagonal hazard stripes, wider toward the tail.
+		float d = fract((p.z * 0.8 + p.y * 0.6) * 1.6);
+		return mix(base, camo_b, step(0.5, d));
+	}
+	if (pattern == 7) {
+		// Sunset: a gradient from the belly up, with a band where the sun sits.
+		float t = smoothstep(-0.8, 1.0, p.y + fbm(q * 0.6) * 0.15);
+		vec3 col = mix(base, camo_b, t);
+		col = mix(col, camo_c, smoothstep(0.75, 1.0, t));
+		return mix(col, camo_d, step(abs(p.y - 0.15), 0.03));
+	}
+	if (pattern == 8) {
+		// Checkerboard, 30 cm squares.
+		vec3 c = floor(q / 0.3);
+		return mod(c.x + c.y + c.z, 2.0) < 1.0 ? base : camo_b;
+	}
+	return base;
 }
 
 void vertex() {
@@ -67,12 +143,14 @@ void fragment() {
 	float soot = smoothstep(1.4, 2.2, obj_pos.z) * smoothstep(0.2, 0.7, obj_pos.y)
 		* (1.0 - smoothstep(0.6, 1.1, abs(obj_pos.x))) * (0.6 + 0.4 * noise(obj_pos * vec3(6.0, 6.0, 1.0)));
 
-	vec3 col = mix(paint * (0.92 + n_fine * 0.12), bare_metal, chip);
+	vec3 col = mix(camo(obj_pos, paint) * (0.92 + n_fine * 0.12), bare_metal, chip);
 	col = mix(col, grime, dirt * 0.45 + soot * 0.7);
 	col *= 1.0 - seam * 0.45;
+	col = mix(col, seam_color, seam * step(0.001, seam_glow + length(seam_color)));
 	ALBEDO = col;
-	METALLIC = mix(0.15, 0.85, chip);
-	ROUGHNESS = mix(0.62, 0.35, chip) + dirt * 0.2;
+	EMISSION = seam_color * seam * seam_glow;
+	METALLIC = mix(paint_metal, 0.85, chip);
+	ROUGHNESS = mix(1.0 - paint_gloss, 0.35, chip) + dirt * 0.2;
 
 	// Bump from seams (sunken) and rivets (raised) via screen-space derivatives.
 	float h = rivet * 0.8 - seam * 1.0 - chip * 0.25;

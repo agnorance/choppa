@@ -20,6 +20,8 @@ $shots = [ordered]@{
 	"settings_gameplay" = "--menu --settings=2 --map=basin --frames=90"
 	"settings_controls" = "--menu --settings=3 --map=basin --frames=90"
 	"settings_audio"    = "--menu --settings=4 --map=basin --frames=90"
+	"hangar"          = "--menu --hangar --map=basin --level=34 --frames=120"
+	"hangar_apex"     = "--menu --hangar --map=basin --level=100 --entitle=apex --camo=apex --frames=120"
 	"battle"          = "--mode=battle --map=basin --autopilot=bot --frames=240"
 	"pause"           = "--mode=battle --map=basin --autopilot=bot --pause=200"
 	"cockpit"         = "--map=basin --cam=fp --autopilot=hover --frames=40"

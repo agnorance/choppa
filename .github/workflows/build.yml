@@ -22,7 +22,7 @@ jobs:
           path: |
             ~/godot
             ~/.local/share/godot/export_templates
-          key: godot-${{ env.GODOT_VERSION }}
+          key: godot-${{ env.GODOT_VERSION }}-linux-templates
 
       - name: Download Godot and export templates
         if: steps.cache-godot.outputs.cache-hit != 'true'
@@ -35,7 +35,7 @@ jobs:
           curl -sSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
           templates=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
           mkdir -p "$templates"
-          unzip -jq templates.tpz 'templates/version.txt' 'templates/windows_*x86_64*' -d "$templates"
+          unzip -jq templates.tpz 'templates/version.txt' 'templates/windows_*x86_64*' 'templates/linux_release.x86_64' -d "$templates"
           rm godot.zip templates.tpz
 
       - name: Set up Godot
@@ -68,3 +68,22 @@ jobs:
           name: choppa-windows
           path: build/windows/choppa.exe
 
+      - name: Export Linux server
+        run: |
+          mkdir -p build/server
+          godot --headless --path . --export-release "Linux Server" build/server/choppa_server.x86_64
+          test -f build/server/choppa_server.x86_64
+
+      - name: Server smoke test
+        run: |
+          # The exported server must start, open its port and keep running.
+          set +e
+          timeout 20 build/server/choppa_server.x86_64 --headless -- --server=7777 > server.log 2>&1
+          code=$?
+          cat server.log | tail -20
+          grep -q "hosting" server.log && [ "$code" = "124" ]
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: choppa-server-linux
+          path: build/server/choppa_server.x86_64

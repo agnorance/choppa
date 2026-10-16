@@ -22,9 +22,10 @@ synthesized sound effects. All of that is on `main` (PR #1). New work continues 
 `godot-foundation`; open a PR to `main` when a chunk is done. Merging is the owner's
 call: they merge on GitHub (with "Create a merge commit").
 Done so far: load times, the UI, two flight models, the damage model, helicopter
-classes, service stations with a loadout, Slot Canyon, PC only. Plan (DESIGN.md
-"Milestones"): polish, the progression foundation, internet multiplayer, then ranked,
-store and the Apex skin. Every feature gets tests (owner's rule). Each session: check `git log` and the roadmap, then confirm the next step.
+classes, service stations with a loadout, Slot Canyon, PC only, polish, the
+progression foundation, internet multiplayer steps 1 and 2 (host, dedicated server,
+direct connect; `NetGame`). Plan (DESIGN.md "Milestones"): a cloud server (owner
+picks the provider), the backend, then ranked, store and the Apex skin. Every feature gets tests (owner's rule). Each session: check `git log` and the roadmap, then confirm the next step.
 
 ## Commands
 
@@ -38,6 +39,7 @@ Godot must be 4.7.2. Two environments:
 | Re-import | `& $env:GODOT --headless --path . --import` | `godot --headless --path . --import` |
 | Bake textures | `tools\bake.ps1` | `tools/bake.sh` |
 | Try a scene | `tools\try.ps1 settings` (no name lists them) | `godot --path . -- --menu --settings=0` |
+| Server | `tools\server.ps1 --map=basin` (then `tools\try.ps1 join`) | `godot --headless --path . -- --server` |
 | Full check | `tools\check.ps1` (tests + every screen into `build\shots\`) | `tools/test.sh` |
 
 - Windows scripts find Godot via `$env:GODOT` (path to `Godot_v4.7.2-stable_win64_console.exe`),
@@ -64,6 +66,11 @@ Godot must be 4.7.2. Two environments:
 
 ## Code rules
 
+- Multiplayer is server-authoritative (`NetGame`): anything that changes health, ammo,
+  scores or deaths must check `authority` (false on a client), and anything visual in
+  `Choppa.step` must skip while `replaying`. New weapon effects need a "fired" event
+  so other clients see them. The network tests in `tests/run_tests.gd` run a server
+  and a client in one process; keep them passing.
 - A choppa only reads a `PilotInput` (cyclic, yaw, collective, boost, fire, item); keep
   input sources (keyboard, mouse, gamepad, network, bots) out of `choppa.gd` so multiplayer stays
   straightforward. Bots go through `Autopilot.fly()`, which turns a wanted velocity and

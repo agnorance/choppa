@@ -24,6 +24,20 @@ Pick a map in the menu (Mesa Basin, Slot Canyon or Test Range), then:
 Esc (or Start) pauses: resume, settings, restart the match,
 back to the title.
 
+## Multiplayer
+
+**Multiplayer** on the title screen: enter your pilot name, then
+
+- **Join** a server by address (`1.2.3.4`, or `1.2.3.4:7778` for another port), or
+- **Host a battle** on the map chosen on the title screen. Friends join with your IP
+  address. From outside your home network they need UDP port 7777 forwarded to your PC.
+
+Online battles have six seats; bots fly the free ones and players take them over as
+they join. A new round starts by itself 12 seconds after one ends. XP counts as usual.
+
+A dedicated server has no window: `tools\server.ps1 --map=canyon` on Windows, or the
+Linux build from CI: `./choppa_server.x86_64 --headless -- --server=7777 --map=basin`.
+
 ## Settings
 
 From the title or the pause menu; saved in `user://settings.cfg`. Tabs switch with the
@@ -124,7 +138,13 @@ godot --path . -- --mode=free --map=basin --autopilot=hover --cam=showcase --exp
 tools\try.ps1              # lists the scenes
 tools\try.ps1 settings     # straight into a scene: menu, settings, hangar, hangarmax, battle, free, easy, race, cockpit,
                            # lake, damaged, tailrotor, engine, bots, missile, rockets,
-                           # gunship, heavy, canyon, canyonbattle, explode
+                           # gunship, heavy, canyon, canyonbattle, explode,
+                           # online, host, join, lagjoin
 tools\check.ps1            # import, all tests, and screenshots of every screen into build\shots\
 ```
 - `--shot=out.png --frames=90`: save a screenshot after 90 ticks and quit.
+- `--host[=port]`, `--server[=port]`, `--connect=addr[:port]`, `--name=Ace`: play online;
+  `--lag=150 --loss=3` simulates a bad connection (round trip in ms, percent lost).
+
+Two windows on one PC: `tools\try.ps1 host` in one, `tools\try.ps1 join` (or `lagjoin`)
+in the other.

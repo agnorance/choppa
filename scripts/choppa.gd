@@ -124,6 +124,10 @@ var clock := 0.0  ## Simulation seconds this choppa has existed.
 var last_shot_time := -10.0  ## `clock` at the last shot, for the muzzle flash.
 var last_shot_side := 1.0  ## Which gun fired it: -1 left, 1 right.
 var over_water := false  ## The ground below is water (for spray instead of dust).
+## False on a network client: the server decides damage, repairs and deaths, and the
+## client only shows what its snapshots say (NetGame).
+var authority := true
+var replaying := false  ## A client re-running inputs after a correction: no shots, no visuals.
 
 
 var model: ChoppaModel
@@ -131,6 +135,7 @@ var model: ChoppaModel
 var _cooldowns := {"rockets": 0.0, "missiles": 0.0, "flares": 0.0, "mines": 0.0, "smoke": 0.0}
 var _rocket_side := 1.0
 var _part_scale := 1.0
+var _tick := 1.0 / 60.0  ## The current step's delta, for code that runs inside it.
 var _gun_timer := 0.0
 var _gun_side := 1.0
 var _shape: CollisionShape3D
@@ -178,6 +183,7 @@ func facing() -> Basis:
 
 ## Advances the simulation by one tick.
 func step(delta: float) -> void:
+	_tick = delta
 	clock += delta
 	if not alive:
 		return
@@ -190,8 +196,9 @@ func step(delta: float) -> void:
 	if locked:
 		i = PilotInput.new()
 
-	_update_gun(i, delta)
-	_update_weapons(i, delta)
+	if not replaying:
+		_update_gun(i, delta)
+		_update_weapons(i, delta)
 	_crash_cooldown = maxf(0.0, _crash_cooldown - delta)
 	if easy:
 		_step_easy(i, delta)
@@ -247,7 +254,8 @@ func step(delta: float) -> void:
 	move_and_slide()
 	_handle_collisions(before)
 	_update_altitude()
-	model.update_pose(self, delta)
+	if not replaying:
+		model.update_pose(self, delta)
 
 
 ## The easy model: a drone with no gravity that hovers when you let go. The mouse (or
@@ -298,7 +306,8 @@ func _step_easy(i: PilotInput, delta: float) -> void:
 	move_and_slide()
 	_handle_collisions(before)
 	_update_altitude()
-	model.update_pose(self, delta)
+	if not replaying:
+		model.update_pose(self, delta)
 
 
 ## Pitch of the nose below the horizon, radians (negative: nose up).
@@ -396,7 +405,7 @@ func part_at(at: Vector3) -> Part:
 
 
 func damage_part(part: Part, amount: float, by: Choppa = null) -> void:
-	if part == Part.HULL or not alive or not mortal or invulnerable > 0.0 or amount <= 0.0:
+	if not authority or part == Part.HULL or not alive or not mortal or invulnerable > 0.0 or amount <= 0.0:
 		return
 	var before: float = parts[part]
 	parts[part] = maxf(0.0, parts[part] - amount)
@@ -423,7 +432,7 @@ func _repair_all() -> void:
 
 
 func damage(amount: float, attacker: Choppa) -> void:
-	if not alive or not mortal or invulnerable > 0.0 or amount <= 0.0:
+	if not authority or not alive or not mortal or invulnerable > 0.0 or amount <= 0.0:
 		return
 	if attacker and attacker != self:
 		_last_attacker = attacker
@@ -435,7 +444,7 @@ func damage(amount: float, attacker: Choppa) -> void:
 
 
 func heal(amount: float) -> bool:
-	if not alive or not needs_repair():
+	if not authority or not alive or not needs_repair():
 		return false
 	var before := health
 	health = minf(max_health, health + amount)
@@ -447,7 +456,7 @@ func heal(amount: float) -> bool:
 
 ## A share of a full repair (a service station calls this every tick it works on you).
 func repair(fraction: float) -> void:
-	if not alive:
+	if not authority or not alive:
 		return
 	var before := health
 	health = minf(max_health, health + max_health * fraction)
@@ -508,6 +517,12 @@ func set_airframe(id: String) -> void:
 
 
 func _die(killer: Choppa) -> void:
+	_wreck()
+	died.emit(killer)
+
+
+## The visible part of dying: also what a network client does when a snapshot says so.
+func _wreck() -> void:
 	alive = false
 	health = 0.0
 	velocity = Vector3.ZERO
@@ -516,7 +531,12 @@ func _die(killer: Choppa) -> void:
 	var boom := Effects.Explosion.new()
 	get_parent().add_child(boom)
 	boom.global_position = global_position
-	died.emit(killer)
+
+
+## Network client: the server says this choppa was shot down.
+func net_wreck() -> void:
+	if alive:
+		_wreck()
 
 
 func _update_weapons(i: PilotInput, delta: float) -> void:
@@ -694,7 +714,7 @@ func _handle_collisions(before: Vector3) -> void:
 	if is_ground:
 		# Skids on the ground: only the sink rate counts, and the skids drag you to a stop.
 		impact = maxf(0.0, -before.y)
-		var braking := exp(-SKID_FRICTION * get_physics_process_delta_time())
+		var braking := exp(-SKID_FRICTION * _tick)
 		velocity.x *= braking
 		velocity.z *= braking
 	if impact > BOUNCE_IMPACT and not is_ground:

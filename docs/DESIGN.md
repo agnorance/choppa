@@ -321,13 +321,37 @@ the world #1 skin need a server nobody can tamper with, so the server is authori
   purchases); the client only renders and predicts.
 
 Steps:
-1. Determinism audit: every random number in the simulation from seeded generators,
-   fixed 60 Hz tick, input and state serialization for a choppa and every weapon
-   object. Tests that a replayed input log gives the same match.
-2. Headless server and direct connect (IP and port), prediction and interpolation,
-   tested with simulated latency and packet loss (`--lag=120 --loss=2`).
-3. Backend: accounts, matchmaking, server browser for private matches.
+1. *(done)* Determinism: the simulation steps on the fixed tick only (no frame times),
+   and a test replays an input log and gets the same flight and damage.
+2. *(done)* Headless server and direct connect (IP and port), prediction,
+   reconciliation and interpolation, tested with simulated latency and packet loss.
+3. Backend: accounts, matchmaking, server browser for private matches; a cloud server
+   (the owner picks the provider; the Linux server build is ready).
 4. Progression on the server (below), then ranked, then the store.
+
+### What exists now (step 2)
+
+- `NetGame` (`scripts/net/net_game.gd`) is the whole netcode, one node with a server
+  and a client role, at the same path on every machine. `NetCodec` packs inputs (29
+  bytes, the last 4 repeated in every packet so a lost one costs nothing) and choppa
+  states (snapshots at 30 Hz, everyone in every snapshot, no delta compression yet).
+- The server runs a normal battle. Players take over bot seats (6 seats); a bot takes
+  a seat back when its player leaves. Rounds follow each other: 12 s after a round ends
+  the server starts the next one on the same field.
+- The client predicts its own choppa, and corrects and replays only when the server's
+  state at the acknowledged tick differs. Others are drawn 100 ms behind. Damage,
+  deaths, scores, stations and ammo come from the server (`authority` is false on
+  the client's choppas, battle and stations). Other pilots' rockets, missiles, flares,
+  mines and smoke are shown from reliable "fired" events and cannot hurt anyone there.
+- XP: the server counts each player's stats and sends them at the round end; the client
+  adds them to its own profile (still a local profile until the backend exists).
+  Only level camos are shown to others; packs and Apex wait for a server-side
+  entitlement check.
+- Ways in: Multiplayer on the title screen (name, address, Join; Host a battle), or
+  `--host`, `--server`, `--connect=addr[:port]`; `--lag` and `--loss` simulate a bad line.
+- Not yet: lag compensation for hits (the server checks hits where things are now, so
+  a high ping means leading targets a little), delta compression, a server browser,
+  chat, NAT punch-through (hosting at home needs UDP 7777 forwarded).
 
 ## Progression, camos and the store (plan)
 
@@ -417,7 +441,9 @@ Apex are entitlements the server grants; offline they can only be previewed
     gone, a wobbling main rotor, a burning engine); a synthesized dieselpunk march for
     the menu and battles on its own Music bus.
 13. **Progression foundation** *(done, offline, see above)*: levels, XP, earned camos, hangar.
-14. **Internet multiplayer**, steps 1 to 4 above.
+14. **Internet multiplayer**: steps 1 and 2 *(done)*: host, dedicated server and direct
+    connect with prediction. Next: a cloud server (owner picks the provider), then the
+    backend (step 3).
 15. **Ranked, store and Apex** on the backend.
 16. Feel pass on the owner's PC throughout; more arenas and battle variants after.
 

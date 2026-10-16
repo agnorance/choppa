@@ -72,6 +72,12 @@ func _run() -> void:
 		"test_camo_reaches_the_hull",
 		"test_every_sound_exists_and_loops_loop",
 		"test_wrecking_a_part_tells_the_shooter_and_shows",
+		"test_replay_is_deterministic",
+		"test_net_client_predicts_and_server_agrees",
+		"test_net_survives_lag_and_loss",
+		"test_net_server_owns_damage_and_kills",
+		"test_net_leaving_hands_the_seat_to_a_bot",
+		"test_net_rounds_follow_each_other",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -1139,3 +1145,227 @@ func test_wrecking_a_part_tells_the_shooter_and_shows() -> void:
 	target.repair(1.0)
 	target.model.update_pose(target, TICK)
 	_check(tail.visible, "and back after a repair")
+
+
+## The same inputs from the same start give exactly the same flight, crash included.
+func test_replay_is_deterministic() -> void:
+	var inputs := []
+	for t in 400:
+		var i := PilotInput.new()
+		i.cyclic = Vector2(sin(t * 0.03) * 0.6, 0.5 if t < 200 else -0.3)
+		i.collective = 0.3 if t < 120 else -0.4
+		i.yaw = cos(t * 0.02) * 0.5
+		inputs.append(i)
+	var ends := []
+	for run in 2:
+		var world := Node3D.new()
+		_world.add_child(world)
+		MapKit.block(world, Vector3(0.0, -1.0, 0.0), Vector3(400.0, 2.0, 400.0), Color.GRAY)
+		MapKit.block(world, Vector3(0.0, 10.0, -60.0), Vector3(80.0, 40.0, 2.0), Color.GRAY)
+		var c := Choppa.new()
+		world.add_child(c)
+		c.respawn(Transform3D(Basis(), Vector3(0.0, 10.0, 0.0)))
+		c.invulnerable = 0.0
+		c.set_physics_process(false)
+		for t in 400:
+			c.input.copy_from(inputs[t])
+			await physics_frame
+			c.step(TICK)
+		ends.append([c.global_transform, c.velocity, c.health])
+		world.queue_free()
+		await physics_frame
+	_check(ends[0][0].is_equal_approx(ends[1][0]) and ends[0][1].is_equal_approx(ends[1][1]),
+		"identical runs end in the same place: %s vs %s" % [ends[0][0].origin, ends[1][0].origin])
+	_check(ends[0][2] == ends[1][2], "and with the same damage, %f vs %f" % [ends[0][2], ends[1][2]])
+
+
+## A server and a client in one process: two physics worlds (SubViewports) and two
+## multiplayer instances, talking over ENet on localhost. Returns {server, client,
+## seat (the server's choppa the client flies), other (a server choppa), own, remote}.
+func _net_pair(lag_ms := 0.0, loss := 0.0) -> Dictionary:
+	var port := 20000 + randi() % 20000
+	var sides := {}
+	for side in ["server", "client"]:
+		var vp := SubViewport.new()
+		vp.own_world_3d = true
+		vp.name = side
+		_world.add_child(vp)
+		var world := Node3D.new()
+		vp.add_child(world)
+		MapKit.block(world, Vector3(0.0, -1.0, 0.0), Vector3(600.0, 2.0, 600.0), Color.GRAY)
+		set_multiplayer(SceneMultiplayer.new(), vp.get_path())
+		var net := NetGame.new()
+		net.name = "Net"
+		net.lag_ms = lag_ms
+		net.loss = loss
+		vp.add_child(net)
+		sides[side] = {"vp": vp, "world": world, "net": net}
+	var spawns: Array[Transform3D] = [Transform3D(Basis(), Vector3(0.0, 10.0, 0.0)), Transform3D(Basis(), Vector3(40.0, 10.0, 0.0))]
+	var field: Array[Choppa] = []
+	for k in 2:
+		var c := Choppa.new()
+		c.pilot_name = "S%d" % k
+		sides.server.world.add_child(c)
+		c.respawn(spawns[k])
+		c.invulnerable = 0.0
+		field.append(c)
+	var battle := Battle.new()
+	sides.server.world.add_child(battle)
+	battle.setup(field, spawns, 5)
+	var server: NetGame = sides.server.net
+	server.battle = battle
+	server.pilots = field
+	var placeholder := Node.new()
+	sides.server.world.add_child(placeholder)
+	server.bots = {field[0]: placeholder}
+	server.welcome_info = {"map": "test", "kills": 5}
+	_check(server.host(port) == OK, "server listens on %d" % port)
+	var client: NetGame = sides.client.net
+	var welcome := []
+	client.welcomed.connect(func(info: Dictionary) -> void: welcome.append(info))
+	_check(client.join("127.0.0.1", port, {"name": "Tester", "airframe": Airframe.GUNSHIP}) == OK, "client connects")
+	for t in 240:
+		await physics_frame
+		if not welcome.is_empty():
+			break
+	_check(not welcome.is_empty(), "the server welcomed the client")
+	if welcome.is_empty():
+		return {}
+	var info: Dictionary = welcome[0]
+	var mine: Array[Choppa] = []
+	for k in info.roster.size():
+		var r: Dictionary = info.roster[k]
+		var c := Choppa.new()
+		c.pilot_name = r.name
+		c.airframe = r.airframe
+		c.local_player = k == info.seat
+		sides.client.world.add_child(c)
+		c.respawn(spawns[k])
+		mine.append(c)
+	var mirror := Battle.new()
+	sides.client.world.add_child(mirror)
+	mirror.setup(mine, spawns, int(info.kills))
+	client.attach(mine, info.seat, mirror, [] as Array[ServiceStation])
+	return {"server": server, "client": client, "seat": field[info.seat], "other": field[1 - info.seat],
+		"own": mine[info.seat], "remote": mine[1 - info.seat], "info": info, "battle": battle, "mirror": mirror}
+
+
+func _net_fly(pair: Dictionary, ticks: int, own_input: Callable, other_input := Callable()) -> void:
+	for t in ticks:
+		own_input.call(pair.own.input, t)
+		if other_input.is_valid():
+			other_input.call(pair.other.input, t)
+		await physics_frame
+
+
+func _net_close(pair: Dictionary) -> void:
+	pair.client.stop()
+	pair.server.stop()
+	await physics_frame
+	for net: NetGame in [pair.client, pair.server]:
+		net.get_parent().queue_free()
+	await physics_frame
+
+
+func test_net_client_predicts_and_server_agrees() -> void:
+	var pair := await _net_pair()
+	if pair.is_empty():
+		return
+	_check(pair.info.seat == 0 and pair.seat.pilot_name == "Tester", "took the free seat as Tester")
+	_check(pair.seat.airframe == Airframe.GUNSHIP, "in the helicopter it asked for")
+	var fly := func(i: PilotInput, t: int) -> void:
+		i.cyclic = Vector2(0.0, 0.6 if t < 40 else 0.0)
+		i.collective = 0.4 if t < 90 else 0.0
+	var other := func(i: PilotInput, t: int) -> void: i.yaw = 0.5 if t < 60 else 0.0
+	await _net_fly(pair, 150, fly, other)
+	await _net_fly(pair, 90, func(i: PilotInput, _t: int) -> void: i.clear())
+	_check(pair.seat.global_position.distance_to(Vector3(0.0, 10.0, 0.0)) > 8.0, "the server flew our inputs, at %s" % pair.seat.global_position)
+	var gap: float = pair.own.global_position.distance_to(pair.seat.global_position)
+	_check(gap < 1.5, "our prediction matches the server within 1.5 m, gap %.2f m" % gap)
+	var remote_gap: float = pair.remote.global_position.distance_to(pair.other.global_position)
+	_check(remote_gap < 2.0, "the other choppa is drawn where the server has it, gap %.2f m" % remote_gap)
+	_check(pair.client.corrections < 20, "few corrections without lag, %d" % pair.client.corrections)
+	await _net_close(pair)
+
+
+func test_net_survives_lag_and_loss() -> void:
+	var pair := await _net_pair(120.0, 0.05)
+	if pair.is_empty():
+		return
+	var fly := func(i: PilotInput, t: int) -> void:
+		i.cyclic = Vector2(0.3 * sin(t * 0.05), 0.5 if t < 60 else 0.0)
+		i.collective = 0.3 if t < 100 else 0.0
+	await _net_fly(pair, 180, fly)
+	await _net_fly(pair, 120, func(i: PilotInput, _t: int) -> void: i.clear())
+	var gap: float = pair.own.global_position.distance_to(pair.seat.global_position)
+	_check(gap < 2.0, "at 120 ms and 5 percent loss our choppa still ends where the server has it, gap %.2f m" % gap)
+	_check(pair.seat.global_position.distance_to(Vector3(0.0, 10.0, 0.0)) > 5.0, "and the server got our inputs")
+	await _net_close(pair)
+
+
+func test_net_server_owns_damage_and_kills() -> void:
+	var pair := await _net_pair()
+	if pair.is_empty():
+		return
+	pair.own.damage(50.0, null)
+	_check(pair.own.health == pair.own.max_health, "a client cannot damage itself")
+	pair.seat.damage(30.0, pair.other)
+	await _net_fly(pair, 10, func(i: PilotInput, _t: int) -> void: i.clear())
+	_check(is_equal_approx(pair.own.health, pair.seat.health), "the server's damage reaches us, %f vs %f" % [pair.own.health, pair.seat.health])
+	var kills := []
+	pair.mirror.kill.connect(func(killer: Choppa, victim: Choppa) -> void: kills.append([killer, victim]))
+	pair.seat.damage(500.0, pair.other)
+	await _net_fly(pair, 10, func(i: PilotInput, _t: int) -> void: i.clear())
+	_check(kills == [[pair.remote, pair.own]], "the kill feed says the other one shot us down, got %s" % [kills])
+	_check(not pair.own.alive and pair.mirror.kills_of(pair.remote) == 1, "we are down and they have the kill")
+	await _net_fly(pair, 60 * 4, func(i: PilotInput, _t: int) -> void: i.clear())
+	_check(pair.own.alive and pair.seat.alive, "and back after the respawn")
+	await _net_close(pair)
+
+
+func test_net_leaving_hands_the_seat_to_a_bot() -> void:
+	var pair := await _net_pair()
+	if pair.is_empty():
+		return
+	var made := []
+	pair.server.bot_factory = func(c: Choppa) -> Node:
+		var bot := Node.new()
+		c.add_child(bot)
+		made.append(c)
+		return bot
+	_check(pair.server.players() == PackedStringArray(["Tester"]), "the server lists us, %s" % pair.server.players())
+	pair.client.stop()
+	for t in 180:
+		await physics_frame
+		if not made.is_empty():
+			break
+	_check(made == [pair.seat] and pair.server.bots.has(pair.seat), "a bot took our seat back")
+	_check(pair.seat.pilot_name == "Bot Tester", "under our name, %s" % pair.seat.pilot_name)
+	_check(pair.server.players().is_empty(), "and nobody is listed any more")
+	await _net_close(pair)
+
+
+## The server starts the next round by itself after ROUND_BREAK; both sides reset, and
+## our XP for the round arrives before the round ends on our side.
+func test_net_rounds_follow_each_other() -> void:
+	var pair := await _net_pair()
+	if pair.is_empty():
+		return
+	var got := []
+	pair.client.xp_received.connect(func(stats: Dictionary) -> void: got.append(["xp", stats]))
+	pair.mirror.match_over.connect(func() -> void: got.append(["over"]))
+	var restarted := []
+	pair.mirror.restarted.connect(func() -> void: restarted.append(true))
+	pair.other.damage(500.0, pair.seat)  # We shoot the other one down...
+	await _net_fly(pair, 10, func(i: PilotInput, _t: int) -> void: i.clear())
+	pair.battle.time_left = 0.05  # ...and the clock runs out.
+	await _net_fly(pair, 20, func(i: PilotInput, _t: int) -> void: i.clear())
+	_check(pair.battle.over and pair.mirror.over, "the round ended on both sides")
+	_check(got.size() == 2 and got[0][0] == "xp" and got[1][0] == "over", "XP first, then the end, got %s" % [got])
+	if got.size() == 2:
+		_check(got[0][1].kill == 1 and got[0][1].won, "with our kill and the win, %s" % got[0][1])
+	await _net_fly(pair, roundi(NetGame.ROUND_BREAK * 60.0) + 20, func(i: PilotInput, _t: int) -> void: i.clear())
+	_check(not pair.battle.over and not pair.mirror.over and restarted.size() == 1, "a new round began by itself")
+	_check(pair.mirror.kills_of(pair.own) == 0 and pair.battle.kills_of(pair.seat) == 0, "with the scores back at zero")
+	_check(pair.own.alive and pair.remote.alive, "and everyone flying")
+	await _net_close(pair)

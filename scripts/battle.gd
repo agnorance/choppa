@@ -6,6 +6,7 @@ extends Node
 signal kill(killer: Choppa, victim: Choppa)  ## killer is null for a plain crash.
 signal respawned(choppa: Choppa)
 signal match_over
+signal restarted  ## A new round began (restart()).
 
 const RESPAWN_DELAY := 3.0
 
@@ -15,6 +16,8 @@ var time_left := 300.0
 var pilots: Array[Choppa] = []
 var spawn_points: Array[Transform3D] = []
 var over := false
+## False on a network client: scores, respawns and the clock come from the server.
+var authority := true
 
 var _score := {}  ## Choppa -> {kills: int, deaths: int}
 var _respawn := {}  ## Choppa -> seconds until respawn
@@ -70,7 +73,7 @@ func best_spawn(choppa: Choppa) -> Transform3D:
 
 
 func tick(delta: float) -> void:
-	if over:
+	if over or not authority:
 		return
 	time_left -= delta
 	for choppa: Choppa in _respawn.keys():
@@ -89,7 +92,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _on_died(killer: Choppa, victim: Choppa) -> void:
-	if over:
+	if over or not authority:
 		return
 	_score[victim].deaths += 1
 	if killer and killer != victim and _score.has(killer):
@@ -105,3 +108,31 @@ func _end() -> void:
 	for choppa in pilots:
 		choppa.locked = true
 	match_over.emit()
+
+
+## A new round on the same field: scores and clock reset, everyone respawns (server).
+func restart() -> void:
+	over = false
+	time_left = time_limit
+	_respawn.clear()
+	for choppa in pilots:
+		_score[choppa] = {"kills": 0, "deaths": 0}
+		choppa.locked = false
+		if authority:
+			choppa.respawn(best_spawn(choppa))
+	restarted.emit()
+
+
+## Network client: the server's numbers for one pilot.
+func net_score(choppa: Choppa, kills: int, deaths: int, respawn_left: float) -> void:
+	_score[choppa] = {"kills": kills, "deaths": deaths}
+	if respawn_left > 0.0:
+		_respawn[choppa] = respawn_left
+	else:
+		_respawn.erase(choppa)
+
+
+## Network client: the match ended on the server.
+func net_end() -> void:
+	if not over:
+		_end()

@@ -8,6 +8,8 @@ signal restart_requested
 signal menu_requested
 signal settings_changed
 
+## Online the match cannot be restarted from here (the server runs the rounds).
+var online := false
 var _home: Control
 var _settings: SettingsMenu
 var _resume: Button
@@ -44,8 +46,8 @@ func _ready() -> void:
 	box.add_child(gap)
 	_resume = _button(box, "Resume", func() -> void: resumed.emit())
 	_button(box, "Settings", _open_settings)
-	_button(box, "Restart match", func() -> void: restart_requested.emit())
-	_button(box, "Main menu", func() -> void: menu_requested.emit())
+	_button(box, "Restart match", func() -> void: restart_requested.emit()).visible = not online
+	_button(box, "Leave match" if online else "Main menu", func() -> void: menu_requested.emit())
 	_button(box, "Quit game", func() -> void: get_tree().quit())
 
 	_settings = SettingsMenu.new()

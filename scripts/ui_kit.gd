@@ -71,6 +71,15 @@ static func theme() -> Theme:
 	t.set_color("font_pressed_color", "Button", INK)
 	t.set_color("font_hover_pressed_color", "Button", INK)
 	t.set_color("font_disabled_color", "Button", FAINT)
+
+	t.set_font("font", "LineEdit", font("condensed"))
+	t.set_font_size("font_size", "LineEdit", 22)
+	t.set_stylebox("normal", "LineEdit", style(Color(1, 1, 1, 0.03), LINE))
+	t.set_stylebox("focus", "LineEdit", style(Color(0, 0, 0, 0), ACCENT))
+	t.set_color("font_color", "LineEdit", TEXT)
+	t.set_color("font_placeholder_color", "LineEdit", FAINT)
+	t.set_color("caret_color", "LineEdit", ACCENT)
+	t.set_color("selection_color", "LineEdit", Color(ACCENT, 0.35))
 	_theme = t
 	return t
 

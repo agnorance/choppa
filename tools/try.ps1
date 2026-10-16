@@ -24,6 +24,10 @@ $scenes = [ordered]@{
 	"heavy"    = @("--mode=free", "--map=basin", "--airframe=heavy")
 	"rockets"  = @("--mode=free", "--map=basin", "--autopilot=weapon:rockets")
 	"explode"  = @("--mode=free", "--map=basin", "--explode=120")
+	"online"   = @("--menu", "--online", "--map=basin")
+	"host"     = @("--host", "--map=basin")
+	"join"     = @("--connect=127.0.0.1")
+	"lagjoin"  = @("--connect=127.0.0.1", "--lag=150", "--loss=3")
 }
 if (-not $scenes.Contains($Scene)) {
 	Write-Output "Scenes:"

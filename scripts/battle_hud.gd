@@ -13,6 +13,8 @@ var choppa: Choppa
 ## Called once when the results show: adds the battle to the profile and returns
 ## Profile.add_battle's result (XP lines, levels, unlocks). Empty: no XP section.
 var xp_provider: Callable
+## Online the next round starts by itself (NetGame.ROUND_BREAK): no "Fight again".
+var online := false
 
 var _root: Control
 var _kills: Label
@@ -24,6 +26,9 @@ var _death_sub: Label
 var _killed_by := ""
 var _big: Label
 var _big_time := 0.0
+var _results: Control
+var _next_round: Label
+var _next_round_in := 0.0
 
 
 func _ready() -> void:
@@ -84,6 +89,25 @@ func _ready() -> void:
 
 	battle.kill.connect(_on_kill)
 	battle.match_over.connect(_show_results)
+	battle.restarted.connect(_on_restarted)
+	_flash_big("FIRST TO %d KILLS" % battle.kill_limit, 2.5)
+
+
+## A short line in the kill feed: who joined, who left.
+func note(text: String) -> void:
+	var line := HBoxContainer.new()
+	line.alignment = BoxContainer.ALIGNMENT_END
+	line.set_meta("age", 0.0)
+	line.add_child(UiKit.outlined(UiKit.label(text, 15, UiKit.MUTED)))
+	_feed.add_child(line)
+
+
+func _on_restarted() -> void:
+	if _results:
+		_results.queue_free()
+		_results = null
+		_next_round = null
+	_killed_by = ""
 	_flash_big("FIRST TO %d KILLS" % battle.kill_limit, 2.5)
 
 
@@ -98,6 +122,9 @@ func _process(delta: float) -> void:
 	else:
 		_death.text = ""
 		_death_sub.text = ""
+	if _next_round:
+		_next_round_in = maxf(0.0, _next_round_in - delta)
+		_next_round.text = "NEXT ROUND IN %d" % ceili(_next_round_in)
 	if _big_time > 0.0:
 		_big_time -= delta
 		_big.modulate.a = clampf(_big_time / 0.4, 0.0, 1.0)
@@ -148,6 +175,7 @@ func _show_results() -> void:
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_root.add_child(panel)
+	_results = panel
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 14)
@@ -173,19 +201,31 @@ func _show_results() -> void:
 		grid.add_child(UiKit.label(str(battle.deaths_of(pilot)), 24, color, "condensed"))
 		place += 1
 	if xp_provider.is_valid():
-		_xp_section(box, xp_provider.call())
+		var result: Dictionary = xp_provider.call()
+		if not result.is_empty():
+			_xp_section(box, result)
 
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 12)
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_child(buttons)
+	var menu := UiKit.button("Leave" if online else "Menu", 160.0)
+	menu.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	menu.pressed.connect(menu_requested.emit)
+	if online:
+		_next_round_in = NetGame.ROUND_BREAK
+		_next_round = UiKit.display("", 24, UiKit.MUTED)
+		_next_round.custom_minimum_size.x = 220.0
+		_next_round.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_next_round.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		buttons.add_child(_next_round)
+		buttons.add_child(menu)
+		menu.grab_focus()
+		return
 	var again := UiKit.button("Fight again", 200.0)
 	again.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	again.pressed.connect(restart_requested.emit)
 	buttons.add_child(again)
-	var menu := UiKit.button("Menu", 160.0)
-	menu.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	menu.pressed.connect(menu_requested.emit)
 	buttons.add_child(menu)
 	again.grab_focus()
 

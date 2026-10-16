@@ -14,12 +14,20 @@ var _hit_at := {}  ## victim -> clock of our last damage on it
 
 func _ready() -> void:
 	battle.kill.connect(_on_kill)
+	battle.restarted.connect(reset)
 	for c in battle.pilots:
 		if c != pilot:
 			c.damaged.connect(_on_damaged.bind(c))
 			c.part_wrecked.connect(_on_part_wrecked)
 	for node in get_tree().get_nodes_in_group("stations"):
 		(node as ServiceStation).served.connect(_on_served)
+
+
+## Back to zero for a new round on the same field (online rounds follow each other).
+func reset() -> void:
+	for key: String in stats:
+		stats[key] = 0
+	_hit_at.clear()
 
 
 ## The finished battle's stats, ready for Profile.add_battle.

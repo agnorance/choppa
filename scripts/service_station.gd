@@ -17,6 +17,8 @@ const DOWN_COLOR := Color(1.0, 0.15, 0.1)
 
 var occupant: Choppa  ## Who is being serviced, or null.
 var cooldown := 0.0
+## False on a network client: the server decides who is serviced; the client shows it.
+var authority := true
 var _work_sound: AudioStreamPlayer3D
 var _progress := 0.0
 var _lamp: StandardMaterial3D
@@ -49,6 +51,9 @@ func _physics_process(delta: float) -> void:
 
 ## One simulation step; public so tests can drive it by hand.
 func tick(delta: float) -> void:
+	if not authority:
+		_show(DOWN_COLOR if cooldown > 0.0 else (BUSY_COLOR if occupant else READY_COLOR))
+		return
 	if cooldown > 0.0:
 		cooldown = maxf(0.0, cooldown - delta)
 		occupant = null
@@ -165,3 +170,10 @@ func _add(mesh: Mesh, material: Material, pos: Vector3) -> void:
 	instance.material_override = material
 	instance.position = pos
 	add_child(instance)
+
+
+## Network client: the server's state of this station.
+func net_state(new_cooldown: float, who: Choppa, done: float) -> void:
+	cooldown = new_cooldown
+	occupant = who
+	_progress = done * SERVICE_TIME

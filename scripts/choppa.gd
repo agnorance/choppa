@@ -543,7 +543,10 @@ func fire_rocket() -> bool:
 	rocket.shooter = self
 	rocket.direction = -global_transform.basis.z
 	rocket.speed = Weapons.Rocket.SPEED + maxf(0.0, velocity.dot(rocket.direction))
-	_drop(rocket, Vector3(1.45 * _rocket_side, -0.9, -1.4), true)
+	var pod := Vector3(1.45 * _rocket_side, -0.9, -1.4)
+	if model and model.pods.size() == 2:
+		pod = model.pods[0 if _rocket_side < 0.0 else 1]
+	_drop(rocket, pod, true)
 	_rocket_side = -_rocket_side
 	return true
 
@@ -643,7 +646,10 @@ func _update_gun(i: PilotInput, delta: float) -> void:
 
 
 func _shoot() -> void:
-	var muzzle := global_position + global_transform.basis * Vector3(1.12 * _gun_side, -0.8, -2.35)
+	var offset := Vector3(1.12 * _gun_side, -0.8, -2.35)
+	if model and model.muzzles.size() == 2:
+		offset = model.muzzles[0 if _gun_side < 0.0 else 1]
+	var muzzle := global_position + global_transform.basis * offset
 	last_shot_side = _gun_side
 	_gun_side = -_gun_side
 	var target := aim_target()

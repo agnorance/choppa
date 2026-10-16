@@ -95,7 +95,8 @@ scripts in `tools/blender/` and committed, so you only need this to change them.
 3. Run the script for what you want to change:
    - `python tools/blender/make_textures.py` (or with names, e.g. `sandstone rock`)
    - `python tools/blender/make_rocks.py`: mesa, arches, hoodoos, boulders
-   - `python tools/blender/make_choppa.py`: the helicopter
+   - `python tools/blender/make_choppa.py`: the helicopter (the scout)
+   - `python tools/blender/make_airframes.py`: the gunship and the heavy
      (`--preview out_dir` renders Cycles previews instead of exporting)
    - `python tools/blender/make_cockpit.py`: the cockpit interior
    - `python tools/blender/make_trees.py`: the pines and their needle texture

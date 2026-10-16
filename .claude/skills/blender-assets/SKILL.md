@@ -13,7 +13,8 @@ Python module (`pip install bpy==5.2.2`, Python 3.13). The outputs are committed
 | `make_textures.py [names]` | `assets/textures/*_albedo.png`, `*_normal.png` | Tileable PBR (4D noise on a torus). |
 | `make_rocks.py` | `assets/models/rocks/*.glb` | Mesa with tunnels, arches, hoodoos, boulders. |
 | `make_choppa.py [--preview DIR [views]]` | `assets/models/choppa/choppa.glb` | The helicopter. |
-| `make_cockpit.py` | `assets/models/choppa/cockpit.glb` | Interior, origin = pilot's eye. |
+| `make_airframes.py [gunship] [heavy] [--preview DIR]` | `assets/models/choppa/gunship.glb`, `heavy.glb` | The bigger classes; reuse make_choppa's helpers and markers (plus `pod_l/r` for rockets). |
+| `make_cockpit.py` | `assets/models/choppa/cockpit.glb` | Interior, origin = pilot's eye. The canopy frame is its own object (`frame`), hidden for the bigger classes. |
 | `make_trees.py [--preview DIR]` | `assets/models/trees/trees.glb`, `assets/textures/needles_albedo.png` | Pines. |
 | `choppa_shared.py` | (module) | Canopy geometry used by both choppa and cockpit. |
 

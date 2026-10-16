@@ -38,6 +38,10 @@ var _last_shot := -10.0
 
 
 var airframe := Airframe.SCOUT  ## Which model to wear; see Airframe.TABLE.
+## Where the model's guns and rocket pods are (body space, left then right); empty when
+## the model has no such markers, and the choppa falls back to the scout's positions.
+var muzzles: Array[Vector3] = []
+var pods: Array[Vector3] = []
 
 
 func _ready() -> void:
@@ -76,6 +80,13 @@ func _build() -> void:
 			mesh.set_surface_override_material(k, materials.get(name, materials.paint))
 		if own:
 			mesh.layers = OWN_LAYER
+	muzzles.clear()
+	pods.clear()
+	for side in ["l", "r"]:
+		if model.find_child("muzzle_" + side):
+			muzzles.append(_marker(model, "muzzle_" + side))
+		if model.find_child("pod_" + side):
+			pods.append(_marker(model, "pod_" + side))
 	_rotor = model.find_child("rotor")
 	_tail_rotor = model.find_child("tail_rotor")
 	var eye := _marker(model, "eye")
@@ -99,10 +110,11 @@ func _build() -> void:
 		# The live instruments, seen through the canopy in chase view too.
 		cockpit_view = Cockpit.new()
 		cockpit_view.choppa = pilot
+		cockpit_view.show_frame = airframe == Airframe.SCOUT
 		cockpit_view.position = eye
 		add_child(cockpit_view)
 	else:
-		var shell := Cockpit.shell()
+		var shell := Cockpit.shell(airframe == Airframe.SCOUT)
 		shell.position = eye
 		_parts.add_child(shell)
 

@@ -293,13 +293,21 @@ def build():
         shell.append(cylinder_between((side * 0.17, 0.72, -0.99), (side * 0.17, 0.78, -0.92), 0.012, "metal", 8))
 
     # Canopy frame, the inside of the exterior's members: sill, two A-pillars, the roof
-    # ring and the rear hoop behind the head.
-    shell += strut(shared.sill_points(-0.03, 30), 0.03)
-    shell += strut(shared.roof_points(-0.025, 24), 0.024)
-    shell += strut(shared.rear_hoop_points(-0.03, 16), 0.035)
-    shell += strut(shared.chin_points(-0.025, 12), 0.02)
+    # ring and the rear hoop behind the head. A separate object ("frame"): the bigger
+    # helicopter classes have their own canopies and hide it.
+    frame = []
+    frame += strut(shared.sill_points(-0.03, 30), 0.03)
+    frame += strut(shared.roof_points(-0.025, 24), 0.024)
+    frame += strut(shared.rear_hoop_points(-0.03, 16), 0.035)
+    frame += strut(shared.chin_points(-0.025, 12), 0.02)
     for side in (-1, 1):
-        shell += strut(shared.pillar_points(side, -0.025, 8), 0.024)
+        frame += strut(shared.pillar_points(side, -0.025, 8), 0.024)
+    activate(frame[0])
+    for p in frame[1:]:
+        p.select_set(True)
+    bpy.ops.object.join()
+    frame[0].name = "frame"
+    bpy.ops.object.shade_smooth()
 
     body = shell[0]
     activate(body)

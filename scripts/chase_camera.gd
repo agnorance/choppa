@@ -75,7 +75,8 @@ func _process(delta: float) -> void:
 		look_at(body.origin + Vector3.UP * 0.5, Vector3.UP)
 		_apply_shake(delta)
 		return
-	var back := body.basis * Vector3(0.0, height, distance + 3.0 * speed_ratio)
+	var reach: float = Airframe.spec(target.airframe).camera
+	var back := body.basis * Vector3(0.0, height * reach, distance * reach + 3.0 * speed_ratio)
 	var desired := body.origin + back
 	desired = _avoid_walls(body.origin + Vector3.UP, desired)
 	if _ready_to_follow:

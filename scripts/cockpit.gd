@@ -11,6 +11,7 @@ const CREAM := Color(0.92, 0.86, 0.7)
 const AMBER := Color(1.0, 0.62, 0.2)
 
 var choppa: Choppa
+var show_frame := true  ## The scout's canopy frame; off for the other classes.
 ## Returns the kill count to show, or -1 for "--" (free flight). Set by the game mode.
 var kills_source: Callable = func() -> int: return -1
 var reticle: Node3D  ## The gunsight glow; only shown from the pilot's seat.
@@ -32,8 +33,13 @@ var _warning: AudioStreamPlayer
 
 
 ## The bare interior (no live instruments), for other choppas seen through their canopy.
-static func shell() -> Node3D:
+## The cockpit model. `frame`: whether to show the scout's canopy frame (the other
+## classes have their own canopy and would see it poke through).
+static func shell(frame := true) -> Node3D:
 	var model: Node3D = (load("res://assets/models/choppa/cockpit.glb") as PackedScene).instantiate()
+	var frame_node := model.find_child("frame") as Node3D
+	if frame_node:
+		frame_node.visible = frame
 	var materials := ChoppaModel.part_materials(PANEL_PAINT, Vector2(0.32, 0.2))
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D"):
 		for k in mesh.mesh.get_surface_count():
@@ -44,7 +50,7 @@ static func shell() -> Node3D:
 
 
 func _ready() -> void:
-	var shell := Cockpit.shell()
+	var shell := Cockpit.shell(show_frame)
 	add_child(shell)
 	_stick = shell.find_child("stick")
 	_collective = shell.find_child("collective")

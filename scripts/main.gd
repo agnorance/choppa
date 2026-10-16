@@ -17,6 +17,7 @@ extends Node
 ##   --dummies=<n>            training targets in free flight (default 3)
 ##   --health=<n>             start with this much health (to see damage effects)
 ##   --explode=<tick>         set off an explosion 26 m ahead of you at that tick
+##   --timing                 print how long the map build and the first frame took
 
 const RIVALS := [
 	["Hawk", Color(0.2, 0.6, 0.95), 1.0],
@@ -53,13 +54,20 @@ func _ready() -> void:
 	if mode == "race":
 		map_id = "range"
 	next_mode = ""
+	GameMap.timing = _args.has("timing")
+	var started := Time.get_ticks_msec()
 	map = GameMap.create(map_id)
 	map.mode = mode
 	add_child(map)
+	GameMap.report("map", started)
 	if mode == "":
 		_show_menu()
 	else:
 		_start()
+	if GameMap.timing:
+		print("timing: map and players built in %d ms, %d ms after launch" % [Time.get_ticks_msec() - started, started])
+		await RenderingServer.frame_post_draw
+		print("timing: first frame drawn %d ms after launch" % Time.get_ticks_msec())
 
 
 func _show_menu() -> void:
@@ -270,6 +278,7 @@ func _physics_process(_delta: float) -> void:
 
 func _save_screenshot(path: String) -> void:
 	await RenderingServer.frame_post_draw
+	path = path.replace("\\", "/")  # Godot reads a backslash path as relative to the project.
 	get_viewport().get_texture().get_image().save_png(path)
 	print("screenshot saved: ", path)
 	get_tree().quit()

@@ -30,6 +30,7 @@ func _ready() -> void:
 	_rng.seed = 2024
 	seed(2024)  # MapKit decorations use the global RNG; keep the map identical every time.
 
+	var t0 := Time.get_ticks_msec()
 	MapKit.environment(self)
 	terrain = Terrain.new()
 	terrain.size = SIZE
@@ -37,7 +38,9 @@ func _ready() -> void:
 	terrain.height_fn = _height
 	terrain.material = MapKit.terrain_material(WATER_LEVEL)
 	add_child(terrain)
+	GameMap.report("basin: terrain+env", t0)
 	MapKit.backdrop(self, 420.0, 7)
+	GameMap.report("basin: backdrop", t0)
 
 	MapKit.rock(self, "mesa", Vector3(0.0, -2.0, 0.0), 0.0, 1.0, Color(0.76, 0.47, 0.31))
 	MapKit.tunnel_lights(self, Vector3.ZERO, 110.0, 12.0)
@@ -67,6 +70,7 @@ func _ready() -> void:
 		MapKit.rock(self, "hoodoo_%d" % _rng.randi_range(1, 3), at, _rng.randf() * TAU,
 			_rng.randf_range(0.8, 1.2), MapKit.SANDSTONE.lerp(MapKit.ROCK, _rng.randf() * 0.5))
 
+	GameMap.report("basin: rocks", t0)
 	# Bridge over the trench.
 	var trench_x := _trench_center(0.0)
 	MapKit.block(self, Vector3(trench_x, _ground(trench_x + 40.0, 0.0) - 1.0, 0.0),
@@ -74,6 +78,7 @@ func _ready() -> void:
 
 	MapKit.water(self, Vector3(LAKE.x, WATER_LEVEL, LAKE.y), 200.0)
 
+	GameMap.report("basin: water", t0)
 	# Pine groves on the hills, boulders everywhere.
 	var planted := 0
 	while planted < 90:
@@ -84,6 +89,7 @@ func _ready() -> void:
 			continue
 		MapKit.tree(self, Vector3(at.x, ground - 0.3, at.z), _rng.randf_range(0.9, 1.6), planted)
 		planted += 1
+	GameMap.report("basin: trees", t0)
 	if Graphics.at_least(Graphics.Quality.MEDIUM):
 		var grass := Grass.new()
 		grass.terrain = terrain
@@ -101,6 +107,7 @@ func _ready() -> void:
 				_rng.randf() * TAU, _rng.randf_range(1.0, 3.2), MapKit.ROCK)
 
 
+	GameMap.report("basin: grass+boulders", t0)
 	# Pickups.
 	for k in 4:
 		var angle := TAU * k / 4.0

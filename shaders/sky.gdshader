@@ -40,7 +40,10 @@ void sky() {
 	vec3 sun_col = LIGHT0_COLOR * LIGHT0_ENERGY;
 	float sun = max(dot(dir, sun_dir), 0.0);
 	// How much this direction faces the sun around the horizon (0 away .. 1 toward).
-	float toward = dot(normalize(dir.xz + 0.0001), normalize(sun_dir.xz + 0.0001)) * 0.5 + 0.5;
+	// Clamped: rounding can push it a hair below zero, and pow() of a negative base is
+	// NaN. One NaN texel poisons the whole filtered radiance map, and every lit surface
+	// turns black (seen on NVIDIA and AMD Vulkan; software Vulkan hid it).
+	float toward = clamp(dot(normalize(dir.xz + 0.0001), normalize(sun_dir.xz + 0.0001)) * 0.5 + 0.5, 0.0, 1.0);
 
 	vec3 horizon = mix(opposite_horizon, horizon_color, pow(toward, 1.5));
 	vec3 col = mix(horizon, zenith_color, pow(clamp(up, 0.0, 1.0), 0.55));

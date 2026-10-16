@@ -91,4 +91,5 @@ godot --path . -- --mode=free --map=basin --autopilot=hover --cam=showcase --exp
 - `--cam=fp|showcase`: start in the cockpit, or with a fixed front view of the choppa.
 - `--health=30`: start damaged (cracked canopy, smoke).
 - `--explode=60`: set off an explosion ahead of you at physics tick 60.
+- `--timing`: print how long the map build and the first frame take.
 - `--shot=out.png --frames=90`: save a screenshot after 90 ticks and quit.

@@ -39,6 +39,10 @@ Free mode is the default with `--shot`; `--map=basin` is the main arena.
   over before a frame is drawn. On Linux, timed effects need
   `xvfb-run -a -s "-screen 0 960x540x24" godot --path . --fixed-fps 60 --resolution 960x540 -- --shot=...`
   and take ~15 minutes; prefer asking the owner to check effect timing on their PC.
+- **Black world, sky and HUD fine:** a NaN in a shader (usually the sky) has poisoned
+  the radiance map; it only shows on hardware Vulkan, not in cloud shots. Bisect with
+  `--rendering-method mobile` / `--rendering-driver d3d12` (both unaffected) and by
+  removing the sun or the sky.
 - **Occlusion:** check the subject isn't behind a tree or rock before concluding an
   effect is broken (trace positions with a temporary `print`).
 - **Backlight:** the sun is low (golden hour). Some yaws put the choppa in silhouette;

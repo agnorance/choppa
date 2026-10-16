@@ -335,15 +335,13 @@ static func glass_cover(radius: float, offset: float) -> Node3D:
 	return glass
 
 
-static var _dial: Texture2D
-static var _glint: Texture2D
-
-
 ## An old instrument face: near-black enamel, a faded track, grime toward the rim, and
 ## a few stains and scratches. Made once, shared by every gauge.
 static func dial_texture() -> Texture2D:
-	if _dial:
-		return _dial
+	return Baked.texture("dial")
+
+
+static func dial_image() -> Image:
 	var size := 256
 	var noise := FastNoiseLite.new()
 	noise.seed = 7
@@ -373,14 +371,14 @@ static func dial_texture() -> Texture2D:
 			var p := from + dir * t
 			if (p - c).length() < size * 0.48:
 				image.set_pixelv(Vector2i(p), image.get_pixelv(Vector2i(p)).lightened(0.12))
-	image.generate_mipmaps()
-	_dial = ImageTexture.create_from_image(image)
-	return _dial
+	return image
 
 
 static func _glint_texture() -> Texture2D:
-	if _glint:
-		return _glint
+	return Baked.texture("glint")
+
+
+static func _glint_image() -> Image:
 	var size := 128
 	var image := Image.create(size, size, true, Image.FORMAT_RGBA8)
 	var c := Vector2.ONE * size * 0.5
@@ -395,9 +393,7 @@ static func _glint_texture() -> Texture2D:
 			crescent *= clampf(-(p.x + p.y) * 0.9, 0.0, 1.0)
 			var a := crescent * 0.55 + 0.04
 			image.set_pixel(x, y, Color(1, 1, 1, a))
-	image.generate_mipmaps()
-	_glint = ImageTexture.create_from_image(image)
-	return _glint
+	return image
 
 
 static func _label(parent: Node3D, text: String, font_size: int, color: Color, pos: Vector3) -> Label3D:

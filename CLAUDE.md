@@ -19,9 +19,10 @@ changing gameplay or looks; it records what the owner decided).
 
 Done: flight model, tricks, boost, battle/free/race modes, items, bots, Mesa Basin, the
 Little Bird style choppa with cockpit view, effects, pines, grass, water, explosions,
-synthesized sound effects. PR #1 (`godot-foundation` -> `main`) waits for the owner to
-merge it on GitHub (merging is the owner's call).
-Noted for later (ask before starting): flight physics feel pass (DESIGN.md, "Physics
+synthesized sound effects. All of that is on `main` (PR #1). New work continues on
+`godot-foundation`; open a PR to `main` when a chunk is done. Merging is the owner's
+call: they merge on GitHub (with "Create a merge commit").
+Load times are done (grass on threads, baked textures). Noted for later (ask before starting): flight physics feel pass (DESIGN.md, "Physics
 ideas"), UI overhaul (DESIGN.md, Milestones), choppa colours/customization, LAN
 multiplayer. Each session: check `git log` and the roadmap, then confirm the next step.
 
@@ -35,6 +36,7 @@ Godot must be 4.7.2. Two environments:
 | Play | `tools\run.ps1 --mode=battle --map=basin` | `godot --path . -- --mode=battle` |
 | Screenshot | `tools\shot.ps1 out.png --cam=showcase --frames=150` | `tools/shot.sh out.png --cam=showcase --frames=150` |
 | Re-import | `& $env:GODOT --headless --path . --import` | `godot --headless --path . --import` |
+| Bake textures | `toolsake.ps1` | `tools/bake.sh` |
 
 - Windows scripts find Godot via `$env:GODOT` (path to `Godot_v4.7.2-stable_win64_console.exe`),
   the PATH, or `C:\Tools\Godot\`. Setup: docs/SETUP_WINDOWS.md.
@@ -71,12 +73,23 @@ Godot must be 4.7.2. Two environments:
   them (see `Effects.Explosion._start`), or they burst at the origin.
 - Very bright HDR colours wash out to cream under AgX tone mapping; keep fire colours
   near 1 and saturated.
+- Shaders: keep `pow()` bases and `normalize()` inputs clamped. One NaN texel in the sky
+  shader poisons the filtered radiance map and every lit surface turns black on real
+  GPUs (NVIDIA and AMD Vulkan); the cloud's software Vulkan hides it, so after a shader
+  change check a screenshot on the owner's PC.
 - `Graphics.quality` (LOW / MEDIUM / HIGH) decides how much detail to spend. Headless
   runs are LOW (no grass), the Compatibility renderer is LOW, phones MEDIUM, desktop HIGH.
 - Sounds come from `tools/audio/make_sounds.py` (numpy only): synthesized, committed as
   `assets/sounds/*.wav`. Loops (`*_loop`) need `edit/loop_mode=2` in their `.import`.
   Play them through `Sounds` (`scripts/sounds.gd`). Nobody can listen in the cloud:
   ask the owner how new sounds feel and tune the generator.
+- Procedural textures drawn in GDScript (dial, canopy cracks, muzzle star, scorch, puff)
+  go through `Baked.texture(name)`: the generator stays next to its user and is listed
+  in `Baked.generators()`; `tools/bake.ps1` draws them into `assets/textures/baked/`
+  (committed). After changing a generator, bake again and commit the PNGs.
+- Load times: check with `-- --timing` (prints map phases and the first frame). Never
+  judge speed under `--verbose`, it slows a start four-fold. Worker threads in GDScript
+  only pay off when the task calls no methods on objects (see `Grass._place`).
 - Textures/models come from Blender scripts in `tools/blender/` (`pip install bpy==5.2.2`).
   Generated files are committed. Texture `.import` files must keep VRAM compression and
   mipmaps (and `normal_map=1` for normal maps). Details: the `blender-assets` skill.

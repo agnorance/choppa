@@ -21,8 +21,14 @@ twist, heavy atmosphere, strong lighting and post-processing.
   terrain. Android gets a reduced MEDIUM preset on the Mobile renderer.
 - Materials are tileable PBR textures generated in Blender (`tools/blender/`), terrain is
   splatted by slope and height in `shaders/terrain.gdshader`.
-- Done: sculpted rock formations (`make_rocks.py`), dieselpunk helicopter with hull
-  shader (`make_choppa.py`), golden-hour sky and snowy backdrop.
+- Done: sculpted rock formations (`make_rocks.py`), golden-hour sky and snowy backdrop.
+- The choppa (`make_choppa.py`): a single-seat dieselpunk Little Bird. Egg cabin whose
+  glass wraps under the pilot's feet, a seven-cylinder radial engine lying flat around
+  the mast (fins, rocker boxes, pushrods, ignition harness, exhaust collector), a
+  five-blade articulated rotor head, slim boom with T-tail, skids, an AH-6 style weapons
+  bench (two machine guns, two rocket pods), riveted access panels and stencils. The
+  canopy frame comes from `choppa_shared.py`, which the cockpit uses too, so the view
+  from inside matches the outside. Other players see the cockpit through the glass.
 - Cockpit view (first draft, `make_cockpit.py` + `scripts/cockpit.gd`): mostly window,
   a compact panel with live needle gauges, amber radar, nixie kill counter, hull lamp
   bar, ordnance plate, warning lamps, missile beacon, and a reflector gunsight with a

@@ -23,6 +23,9 @@ then Android. Design, art direction and roadmap: docs/DESIGN.md.
 - Textures/models come from Blender scripts in `tools/blender/` (`pip install bpy==5.2.2`):
   `make_textures.py`, `make_rocks.py`, `make_choppa.py`, `make_cockpit.py`.
   `--cam=showcase` frames the choppa for model screenshots, `--cam=fp` shows the cockpit.
+  `make_choppa.py --preview DIR [views]` renders Cycles previews without exporting (fast
+  model iteration). Canopy geometry lives in `choppa_shared.py`, used by both choppa
+  and cockpit scripts; the game reads marker empties (`eye`, `muzzle_*`, `exhaust_*`).
   Generated files are committed. Texture `.import` files must keep VRAM compression and
   mipmaps (and `normal_map=1` for normal maps).
 - A choppa only reads a `PilotInput`; keep input sources (keyboard, touch, network, bots)

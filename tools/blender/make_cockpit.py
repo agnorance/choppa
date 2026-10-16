@@ -2,7 +2,8 @@
 
 Run:  python3 tools/blender/make_cockpit.py
 
-Origin = the pilot's eye. Blender +Y is forward (Godot -Z). The static shell (panel,
+Origin = the pilot's eye. The canopy frame and the tub walls come from choppa_shared.py,
+the same geometry the exterior (make_choppa.py) uses. Blender +Y is forward (Godot -Z). The static shell (panel,
 glare shield, consoles, tub, inner canopy frame, switches) is one mesh; the stick and
 collective are separate objects so the game can move them. Empty objects named
 "mount_*" mark where the game puts live instruments: their local -Y (Godot +Z) points
@@ -11,9 +12,14 @@ out of the panel toward the pilot. Materials: paint, metal, dark, brass.
 import math
 import os
 
+import sys
+
 import bpy
 import bmesh  # Only importable after bpy.
-from mathutils import Euler, Vector
+from mathutils import Euler, Matrix, Vector
+
+sys.path.insert(0, os.path.dirname(__file__))
+import choppa_shared as shared  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "models", "choppa", "cockpit.glb")
 MATS = {}
@@ -86,17 +92,64 @@ def mount(name, x, y_up, out=0.0):
 
 def cylinder_between(a, b, radius, material, verts=10):
     a, b = Vector(a), Vector(b)
-    o = prim("cylinder", material, location=(a + b) / 2, vertices=verts, radius=radius, depth=(b - a).length)
-    o.rotation_mode = "QUATERNION"
-    o.rotation_quaternion = Vector((0, 0, 1)).rotation_difference((b - a).normalized())
-    activate(o)
-    bpy.ops.object.transform_apply(rotation=True)
+    o = prim("cylinder", material, vertices=verts, radius=radius, depth=(b - a).length)
+    rot = Vector((0, 0, 1)).rotation_difference((b - a).normalized()).to_matrix().to_4x4()
+    o.data.transform(Matrix.Translation((a + b) / 2) @ rot)
     return o
 
 
-def strut(points, radius=0.022):
-    """A bent canopy frame member through the given points."""
-    return [cylinder_between(a, b, radius, "dark", 10) for a, b in zip(points, points[1:])]
+def strut(points, radius=0.022, material="paint"):
+    """A bent canopy frame member through model-space points, moved into eye space."""
+    points = [p - shared.EYE for p in points]
+    return [cylinder_between(a, b, radius, material, 10) for a, b in zip(points, points[1:])]
+
+
+FLOOR_Z = shared.EYE.z - 1.0  # Model space.
+
+
+def _mesh_object(bm, name):
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    mesh = bpy.data.meshes.new(name)
+    bm.to_mesh(mesh)
+    bm.free()
+    o = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(mat("paint"))
+    return o
+
+
+def tub_wall():
+    """Inner cockpit wall hanging from the sill down to the floor, following the egg.
+    Toward the nose the sill drops below the floor and the wall runs out: chin glass."""
+    bm = bmesh.new()
+    sill = [p for p in shared.sill_points(-0.05, 48)]
+    top = [bm.verts.new(p - shared.EYE) for p in sill]
+    bottom = [bm.verts.new(Vector((p.x, p.y, min(p.z, FLOOR_Z))) - shared.EYE) for p in sill]
+    c = shared.EGG_CENTER
+    inner = [bm.verts.new(Vector((p.x * 0.9, c.y + (p.y - c.y) * 0.95, p.z)) - shared.EYE) for p in sill]
+    for k in range(len(sill) - 1):
+        if sill[k].z <= FLOOR_Z and sill[k + 1].z <= FLOOR_Z:
+            continue
+        bm.faces.new((top[k], top[k + 1], bottom[k + 1], bottom[k]))
+        bm.faces.new((inner[k], inner[k + 1], top[k + 1], top[k]))  # Sill ledge.
+    o = _mesh_object(bm, "tub")
+    solid = o.modifiers.new("solid", "SOLIDIFY")
+    solid.thickness = 0.02
+    apply_all(o)
+    return o
+
+
+def floor():
+    bm = bmesh.new()
+    outline = shared.floor_outline(FLOOR_Z, 0.06, y_max=1.9)
+    top = [bm.verts.new(p - shared.EYE) for p in outline]
+    low = [bm.verts.new(p - shared.EYE - Vector((0, 0, 0.03))) for p in outline]
+    bm.faces.new(top)
+    bm.faces.new(list(reversed(low)))
+    for k in range(len(top)):
+        j = (k + 1) % len(top)
+        bm.faces.new((top[k], low[k], low[j], top[j]))
+    return _mesh_object(bm, "floor")
 
 
 def build():
@@ -170,18 +223,23 @@ def build():
             shell.append(prim("cylinder", "metal", location=(side * 0.55, -0.15 + k * 0.1, -0.53),
                               vertices=10, radius=0.012, depth=0.02))
 
-    # Cockpit tub: floor, low sills, nose bulkhead under the panel.
-    shell.append(prim("cube", "paint", location=(0, 0.3, -1.0), scale=(0.75, 0.9, 0.03), bevel_width=0.02))
+    # Cockpit tub: floor and walls hanging from the sill.
+    shell.append(floor())
+    shell.append(tub_wall())
+    # Centre pedestal holding up the panel, and the pedals in the chin glass.
+    shell.append(prim("cube", "paint", location=(0, 0.6, -0.8), scale=(0.1, 0.07, 0.21), bevel_width=0.015))
     for side in (-1, 1):
-        shell.append(prim("cube", "paint", location=(side * 0.75, 0.2, -0.65), scale=(0.03, 0.8, 0.35), bevel_width=0.02))
-        shell.append(prim("cube", "dark", location=(side * 0.73, 0.2, -0.3), scale=(0.05, 0.8, 0.02), bevel_width=0.01))
-    shell.append(prim("cube", "paint", location=(0, 0.95, -0.78), scale=(0.75, 0.03, 0.2), bevel_width=0.02))
+        shell.append(prim("cube", "dark", location=(side * 0.17, 0.8, -0.93), rotation=(math.radians(-50), 0, 0),
+                          scale=(0.05, 0.1, 0.012), bevel_width=0.006))
+        shell.append(cylinder_between((side * 0.17, 0.72, -0.99), (side * 0.17, 0.78, -0.92), 0.012, "metal", 8))
 
-    # Canopy frame: just two curved A-pillars, a low front sill and an overhead rail.
+    # Canopy frame, the inside of the exterior's members: sill, two A-pillars, the roof
+    # ring and the rear hoop behind the head.
+    shell += strut(shared.sill_points(-0.03, 30), 0.03)
+    shell += strut(shared.roof_points(-0.025, 24), 0.024)
+    shell += strut(shared.rear_hoop_points(-0.03, 16), 0.035)
     for side in (-1, 1):
-        shell += strut([(side * 0.74, 0.92, -0.3), (side * 0.7, 0.95, 0.05), (side * 0.6, 0.75, 0.42),
-                        (side * 0.42, 0.35, 0.72), (side * 0.3, -0.2, 0.82)])
-    shell += strut([(-0.3, -0.2, 0.82), (0.3, -0.2, 0.82)], 0.03)
+        shell += strut(shared.pillar_points(side, -0.025, 8), 0.024)
 
     body = shell[0]
     activate(body)

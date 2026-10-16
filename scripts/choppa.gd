@@ -115,7 +115,7 @@ func _ready() -> void:
 	_shape = CollisionShape3D.new()
 	_shape.shape = capsule
 	_shape.rotation_degrees.x = 90.0
-	_shape.position.z = 0.8
+	_shape.position.z = 0.3  # Cabin nose 2.4 m ahead of the centre; covers the tail cone.
 	add_child(_shape)
 
 	model = ChoppaModel.new()
@@ -429,7 +429,7 @@ func _update_gun(i: PilotInput, delta: float) -> void:
 
 
 func _shoot() -> void:
-	var muzzle := global_position + facing() * Vector3(0.9 * _gun_side, -0.5, -2.2)
+	var muzzle := global_position + facing() * Vector3(1.12 * _gun_side, -0.8, -2.35)
 	_gun_side = -_gun_side
 	var target := aim_target()
 	var direction := facing() * Vector3.FORWARD

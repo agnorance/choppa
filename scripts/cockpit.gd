@@ -13,6 +13,7 @@ const AMBER := Color(1.0, 0.62, 0.2)
 var choppa: Choppa
 ## Returns the kill count to show, or -1 for "--" (free flight). Set by the game mode.
 var kills_source: Callable = func() -> int: return -1
+var reticle: Node3D  ## The gunsight glow; only shown from the pilot's seat.
 
 var _gauges := {}
 var _stick: Node3D
@@ -29,15 +30,21 @@ var _radar: RadarScreen
 var _clock := 0.0
 
 
-func _ready() -> void:
-	var shell: Node3D = (load("res://assets/models/choppa/cockpit.glb") as PackedScene).instantiate()
-	add_child(shell)
+## The bare interior (no live instruments), for other choppas seen through their canopy.
+static func shell() -> Node3D:
+	var model: Node3D = (load("res://assets/models/choppa/cockpit.glb") as PackedScene).instantiate()
 	var materials := ChoppaModel.part_materials(PANEL_PAINT, Vector2(0.32, 0.2))
-	for mesh: MeshInstance3D in shell.find_children("*", "MeshInstance3D"):
+	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D"):
 		for k in mesh.mesh.get_surface_count():
 			var source := mesh.mesh.surface_get_material(k)
 			mesh.set_surface_override_material(k, materials.get(source.resource_name if source else "paint", materials.paint))
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return model
+
+
+func _ready() -> void:
+	var shell := Cockpit.shell()
+	add_child(shell)
 	_stick = shell.find_child("stick")
 	_collective = shell.find_child("collective")
 
@@ -53,7 +60,8 @@ func _ready() -> void:
 			["shield", Color(0.2, 0.8, 1.0), "SHLD"], ["scrambled", Color(0.75, 0.3, 1.0), "SCRM"]]:
 		_lamps[lamp[0]] = _build_lamp(_mount(shell, "lamp_" + lamp[0]), lamp[1], lamp[2])
 	_build_beacon(_mount(shell, "beacon"))
-	_build_reticle(_mount(shell, "sight"))
+	reticle = _mount(shell, "sight")
+	_build_reticle(reticle)
 
 	# A dim warm light so the panel reads even in the shade.
 	var fill := OmniLight3D.new()

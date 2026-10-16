@@ -20,7 +20,7 @@ var _blur_material: StandardMaterial3D
 var _tilt := Vector2.ZERO  ## x: pitch, y: roll.
 var _rotor_speed := 0.0
 var _dust: CPUParticles3D
-var _trail: CPUParticles3D
+var _trails: Array[CPUParticles3D] = []
 var _smoke: CPUParticles3D
 var _flashes: Array[MeshInstance3D] = []
 var _bubble: MeshInstance3D
@@ -43,6 +43,7 @@ func _ready() -> void:
 			mesh.layers = OWN_LAYER
 	_rotor = model.find_child("rotor")
 	_tail_rotor = model.find_child("tail_rotor")
+	var eye := _marker(model, "eye")
 
 	var disc := CylinderMesh.new()
 	disc.top_radius = 4.3
@@ -54,17 +55,21 @@ func _ready() -> void:
 	_blur_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_blur_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_blur_material.albedo_color = Color(0.35, 0.35, 0.36, 0.0)
-	_part(disc, _blur_material, Vector3(0.0, 1.8, 0.4))
+	_part(disc, _blur_material, _rotor.position + Vector3(0.0, -0.05, 0.0))
 
 	cockpit = Marker3D.new()
-	cockpit.position = Vector3(0.0, 0.55, -1.15)
+	cockpit.position = eye
 	add_child(cockpit)
 	if own:
+		# The live instruments, seen through the canopy in chase view too.
 		cockpit_view = Cockpit.new()
 		cockpit_view.choppa = pilot
-		cockpit_view.position = cockpit.position
-		cockpit_view.visible = false
+		cockpit_view.position = eye
 		add_child(cockpit_view)
+	else:
+		var shell := Cockpit.shell()
+		shell.position = eye
+		_parts.add_child(shell)
 
 	var flash_mesh := SphereMesh.new()
 	flash_mesh.radius = 0.35
@@ -74,8 +79,9 @@ func _ready() -> void:
 	var flash_material := StandardMaterial3D.new()
 	flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	flash_material.albedo_color = Color(1.0, 0.85, 0.4)
-	for side in [-1.0, 1.0]:
-		var flash := _part(flash_mesh, flash_material, Vector3(0.9 * side, -0.45, -2.3), Vector3.ZERO, Vector3(1, 1, 2))
+	for muzzle in ["muzzle_l", "muzzle_r"]:
+		var at := _marker(model, muzzle) + Vector3(0.0, 0.0, -0.25)
+		var flash := _part(flash_mesh, flash_material, at, Vector3.ZERO, Vector3(0.7, 0.7, 1.6))
 		flash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_flashes.append(flash)
 
@@ -102,19 +108,21 @@ func _ready() -> void:
 	_dust.emitting = false
 	add_child(_dust)
 
-	# Boost flame and exhaust trail.
-	_trail = Effects.puffs(Effects.gradient([
-		Color(1.0, 0.85, 0.4, 0.9), Color(1.0, 0.45, 0.1, 0.6), Color(0.4, 0.4, 0.4, 0.0),
-	]), 40, 0.45)
-	_trail.position = Vector3(0.0, 0.75, 2.1)
-	_trail.direction = Vector3.BACK
-	_trail.spread = 8.0
-	_trail.initial_velocity_min = 6.0
-	_trail.initial_velocity_max = 9.0
-	_trail.scale_amount_min = 0.8
-	_trail.scale_amount_max = 1.4
-	_trail.emitting = false
-	add_child(_trail)
+	# Boost flames out of both exhaust stubs.
+	for exhaust in ["exhaust_l", "exhaust_r"]:
+		var trail := Effects.puffs(Effects.gradient([
+			Color(1.0, 0.85, 0.4, 0.9), Color(1.0, 0.45, 0.1, 0.6), Color(0.4, 0.4, 0.4, 0.0),
+		]), 28, 0.4)
+		trail.position = _marker(model, exhaust)
+		trail.direction = Vector3(0.1 * signf(trail.position.x), -0.1, 1.0)
+		trail.spread = 8.0
+		trail.initial_velocity_min = 6.0
+		trail.initial_velocity_max = 9.0
+		trail.scale_amount_min = 0.5
+		trail.scale_amount_max = 1.0
+		trail.emitting = false
+		add_child(trail)
+		_trails.append(trail)
 
 	# Shield bubble; turns gold during GET TO THE CHOPPA.
 	var sphere := SphereMesh.new()
@@ -154,7 +162,7 @@ func _ready() -> void:
 	_smoke = Effects.puffs(Effects.gradient([
 		Color(0.15, 0.15, 0.15, 0.0), Color(0.12, 0.12, 0.12, 0.7), Color(0.2, 0.2, 0.2, 0.0),
 	]), 24, 1.6)
-	_smoke.position = Vector3(0.0, 0.8, 0.8)
+	_smoke.position = _rotor.position * Vector3(1.0, 0.7, 1.0)  # Out of the engine.
 	_smoke.direction = Vector3.UP
 	_smoke.spread = 25.0
 	_smoke.initial_velocity_min = 1.0
@@ -199,7 +207,8 @@ func update_pose(c: Choppa, delta: float) -> void:
 	_parts.visible = c.invulnerable <= 0.0 or fmod(c.invulnerable, 0.2) > 0.08
 	for flash in _flashes:
 		flash.visible = c.clock - c.last_shot_time < 0.05
-	_trail.emitting = c.is_boosting()
+	for trail in _trails:
+		trail.emitting = c.is_boosting()
 	_sparks.emitting = c.scrambled > 0.0
 	_bubble.visible = c.shield > 0.0 or c.rampage > 0.0
 	if _bubble.visible:
@@ -216,6 +225,12 @@ func update_pose(c: Choppa, delta: float) -> void:
 static var _cached_scene: PackedScene
 
 
+## Position of an empty from the Blender model, in model space.
+static func _marker(model: Node3D, marker_name: String) -> Vector3:
+	var node: Node3D = model.find_child(marker_name)
+	return node.position if node else Vector3.ZERO
+
+
 static func _scene() -> PackedScene:
 	if _cached_scene == null:
 		_cached_scene = load("res://assets/models/choppa/choppa.glb")
@@ -224,10 +239,7 @@ static func _scene() -> PackedScene:
 
 ## Materials by the names the Blender scripts give them; `paint` uses the hull shader.
 static func part_materials(paint: Color, panel_size := Vector2(1.35, 0.75)) -> Dictionary:
-	var hull := ShaderMaterial.new()
-	hull.shader = load("res://shaders/hull.gdshader")
-	hull.set_shader_parameter("paint", paint)
-	hull.set_shader_parameter("panel_size", panel_size)
+	var hull := _hull(paint, panel_size)
 	var glass := StandardMaterial3D.new()
 	glass.albedo_color = Color(0.25, 0.32, 0.35, 0.35)
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -242,15 +254,34 @@ static func part_materials(paint: Color, panel_size := Vector2(1.35, 0.75)) -> D
 	green.emission_enabled = true
 	green.emission = Color(0.1, 1.0, 0.2)
 	green.emission_energy_multiplier = 4.0
+	var lamp := _material(Color(1.0, 0.92, 0.75), 0.0, 0.1)
+	lamp.emission_enabled = true
+	lamp.emission = Color(1.0, 0.85, 0.6)
+	lamp.emission_energy_multiplier = 1.5
 	return {
 		"paint": hull,
 		"metal": _material(Color(0.32, 0.32, 0.33), 0.85, 0.38),
 		"dark": _material(Color(0.1, 0.1, 0.11), 0.4, 0.6),
 		"glass": glass,
 		"brass": _material(Color(0.78, 0.6, 0.3), 0.9, 0.3),
+		"rubber": _material(Color(0.05, 0.05, 0.05), 0.0, 0.9),
+		"exhaust": _material(Color(0.24, 0.15, 0.1), 0.75, 0.62),
+		"lamp": lamp,
+		# Markings share the hull's chips, grime and seams.
+		"hazard": _hull(Color(0.85, 0.62, 0.12), panel_size),
+		"decal": _hull(Color(0.86, 0.82, 0.68), panel_size),
+		"marking_red": _hull(Color(0.6, 0.1, 0.06), panel_size),
 		"light_red": red,
 		"light_green": green,
 	}
+
+
+static func _hull(paint: Color, panel_size: Vector2) -> ShaderMaterial:
+	var hull := ShaderMaterial.new()
+	hull.shader = load("res://shaders/hull.gdshader")
+	hull.set_shader_parameter("paint", paint)
+	hull.set_shader_parameter("panel_size", panel_size)
+	return hull
 
 
 static func _material(albedo: Color, metallic: float, roughness: float) -> StandardMaterial3D:

@@ -5,9 +5,10 @@ proposal that can change after playtesting.
 
 ## Pitch
 
-Arcade multiplayer helicopter battles. Mario Kart energy in the air: tight courses with
-tunnels and canyons, flashy tricks that feed your boost, and item boxes full of dirty
-tricks to fool your friends. GET TO THE CHOPPA!
+**Arcade arena shooter with helicopters (decided).** Mario Kart battle-mode energy in the
+air: enclosed arenas with tunnels, trenches, arches and cover, flashy tricks that feed
+your boost, a machine gun for everyone, and item boxes full of dirty tricks to fool your
+friends. GET TO THE CHOPPA!
 
 ## Platform and tech (decided)
 
@@ -34,15 +35,16 @@ moving fast and looking good.
 | Item (X / R) | Use the held item. |
 | Camera (Y / V) | Toggle chase / cockpit view. |
 
-Collisions bounce you off walls and stun you briefly; no instant death from scraping a wall.
+Collisions bounce you off walls and stun you briefly. Hard crashes cost health; if you
+crash soon after being shot, the kill goes to whoever shot you.
 
 ### Machine gun (decided)
 
-Every choppa has a twin machine gun. It **knocks targets back instead of damaging them**:
-in a race it shoves rivals into walls, in battle it pushes them into hazards and mines.
-Items stay the real weapons.
+Every choppa has a twin machine gun. In battle it does **light damage plus a little
+knockback** (25 hits from full health); in races it only pushes. Items are meant to be
+the big hitters.
 
-- Rapid fire (12.5 rounds/s), tracers, rounds stopped by walls.
+- Rapid fire (12.5 rounds/s, 4 damage each), tracers, rounds stopped by walls.
 - Aim assist: rounds snap to a choppa inside a 12° cone ahead (lock ring on the HUD).
 - Overheats after ~2.3 s of continuous fire, then cools down.
 - A barrel roll dodges bullets.
@@ -66,19 +68,19 @@ opponents), tunnel-threading bonus, and tricks that cancel incoming items when t
 
 ## Modes
 
-1. **Race:** checkpoint courses with ring gates, tunnels, canyons and shortcuts. Laps,
-   positions, Mario Kart style catch-up item odds.
-2. **Battle:** arena, everyone has 3 hearts (like Mario Kart balloons). Items are the
-   weapons. Last choppa flying wins, or most hits in a time limit.
-3. Later ideas: hostage rescue race (carry the most soldiers to the pad, "GET TO THE
-   CHOPPA"), king of the hill, tag.
+1. **Battle** *(main mode, first version done)*: free-for-all deathmatch. 100 health,
+   respawn after 3 s with a 2 s spawn shield at the spawn point farthest from enemies.
+   First to 8 kills wins, or the leader after 5 minutes. Repair kits restore 40 health.
+2. Later battle variants: team deathmatch, balloon battle (3 hearts, last choppa flying
+   wins), king of the hill, capture the flag, hostage rescue ("GET TO THE CHOPPA").
+3. **Race** *(side mode)*: checkpoint race on the test range, kept because it exists.
 
 Bots fill empty slots in every mode. They also let me test multiplayer headless.
 
 ## Items ("fool your friends")
 
-Item boxes respawn a few seconds after pickup. Odds depend on your position: leaders get
-defensive items, those trailing get the strong ones.
+Item boxes respawn a few seconds after pickup. Odds depend on the scoreboard: the leader
+gets defensive items, those trailing get the strong ones.
 
 | Item | What it does |
 |---|---|
@@ -91,17 +93,22 @@ defensive items, those trailing get the strong ones.
 | Winch hook | Grab the choppa in front and steal its item. |
 | Decoy flare | Breaks missile locks; held behind you like a banana. |
 | Shield | Blocks one hit. |
-| GET TO THE CHOPPA | Last-place only: autopilot rocket through the course, knocking others aside. |
+| GET TO THE CHOPPA | Last place only: a short invulnerable rampage with a heavy gun. |
 
 ## Maps
 
-Built from modular pieces (tunnel segments, mesas, canyons, arches, ring gates, boost
-pads) so new maps are mostly assembly. Low-poly, flat-shaded look with strong colors and
-fog for depth. Planned first maps:
+Enclosed arenas: cliffs or walls all round that rise above the flight ceiling. Plenty of
+cover, tunnels to dive through and height differences. Built from a heightmap terrain
+plus modular pieces (`MapKit`: mesas with tunnels, arches, hoodoos, ruins, trees,
+boulders, water, clouds), so new maps are mostly a height function and placement.
+Low-poly, flat-shaded look with strong colours.
 
-- **Test range** (exists): open field, a mesa with a tunnel, pillars, rings, item boxes.
-- **Canyon run:** a race through a winding canyon with a cave shortcut.
-- **Dockyard:** battle arena of shipping containers, cranes and a warehouse to fly through.
+- **Mesa Basin** *(exists)*: desert basin ringed by sandstone cliffs; central mesa with
+  crossing tunnels, ring of ruined arches, a trench for sneaking up low, a lake, hoodoo
+  field, pine groves.
+- **Test range** *(exists)*: open field with two tunnels; also the race course.
+- Ideas: **Dockyard** (shipping containers, cranes, a warehouse to fly through),
+  **Ice canyon** (frozen river, ice caves), **City block** (rooftops, streets, a tunnel).
 
 ## Multiplayer
 
@@ -119,19 +126,21 @@ fog for depth. Planned first maps:
 
 ## Milestones
 
-1. **Foundation** *(this branch)*: project, flight model, tricks, boost, chase/cockpit
-   camera, test range with tunnel, item boxes with Turbo, touch controls, tests, CI builds.
-2. **Feel pass:** tune flight on real hardware (Windows + Android), audio, particles, camera
-   shake, trick popups.
-3. **Race mode** *(first version done)*: title menu, checkpoint race through both tunnels
-   on the test range, laps, positions, countdown, results, racer bots, respawn at the
-   last gate. Still to do: a dedicated race map, catch-up item odds, smarter bots.
-4. **Items:** the full item set with position-weighted odds.
+1. **Foundation** *(done)*: project, flight model, tricks, boost, chase/cockpit camera,
+   machine gun, touch controls, tests, CI builds.
+2. **Battle mode and first arena** *(done)*: health, damage, death, respawn, deathmatch
+   rules, kill feed, scoreboard, combat bots, Mesa Basin, terrain, effects (explosions,
+   rotor dust, boost flame, muzzle flash, damage smoke).
+3. **Items:** missiles, mines, fake boxes, smoke and the rest, with scoreboard-weighted
+   odds.
+4. **Feel pass:** tune on real hardware (Windows + Android), audio, camera shake, hit
+   markers.
 5. **LAN multiplayer:** host/join, discovery, prediction and interpolation.
-6. **Battle mode** and an arena map.
-7. **Internet play**, menus, choppa colors and customization.
+6. **More arenas** and battle variants.
+7. **Internet play**, choppa colours and customization.
 
 ## Decided after the first build
 
-- Weak machine gun with knockback: yes.
+- Machine gun: yes.
 - Control scheme: keep the current drone-style controls (steering plus separate lift).
+- Genre: arena shooter first, not a racing game.

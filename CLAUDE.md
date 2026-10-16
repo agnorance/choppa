@@ -1,6 +1,6 @@
 # choppa: instructions for Claude
 
-Arcade multiplayer helicopter game, started 2026-10-16. Godot 4.7 (GDScript, Compatibility
+Arcade helicopter arena shooter (multiplayer planned), started 2026-10-16. Godot 4.7 (GDScript, Compatibility
 renderer), targets Windows and Android. Design and roadmap: docs/DESIGN.md.
 
 - The owner plays and tests on Windows (desktop) and Android (sideloaded APK).
@@ -16,8 +16,12 @@ renderer), targets Windows and Android. Design and roadmap: docs/DESIGN.md.
   `tools/shot.sh out.png --autopilot=forward --frames=120`. Look at screenshots after
   visual changes.
 - Game arguments go after `--`; see `scripts/main.gd` for the list. Useful:
-  `--mode=race --autopilot=race` (a bot flies you), `--menu` (title screen).
+  `--mode=battle --map=basin --autopilot=bot` (a bot flies you), `--menu` (title screen).
+  The software renderer here is slow (~5 fps), so long screenshots take minutes.
 - A choppa only reads a `PilotInput`; keep input sources (keyboard, touch, network, bots)
   out of `choppa.gd` so multiplayer stays straightforward.
 - Maps and models are built from primitives in code for now; keep scene files minimal.
+  Maps extend `GameMap`; reusable pieces live in `MapKit`; terrain is `Terrain`.
+- Particles: use `Effects.puffs()`. On the Compatibility renderer `BILLBOARD_PARTICLES`
+  drops per-particle scale, and CPUParticles3D default gravity pulls puffs into the ground.
 - CI (`.github/workflows/build.yml`) runs the tests and exports Windows + Android builds.

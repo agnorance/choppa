@@ -33,6 +33,7 @@ func setup(course: Array[RingGate], field: Array[Choppa], lap_count := 3) -> voi
 	for choppa in racers:
 		_progress[choppa] = {"lap": 0, "next": 0, "done": false}
 		choppa.locked = true
+		choppa.mortal = false
 	for gate in gates:
 		gate.passed.connect(_on_gate_passed.bind(gate))
 

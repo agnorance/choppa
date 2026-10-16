@@ -1,7 +1,7 @@
 # choppa
 
-GET TO THE CHOPPA! An arcade multiplayer helicopter game: race and battle your friends
-through tunnels and canyons, pull sick moves, and use Mario Kart style items to fool
+GET TO THE CHOPPA! An arcade helicopter arena shooter: battle your friends through
+tunnels, trenches and ruins, pull sick moves, and use Mario Kart style items to fool
 them.
 
 Made with [Godot 4.7](https://godotengine.org). Runs on Windows and Android. Design and
@@ -32,9 +32,13 @@ Then add two repository secrets under **Settings > Secrets and variables > Actio
 
 ## Modes
 
-- **Race vs 3 bots:** 3 laps through both tunnels on the test range. Fly through the
-  glowing cyan gate next; an arrow at the screen edge points to it when it's off screen.
-- **Free flight:** the test range with loose boost rings and three training dummies.
+Pick a map in the menu (Mesa Basin or Test Range), then:
+
+- **Battle vs 3 bots:** free-for-all. First to 8 kills, or the leader after 5 minutes.
+  You respawn 3 s after being shot down, with a short spawn shield. Red-cross crates
+  repair 40 health.
+- **Free flight:** explore the map with three training dummies to shoot.
+- **Race (test range):** 3 laps through both tunnels against bots. No damage in races.
 
 Esc (or the Android back button) returns to the menu.
 
@@ -50,12 +54,11 @@ Esc (or the Android back button) returns to the menu.
 | Trick (+ direction) | F | A | TRICK |
 | Use item | R | X | ITEM |
 | Camera | V | Y | CAM |
-| Respawn (race: at your last gate) | Backspace | Back/Select | |
+| Respawn (race: at your last gate; not in battle) | Backspace | Back/Select | |
 
-The machine gun knocks other choppas around instead of damaging them. It snaps onto
-targets in a narrow cone ahead (white ring) and overheats after about two seconds of
-continuous fire. A barrel roll dodges bullets. Three training dummies hover around the
-test range to shoot at.
+The machine gun snaps onto targets in a narrow cone ahead (white ring) and overheats
+after about two seconds of continuous fire. A barrel roll dodges bullets. Crashing into
+walls hurts too.
 
 Tricks: roll (trick + left/right), front flip (trick + forward), 180 snap (trick + back),
 pirouette (trick alone). Landing a trick close to the ground fills your boost meter

@@ -14,6 +14,9 @@ var _altitude: Label
 var _fps: Label
 var _boost: ProgressBar
 var _heat: ProgressBar
+var _health: ProgressBar
+var _health_fill: StyleBoxFlat
+var _vignette: TextureRect
 var _heat_fill: StyleBoxFlat
 var _crosshair: Control
 var _hit_flash := 0.0
@@ -69,6 +72,39 @@ func _ready() -> void:
 	_heat.add_theme_stylebox_override("background", back)
 	root.add_child(_heat)
 
+	var hp_label := _label(root, 16, Vector2(0, 1), Vector2(24, -50))
+	hp_label.text = "HP"
+	_health = ProgressBar.new()
+	_health.max_value = Choppa.MAX_HEALTH
+	_health.show_percentage = false
+	_health.custom_minimum_size = Vector2(260, 18)
+	_place(_health, Vector2(0, 1), Vector2(24, -24))
+	_health_fill = StyleBoxFlat.new()
+	_health_fill.set_corner_radius_all(5)
+	_health.add_theme_stylebox_override("fill", _health_fill)
+	_health.add_theme_stylebox_override("background", back)
+	root.add_child(_health)
+
+	# Red screen edges when hit.
+	var edge := Gradient.new()
+	edge.set_color(0, Color(0.8, 0.0, 0.0, 0.0))
+	edge.set_color(1, Color(0.8, 0.0, 0.0, 0.9))
+	edge.set_offset(0, 0.55)
+	var edge_texture := GradientTexture2D.new()
+	edge_texture.gradient = edge
+	edge_texture.fill = GradientTexture2D.FILL_RADIAL
+	edge_texture.fill_from = Vector2(0.5, 0.5)
+	edge_texture.fill_to = Vector2(1.0, 1.0)
+	_vignette = TextureRect.new()
+	_vignette.texture = edge_texture
+	_vignette.anchor_right = 1.0
+	_vignette.anchor_bottom = 1.0
+	_vignette.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_vignette.stretch_mode = TextureRect.STRETCH_SCALE
+	_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vignette.modulate.a = 0.0
+	root.add_child(_vignette)
+
 	_crosshair = Control.new()
 	_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_crosshair.anchor_right = 1.0
@@ -94,6 +130,8 @@ func _ready() -> void:
 	choppa.trick_botched.connect(func(_name: String) -> void: _show_callout("BOTCHED", Color(1, 0.3, 0.3)))
 	choppa.item_changed.connect(func(_name: String) -> void: _update_item())
 	choppa.scored_hit.connect(func(_target: Choppa) -> void: _hit_flash = 0.12)
+	choppa.damaged.connect(func(amount: float, _attacker: Choppa) -> void:
+		_vignette.modulate.a = minf(1.0, _vignette.modulate.a + amount / 20.0))
 	choppa.gun_overheated.connect(func() -> void: _show_callout("OVERHEAT", Color(1, 0.4, 0.2)))
 	_update_item()
 
@@ -110,6 +148,10 @@ func _process(delta: float) -> void:
 	_heat.value = choppa.heat
 	_heat_fill.bg_color = Color(1.0, 0.25, 0.15) if choppa.overheated else Color(1.0, 0.9, 0.5)
 	_hit_flash = maxf(0.0, _hit_flash - delta)
+	_health.value = choppa.health
+	var hp := choppa.health / Choppa.MAX_HEALTH
+	_health_fill.bg_color = Color(0.9, 0.2, 0.15).lerp(Color(0.3, 0.85, 0.35), smoothstep(0.2, 0.6, hp))
+	_vignette.modulate.a = maxf(0.0, _vignette.modulate.a - delta * 1.5)
 	_crosshair.queue_redraw()
 	if _callout_time > 0.0:
 		_callout_time -= delta
@@ -118,7 +160,7 @@ func _process(delta: float) -> void:
 
 ## A cross where your guns point, or a ring around the locked-on target.
 func _draw_crosshair() -> void:
-	if camera == null or choppa.trick != "":
+	if camera == null or choppa.trick != "" or not choppa.alive:
 		return
 	var color := Color(1, 0.3, 0.2) if _hit_flash > 0.0 else Color(1, 1, 1, 0.85)
 	var target := choppa.aim_target()

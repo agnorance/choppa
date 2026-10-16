@@ -38,6 +38,14 @@ func _run() -> void:
 		"test_race_standings_and_results",
 		"test_bot_flies_the_course",
 		"test_four_bots_all_finish",
+		"test_bullets_damage_and_kill",
+		"test_spawn_shield_blocks_damage",
+		"test_crash_after_hit_credits_attacker",
+		"test_battle_kills_respawn_and_limit",
+		"test_battle_time_limit",
+		"test_health_crate_heals",
+		"test_terrain_collision_matches_mesh",
+		"test_bots_battle_in_arena",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -66,6 +74,7 @@ func _choppa(pos: Vector3) -> Choppa:
 	var choppa := Choppa.new()
 	_world.add_child(choppa)
 	choppa.respawn(Transform3D(Basis(), pos))
+	choppa.invulnerable = 0.0
 	choppa.set_physics_process(false)  # The tests step it by hand.
 	return choppa
 
@@ -242,7 +251,7 @@ func test_bullets_knock_target_back() -> void:
 		target.step(TICK)
 	_check(hits.size() >= 8, "scored hits, got %d" % hits.size())
 	_check(hits.all(func(t: Choppa) -> bool: return t == target), "hit the target")
-	_check(target.velocity.z < -5.0, "pushed away from shooter, v=%s" % target.velocity)
+	_check(target.velocity.z < -0.2, "pushed away from shooter, v=%s" % target.velocity)
 
 
 func test_aim_assist_hits_target_above() -> void:
@@ -407,3 +416,154 @@ func test_four_bots_all_finish() -> void:
 	var times := race.results.map(func(r: Dictionary) -> String: return "%.1f" % r.time)
 	print("    finish times %s, race time %.1fs" % [times, race.time])
 	_check(race.results.size() == 4, "all four finished, got %d" % race.results.size())
+
+
+func test_bullets_damage_and_kill() -> void:
+	var shooter := _choppa(Vector3(0.0, 10.0, 0.0))
+	var target := _choppa(Vector3(0.0, 10.0, -30.0))
+	var deaths := []
+	target.died.connect(func(killer: Choppa) -> void: deaths.append(killer))
+	for t in 600:
+		shooter.input.fire = shooter.heat < 0.8
+		await physics_frame
+		shooter.step(TICK)
+		target.step(TICK)
+		if not target.alive:
+			break
+	_check(deaths == [shooter], "killed by the shooter, got %s" % [deaths])
+	_check(not target.alive and target.health == 0.0, "dead")
+	_check(shooter.aim_target() == null, "dead choppas are not targets")
+	target.input.move = Vector2(0.0, 1.0)
+	var at := target.global_position
+	target.step(TICK)
+	_check(target.global_position == at, "dead choppas don't fly")
+	target.respawn(Transform3D(Basis(), Vector3(0.0, 10.0, -30.0)))
+	_check(target.alive and target.health == Choppa.MAX_HEALTH, "respawned at full health")
+
+
+func test_spawn_shield_blocks_damage() -> void:
+	var a := _choppa(Vector3(0.0, 10.0, 0.0))
+	a.respawn(Transform3D(Basis(), Vector3(0.0, 10.0, 0.0)))
+	a.damage(50.0, null)
+	_check(a.health == Choppa.MAX_HEALTH, "shielded right after spawning")
+	await _fly(a, int(Choppa.SPAWN_SHIELD / TICK) + 2)
+	a.damage(50.0, null)
+	_check(a.health == 50.0, "shield wears off")
+
+
+func test_crash_after_hit_credits_attacker() -> void:
+	MapKit.block(_world, Vector3(0.0, 10.0, -30.0), Vector3(40.0, 40.0, 2.0), Color.GRAY)
+	var shooter := _choppa(Vector3(50.0, 10.0, 0.0))
+	var victim := _choppa(Vector3(0.0, 10.0, 0.0))
+	victim.damage(Choppa.MAX_HEALTH - 5.0, shooter)
+	var deaths := []
+	victim.died.connect(func(killer: Choppa) -> void: deaths.append(killer))
+	victim.velocity = Vector3(0.0, 0.0, -70.0)
+	await _fly(victim, 30)
+	_check(deaths == [shooter], "crash kill credited to the shooter, got %s" % [deaths])
+
+
+func test_battle_kills_respawn_and_limit() -> void:
+	var a := _choppa(Vector3(0.0, 10.0, 0.0))
+	var b := _choppa(Vector3(0.0, 10.0, -20.0))
+	var spawns: Array[Transform3D] = [
+		Transform3D(Basis(), Vector3(0.0, 10.0, 5.0)), Transform3D(Basis(), Vector3(0.0, 10.0, 300.0)),
+	]
+	var battle := Battle.new()
+	battle.set_physics_process(false)
+	_world.add_child(battle)
+	battle.setup([a, b], spawns, 2, 60.0)
+	b.damage(500.0, a)
+	_check(battle.kills_of(a) == 1 and battle.deaths_of(b) == 1, "kill counted")
+	_check(battle.respawn_in(b) > 0.0, "victim waits to respawn")
+	battle.tick(Battle.RESPAWN_DELAY + 0.01)
+	_check(b.alive, "victim respawned")
+	_check(b.global_position.distance_to(spawns[1].origin) < 0.1, "respawned far from the killer")
+	_check(battle.standings()[0] == a, "killer leads")
+	b.invulnerable = 0.0
+	b.damage(500.0, a)
+	_check(battle.over, "kill limit ends the match")
+	_check(a.locked and b.locked, "everyone stops at the end")
+
+
+func test_battle_time_limit() -> void:
+	var a := _choppa(Vector3(0.0, 10.0, 0.0))
+	var battle := Battle.new()
+	battle.set_physics_process(false)
+	_world.add_child(battle)
+	battle.setup([a], [Transform3D()], 10, 5.0)
+	battle.tick(4.0)
+	_check(not battle.over, "still running")
+	battle.tick(1.5)
+	_check(battle.over and battle.time_left == 0.0, "time runs out")
+
+
+func test_health_crate_heals() -> void:
+	var crate := HealthCrate.new()
+	crate.position = Vector3(0.0, 10.0, -15.0)
+	_world.add_child(crate)
+	var choppa := _choppa(Vector3(0.0, 10.0, 0.0))
+	choppa.damage(70.0, null)
+	await _fly(choppa, 60, func(i: PilotInput, _t: int) -> void: i.move = Vector2(0.0, 1.0))
+	_check(is_equal_approx(choppa.health, 30.0 + HealthCrate.HEAL), "healed, hp=%f" % choppa.health)
+	_check(not crate.is_available(), "crate used up")
+
+
+func test_terrain_collision_matches_mesh() -> void:
+	var terrain := Terrain.new()
+	terrain.size = 200.0
+	terrain.resolution = 20
+	terrain.height_fn = func(x: float, z: float) -> float: return sin(x * 0.05) * 10.0 + z * 0.1
+	terrain.color_fn = func(_c: Vector3, _s: float) -> Color: return Color.GREEN
+	_world.add_child(terrain)
+	await physics_frame
+	var space := _world.get_world_3d().direct_space_state
+	for p: Vector2 in [Vector2(0, 0), Vector2(33, -12), Vector2(-71, 58), Vector2(12.5, 7.5)]:
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(p.x, 100, p.y), Vector3(p.x, -100, p.y)))
+		var expected := terrain.height_at(p.x, p.y)
+		_check(hit and absf(hit.position.y - expected) < 0.05, "collision at %s: %s vs %f" % [p, hit.get("position"), expected])
+
+
+func test_bots_battle_in_arena() -> void:
+	var map := MesaBasin.new()
+	map.mode = "battle"
+	_world.add_child(map)
+	var field: Array[Choppa] = []
+	for n in 4:
+		var c := Choppa.new()
+		c.pilot_name = "Bot%d" % n
+		c.max_altitude = map.ceiling
+		_world.add_child(c)
+		c.respawn(map.spawn_points[n * 2])
+		field.append(c)
+	var battle := Battle.new()
+	_world.add_child(battle)
+	battle.setup(field, map.spawn_points, 99, 120.0)
+	var bumps := {}
+	var travelled := {}
+	for c in field:
+		bumps[c] = 0
+		travelled[c] = 0.0
+		c.bumped.connect(func(_i: float) -> void: bumps[c] += 1)
+		var bot := FighterBot.new()
+		bot.choppa = c
+		bot.ceiling = map.ceiling
+		bot.rng.seed = hash(c.pilot_name)
+		_world.add_child(bot)
+	var last := {}
+	for c in field:
+		last[c] = c.global_position
+	while not battle.over:
+		await physics_frame
+		for c in field:
+			if c.alive:
+				travelled[c] += c.global_position.distance_to(last[c])
+			last[c] = c.global_position
+	var summary := field.map(func(c: Choppa) -> String:
+		return "%s k%d d%d bumps%d %.0fm" % [c.pilot_name, battle.kills_of(c), battle.deaths_of(c), bumps[c], travelled[c]])
+	print("    ", summary)
+	var kills := 0
+	for c in field:
+		kills += battle.kills_of(c)
+		_check(travelled[c] > 800.0, "%s kept moving" % c.pilot_name)
+	_check(kills >= 4, "bots score kills, got %d" % kills)

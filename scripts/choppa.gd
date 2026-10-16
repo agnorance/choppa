@@ -11,6 +11,9 @@ signal item_changed(item_name: String)
 signal hit_taken(impulse: Vector3, shooter: Choppa)
 signal scored_hit(target: Choppa)
 signal gun_overheated
+signal damaged(amount: float, attacker: Choppa)
+signal died(killer: Choppa)
+signal healed(amount: float)
 
 ## Below this altitude a trick counts as "low" and its boost reward doubles.
 const LOW_ALTITUDE := 6.0
@@ -24,6 +27,11 @@ const GUN_COOL_RATE := 0.6  ## Heat lost per second when not firing.
 const AIM_ASSIST_ANGLE := deg_to_rad(12.0)  ## Horizontal cone that snaps bullets.
 const AIM_ASSIST_PITCH := deg_to_rad(35.0)
 const AIM_ASSIST_RANGE := 160.0
+const MAX_HEALTH := 100.0
+const CRASH_DAMAGE_FROM := 22.0  ## Wall impacts harder than this hurt.
+const SPAWN_SHIELD := 2.0  ## Seconds of invulnerability after respawning.
+## A crash this soon after being shot counts as a kill for whoever shot you.
+const CRASH_CREDIT_TIME := 4.0
 const TRICKS := {
 	"BARREL ROLL": {"duration": 0.55, "reward": 0.15},
 	"FRONT FLIP": {"duration": 0.6, "reward": 0.18},
@@ -58,6 +66,12 @@ var locked := false  ## Ignores input, e.g. during a race countdown.
 var altitude := 500.0  ## Height of the skids above whatever is below.
 var heat := 0.0  ## Gun heat, 0..1.
 var overheated := false
+var health := MAX_HEALTH
+var alive := true
+var mortal := true  ## False in races: hits still push, but never hurt.
+var invulnerable := 0.0
+var clock := 0.0  ## Simulation seconds this choppa has existed.
+var last_shot_time := -10.0  ## `clock` at the last shot, for the muzzle flash.
 
 var trick := ""  ## Name of the trick in progress, "" when none.
 var trick_time := 0.0
@@ -72,6 +86,9 @@ var _prev_trick := false
 var _prev_item := false
 var _gun_timer := 0.0
 var _gun_side := 1.0
+var _shape: CollisionShape3D
+var _last_attacker: Choppa
+var _last_attacker_time := -100.0
 
 
 func _ready() -> void:
@@ -82,11 +99,11 @@ func _ready() -> void:
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = 1.1
 	capsule.height = 5.4
-	var shape := CollisionShape3D.new()
-	shape.shape = capsule
-	shape.rotation_degrees.x = 90.0
-	shape.position.z = 0.8
-	add_child(shape)
+	_shape = CollisionShape3D.new()
+	_shape.shape = capsule
+	_shape.rotation_degrees.x = 90.0
+	_shape.position.z = 0.8
+	add_child(_shape)
 
 	model = ChoppaModel.new()
 	model.color = team_color
@@ -114,6 +131,10 @@ func facing() -> Basis:
 
 ## Advances the simulation by one tick.
 func step(delta: float) -> void:
+	clock += delta
+	if not alive:
+		return
+	invulnerable = maxf(0.0, invulnerable - delta)
 	var i := input
 	if stun > 0.0:
 		stun -= delta
@@ -178,7 +199,7 @@ func aim_target() -> Choppa:
 	var best_angle := AIM_ASSIST_ANGLE
 	for node in get_tree().get_nodes_in_group("choppas"):
 		var other := node as Choppa
-		if other == self:
+		if other == self or not other.alive:
 			continue
 		var to := other.global_position - global_position
 		var flat := Vector3(to.x, 0.0, to.z)
@@ -192,12 +213,47 @@ func aim_target() -> Choppa:
 
 
 ## Called by a bullet. Returns false when the hit is dodged.
-func take_hit(impulse: Vector3, shooter: Choppa) -> bool:
-	if trick == "BARREL ROLL":
+func take_hit(impulse: Vector3, shooter: Choppa, amount := 0.0) -> bool:
+	if not alive or trick == "BARREL ROLL":
 		return false
 	velocity += impulse
 	hit_taken.emit(impulse, shooter)
+	damage(amount, shooter)
 	return true
+
+
+func damage(amount: float, attacker: Choppa) -> void:
+	if not alive or not mortal or invulnerable > 0.0 or amount <= 0.0:
+		return
+	if attacker and attacker != self:
+		_last_attacker = attacker
+		_last_attacker_time = clock
+	health -= amount
+	damaged.emit(amount, attacker)
+	if health <= 0.0:
+		_die(attacker)
+
+
+func heal(amount: float) -> bool:
+	if not alive or health >= MAX_HEALTH:
+		return false
+	var before := health
+	health = minf(MAX_HEALTH, health + amount)
+	healed.emit(health - before)
+	return true
+
+
+func _die(killer: Choppa) -> void:
+	alive = false
+	health = 0.0
+	trick = ""
+	velocity = Vector3.ZERO
+	model.visible = false
+	_shape.set_deferred("disabled", true)
+	var boom := Effects.Explosion.new()
+	get_parent().add_child(boom)
+	boom.global_position = global_position
+	died.emit(killer)
 
 
 func give_item(item_name: String) -> bool:
@@ -232,6 +288,12 @@ func respawn(at: Transform3D) -> void:
 	turbo_time = 0.0
 	heat = 0.0
 	overheated = false
+	if not alive:
+		alive = true
+		_shape.set_deferred("disabled", false)
+	health = MAX_HEALTH
+	invulnerable = SPAWN_SHIELD
+	model.visible = true
 	reset_physics_interpolation()
 	_update_altitude()
 
@@ -263,6 +325,7 @@ func _shoot() -> void:
 	var direction := facing() * Vector3.FORWARD
 	if target:
 		direction = (target.global_position - muzzle).normalized()
+	last_shot_time = clock
 	var bullet := Bullet.new()
 	bullet.shooter = self
 	bullet.direction = direction
@@ -339,7 +402,9 @@ func _handle_collisions(before: Vector3) -> void:
 		velocity = before.bounce(normal) * 0.45
 		stun = clampf(impact / 60.0, 0.15, 0.5)
 		bumped.emit(impact)
-
+	if impact > CRASH_DAMAGE_FROM:
+		var credit := _last_attacker if clock - _last_attacker_time < CRASH_CREDIT_TIME else null
+		damage((impact - CRASH_DAMAGE_FROM) * 1.2, credit)
 
 func _update_altitude() -> void:
 	var query := PhysicsRayQueryParameters3D.create(

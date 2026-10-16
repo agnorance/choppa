@@ -1,5 +1,5 @@
 class_name TestRange
-extends Node3D
+extends GameMap
 ## Sandbox map: open field, two tunnels through mesas, an arch, a pillar forest and item
 ## boxes. In "free" mode it has a few loose boost rings; in "race" mode a checkpoint
 ## course loops through both tunnels.
@@ -20,17 +20,19 @@ const COURSE := [
 	[Vector3(-90.0, 10.0, 100.0), PI * 0.5, 8.0],
 ]
 
-var mode := "free"
-var gates: Array[RingGate] = []  ## Race checkpoints in order (race mode only).
 
-var spawn_points: Array[Transform3D] = [
-	Transform3D(Basis(), Vector3(0.0, 3.0, 90.0)),
-	Transform3D(Basis(), Vector3(-14.0, 3.0, 90.0)),
-	Transform3D(Basis(), Vector3(14.0, 3.0, 90.0)),
-	Transform3D(Basis(), Vector3(-7.0, 3.0, 108.0)),
-	Transform3D(Basis(), Vector3(7.0, 3.0, 108.0)),
-	Transform3D(Basis(), Vector3(-21.0, 3.0, 108.0)),
-]
+func _init() -> void:
+	spawn_points = [
+		Transform3D(Basis(), Vector3(0.0, 3.0, 90.0)),
+		Transform3D(Basis(), Vector3(-14.0, 3.0, 90.0)),
+		Transform3D(Basis(), Vector3(14.0, 3.0, 90.0)),
+		Transform3D(Basis(), Vector3(-7.0, 3.0, 108.0)),
+		Transform3D(Basis(), Vector3(7.0, 3.0, 108.0)),
+		Transform3D(Basis(), Vector3(-21.0, 3.0, 108.0)),
+	]
+	dummy_posts = [
+		Vector3(-25.0, 10.0, 50.0), Vector3(25.0, 13.0, 45.0), Vector3(0.0, 17.0, 15.0),
+	]
 
 
 func _ready() -> void:

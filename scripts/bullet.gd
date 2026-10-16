@@ -1,11 +1,12 @@
 class_name Bullet
 extends Node3D
-## Machine gun round. Knocks choppas back instead of damaging them. Moves in straight
-## steps and ray-checks each step, so it can't tunnel through thin walls.
+## Machine gun round: light damage and a little knockback. Moves in straight steps and
+## ray-checks each step, so it can't tunnel through thin walls.
 
 const SPEED := 180.0
 const LIFETIME := 0.9
-const KNOCKBACK := 2.5  ## Velocity added to the target per hit.
+const KNOCKBACK := 1.2  ## Velocity added to the target per hit.
+const DAMAGE := 4.0
 
 static var _mesh: BoxMesh
 static var _material: StandardMaterial3D
@@ -48,7 +49,7 @@ func _physics_process(delta: float) -> void:
 		global_position = to
 		return
 	var target := hit.collider as Choppa
-	if target and target.take_hit(direction * KNOCKBACK, shooter) and is_instance_valid(shooter):
+	if target and target.take_hit(direction * KNOCKBACK, shooter, DAMAGE) and is_instance_valid(shooter):
 		shooter.scored_hit.emit(target)
 	if target == null or not target.trick == "BARREL ROLL":
 		_spark(hit.position)

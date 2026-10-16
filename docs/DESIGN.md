@@ -123,7 +123,9 @@ fog for depth. Planned first maps:
    camera, test range with tunnel, item boxes with Turbo, touch controls, tests, CI builds.
 2. **Feel pass:** tune flight on real hardware (Windows + Android), audio, particles, camera
    shake, trick popups.
-3. **Race mode:** checkpoints, laps, positions, first race map, bots.
+3. **Race mode** *(first version done)*: title menu, checkpoint race through both tunnels
+   on the test range, laps, positions, countdown, results, racer bots, respawn at the
+   last gate. Still to do: a dedicated race map, catch-up item odds, smarter bots.
 4. **Items:** the full item set with position-weighted odds.
 5. **LAN multiplayer:** host/join, discovery, prediction and interpolation.
 6. **Battle mode** and an arena map.

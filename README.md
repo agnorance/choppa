@@ -30,6 +30,14 @@ Then add two repository secrets under **Settings > Secrets and variables > Actio
 `certutil -encodehex -f choppa.keystore out.txt 0x40000001`) and
 `ANDROID_KEYSTORE_PASSWORD`. Keep the keystore file safe and out of the repo.
 
+## Modes
+
+- **Race vs 3 bots:** 3 laps through both tunnels on the test range. Fly through the
+  glowing cyan gate next; an arrow at the screen edge points to it when it's off screen.
+- **Free flight:** the test range with loose boost rings and three training dummies.
+
+Esc (or the Android back button) returns to the menu.
+
 ## Controls
 
 | Action | Keyboard | Gamepad | Touch |
@@ -42,7 +50,7 @@ Then add two repository secrets under **Settings > Secrets and variables > Actio
 | Trick (+ direction) | F | A | TRICK |
 | Use item | R | X | ITEM |
 | Camera | V | Y | CAM |
-| Respawn | Backspace | Back/Select | |
+| Respawn (race: at your last gate) | Backspace | Back/Select | |
 
 The machine gun knocks other choppas around instead of damaging them. It snaps onto
 targets in a narrow cone ahead (white ring) and overheats after about two seconds of
@@ -58,4 +66,4 @@ twice as much.
 1. Install Godot 4.7.2 (standard build, not .NET).
 2. Open `project.godot` in Godot and press F5.
 
-Tests: `godot --headless --path . --script res://tests/run_tests.gd`
+Tests: `godot --headless --fixed-fps 60 --path . --script res://tests/run_tests.gd`

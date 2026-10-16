@@ -197,8 +197,9 @@ static func pillar(parent: Node3D, base: Vector3, radius: float, height: float) 
 	parent.add_child(body)
 
 
-static func ring(parent: Node3D, center: Vector3, yaw: float) -> RingGate:
+static func ring(parent: Node3D, center: Vector3, yaw: float, radius := 5.0) -> RingGate:
 	var gate := RingGate.new()
+	gate.radius = radius
 	gate.position = center
 	gate.rotation.y = yaw
 	parent.add_child(gate)

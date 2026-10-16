@@ -1,5 +1,7 @@
 extends SceneTree
-## Headless test runner: godot --headless --path . --script res://tests/run_tests.gd
+## Headless test runner:
+##   godot --headless --fixed-fps 60 --path . --script res://tests/run_tests.gd
+## --fixed-fps lets physics run as fast as the CPU allows instead of in real time.
 ## Each test builds a tiny world, flies a choppa with scripted input and checks the result.
 
 const TICK := 1.0 / 60.0
@@ -32,6 +34,10 @@ func _run() -> void:
 		"test_aim_assist_hits_target_above",
 		"test_barrel_roll_dodges_bullets",
 		"test_bullets_stop_at_walls",
+		"test_race_counts_gates_in_order_and_laps",
+		"test_race_standings_and_results",
+		"test_bot_flies_the_course",
+		"test_four_bots_all_finish",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -277,3 +283,127 @@ func test_bullets_stop_at_walls() -> void:
 	target.hit_taken.connect(func(_i: Vector3, _s: Choppa) -> void: taken.append(true))
 	await _fly(shooter, 30, _hold_fire)
 	_check(taken.is_empty(), "wall blocked the bullets")
+
+
+## A race on a bare course of gates (no map) with racers parked behind gate 0.
+func _mini_race(field: Array[Choppa], gate_count := 3, laps := 2) -> Race:
+	var course: Array[RingGate] = []
+	for n in gate_count:
+		var gate := RingGate.new()
+		gate.index = n
+		gate.position = Vector3(0.0, 10.0, -100.0 * n)
+		_world.add_child(gate)
+		course.append(gate)
+	var race := Race.new()
+	race.set_physics_process(false)
+	_world.add_child(race)
+	race.setup(course, field, laps)
+	race.tick(Race.COUNTDOWN + 0.01)
+	return race
+
+
+func test_race_counts_gates_in_order_and_laps() -> void:
+	var a := _choppa(Vector3(0.0, 10.0, 20.0))
+	var race := _mini_race([a], 3, 2)
+	_check(race.running and not a.locked, "countdown over, racer unlocked")
+	var g := race.gates
+	g[1].passed.emit(a)  # Out of order: ignored.
+	_check(race._checkpoints(a) == 0, "skipping the start line does not count")
+	g[0].passed.emit(a)
+	_check(race.lap_of(a) == 1 and race.next_gate(a) == g[1], "lap 1 started")
+	var back := race.respawn_point(a)
+	_check(back.origin.is_equal_approx(g[0].global_position), "respawn at the last gate")
+	_check((back.basis * Vector3.FORWARD).dot(Vector3.FORWARD) > 0.99, "respawn facing the next gate")
+	g[2].passed.emit(a)  # Skipped gate 1: ignored.
+	_check(race.next_gate(a) == g[1], "must take gates in order")
+	g[1].passed.emit(a)
+	g[2].passed.emit(a)
+	g[0].passed.emit(a)
+	_check(race.lap_of(a) == 2, "lap 2 started")
+	_check(not race.is_done(a), "not finished yet")
+	g[1].passed.emit(a)
+	g[2].passed.emit(a)
+	g[0].passed.emit(a)
+	_check(race.is_done(a), "finished after 2 laps")
+	_check(race.over and race.results.size() == 1, "race over when everyone finished")
+
+
+func test_race_standings_and_results() -> void:
+	var a := _choppa(Vector3(0.0, 10.0, 20.0))
+	var b := _choppa(Vector3(5.0, 10.0, 20.0))
+	var c := _choppa(Vector3(10.0, 10.0, 20.0))
+	var race := _mini_race([a, b, c], 3, 1)
+	var g := race.gates
+	for r: Choppa in [a, b, c]:
+		g[0].passed.emit(r)
+	g[1].passed.emit(b)
+	_check(race.standings()[0] == b, "b leads after more gates")
+	c.global_position = Vector3(0.0, 10.0, -95.0)  # Closest to gate 1.
+	_check(race.place_of(c) == 2 and race.place_of(a) == 3, "ties broken by distance")
+	for gate in [g[2], g[0]]:
+		gate.passed.emit(c)  # c is still on gate 1: ignored.
+	for gate in [g[2], g[0]]:
+		gate.passed.emit(b)
+	_check(race.is_done(b) and race.place_of(b) == 1, "b finished first")
+	_check(not race.over, "race continues for the others")
+	race.tick(Race.FINISH_GRACE + 0.1)
+	_check(race.over, "grace period ends the race")
+
+
+func test_bot_flies_the_course() -> void:
+	var map := TestRange.new()
+	map.mode = "race"
+	_world.add_child(map)
+	var bot_choppa := Choppa.new()
+	_world.add_child(bot_choppa)
+	bot_choppa.respawn(map.spawn_points[0])
+	var race := Race.new()
+	_world.add_child(race)
+	race.setup(map.gates, [bot_choppa], 2)
+	var bot := RacerBot.new()
+	bot.choppa = bot_choppa
+	bot.race = race
+	_world.add_child(bot)
+	var bumps := []
+	bot_choppa.bumped.connect(func(impact: float) -> void:
+		bumps.append(impact)
+		print("      BUMP %.0f at %s next gate %d" % [impact, bot_choppa.global_position.snapped(Vector3.ONE), race.next_gate(bot_choppa).index]))
+	var laps := []
+	race.lap_started.connect(func(_c: Choppa, lap: int) -> void: laps.append([lap, race.time]))
+	var limit := 60 * 240
+	while not race.over and limit > 0:
+		await physics_frame
+		limit -= 1
+	print("    laps started at %s, finished=%s in %.1fs, bumps=%s, stuck at gate %d" % [
+		laps, race.is_done(bot_choppa), race.time, bumps, race.next_gate(bot_choppa).index])
+	_check(race.is_done(bot_choppa), "bot finished 2 laps")
+	_check(race.time < 150.0, "in reasonable time, %.1fs" % race.time)
+	_check(bumps.is_empty(), "no wall hits, got %d" % bumps.size())
+
+
+func test_four_bots_all_finish() -> void:
+	var map := TestRange.new()
+	map.mode = "race"
+	_world.add_child(map)
+	var field: Array[Choppa] = []
+	for n in 4:
+		var c := Choppa.new()
+		_world.add_child(c)
+		c.respawn(map.spawn_points[n])
+		field.append(c)
+	var race := Race.new()
+	_world.add_child(race)
+	race.setup(map.gates, field, 1)
+	for n in 4:
+		var bot := RacerBot.new()
+		bot.choppa = field[n]
+		bot.race = race
+		bot.skill = 1.0 - n * 0.1
+		_world.add_child(bot)
+	var limit := 60 * 180
+	while not race.over and limit > 0:
+		await physics_frame
+		limit -= 1
+	var times := race.results.map(func(r: Dictionary) -> String: return "%.1f" % r.time)
+	print("    finish times %s, race time %.1fs" % [times, race.time])
+	_check(race.results.size() == 4, "all four finished, got %d" % race.results.size())

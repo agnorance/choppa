@@ -32,6 +32,7 @@ const TRICKS := {
 }
 
 @export var team_color := Color(0.95, 0.5, 0.1)
+@export var pilot_name := "Pilot"
 @export var local_player := false  ## Hide own model from the cockpit camera.
 
 @export_group("Flight")
@@ -53,6 +54,7 @@ var boost_meter := 0.5
 var turbo_time := 0.0
 var item := ""
 var stun := 0.0
+var locked := false  ## Ignores input, e.g. during a race countdown.
 var altitude := 500.0  ## Height of the skids above whatever is below.
 var heat := 0.0  ## Gun heat, 0..1.
 var overheated := false
@@ -115,6 +117,8 @@ func step(delta: float) -> void:
 	var i := input
 	if stun > 0.0:
 		stun -= delta
+		i = PilotInput.new()
+	if locked:
 		i = PilotInput.new()
 
 	if i.trick and not _prev_trick:

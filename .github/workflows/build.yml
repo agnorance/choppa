@@ -13,16 +13,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Cache Godot
         id: cache-godot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/godot
@@ -61,7 +61,7 @@ jobs:
         run: godot --headless --path . --import
 
       - name: Run tests
-        run: godot --headless --path . --script res://tests/run_tests.gd
+        run: godot --headless --fixed-fps 60 --path . --script res://tests/run_tests.gd
 
       - name: Export Windows
         run: |
@@ -98,12 +98,12 @@ jobs:
           godot --headless --path . --export-release "Android" build/android/choppa.apk
           test -f build/android/choppa.apk
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: choppa-windows
           path: build/windows/choppa.exe
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: choppa-android
           path: build/android/choppa.apk

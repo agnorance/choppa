@@ -20,7 +20,9 @@ then Android. Design, art direction and roadmap: docs/DESIGN.md.
   `--mode=battle --map=basin --autopilot=bot` (a bot flies you), `--menu` (title screen).
   The software renderer here is slow (~1 fps with Forward+), so long screenshots take
   minutes. Forward+ needs Vulkan: `apt-get install -y mesa-vulkan-drivers` (lavapipe).
-- Textures/models come from Blender scripts in `tools/blender/` (`pip install bpy==5.2.2`).
+- Textures/models come from Blender scripts in `tools/blender/` (`pip install bpy==5.2.2`):
+  `make_textures.py`, `make_rocks.py`, `make_choppa.py`. `--cam=showcase` frames the choppa
+  for model screenshots.
   Generated files are committed. Texture `.import` files must keep VRAM compression and
   mipmaps (and `normal_map=1` for normal maps).
 - A choppa only reads a `PilotInput`; keep input sources (keyboard, touch, network, bots)

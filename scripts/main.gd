@@ -10,7 +10,7 @@ extends Node
 ##   --autopilot=<plan>       fly a ScriptedPilot plan instead of reading controls;
 ##                            "bot" lets the mode's AI fly you
 ##   --spawn=x,y,z[,yaw]      start position, yaw in degrees (free flight)
-##   --cam=fp                 start in first-person view
+##   --cam=fp|showcase        start in first-person view / a fixed front view of the choppa
 ##   --touch                  show touch controls even without a touchscreen
 ##   --shot=<file.png>        save a screenshot after --frames physics ticks and quit
 ##   --frames=<n>             ticks before the screenshot (default 90)
@@ -83,6 +83,7 @@ func _start() -> void:
 	var chase := ChaseCamera.new()
 	chase.target = choppa
 	chase.first_person = _args.get("cam", "") == "fp"
+	chase.showcase = _args.get("cam", "") == "showcase"
 	add_child(chase)
 	chase.make_current()
 	camera = chase

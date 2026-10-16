@@ -1,6 +1,7 @@
 class_name ChoppaModel
 extends Node3D
-## Low-poly helicopter built from primitives, plus its tilt and trick animations.
+## The helicopter model (assets/models/choppa, built by tools/blender/make_choppa.py)
+## with its hull materials, tilt and trick animations, spinning rotors and effects.
 ## Purely visual: it never affects the simulation. Forward is -Z.
 
 ## Render layer bit for the local player's own choppa, hidden from the cockpit camera.
@@ -28,75 +29,33 @@ var _sparks: CPUParticles3D
 func _ready() -> void:
 	_parts = Node3D.new()
 	add_child(_parts)
-	var paint := _material(color, 0.2, 0.45)
-	var dark := _material(color.darkened(0.45), 0.2, 0.6)
-	var metal := _material(Color(0.22, 0.23, 0.25), 0.7, 0.4)
-	var glass := _material(Color(0.12, 0.2, 0.3), 0.3, 0.1)
-
-	var body_mesh := SphereMesh.new()
-	body_mesh.radial_segments = 16
-	body_mesh.rings = 8
-	_part(body_mesh, paint, Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 0.9, 1.5))
-	_part(body_mesh, glass, Vector3(0.0, 0.15, -0.85), Vector3.ZERO, Vector3(0.75, 0.62, 0.8))
-
-	var boom := CylinderMesh.new()
-	boom.top_radius = 0.12
-	boom.bottom_radius = 0.26
-	boom.height = 3.4
-	boom.radial_segments = 8
-	_part(boom, paint, Vector3(0.0, 0.2, 2.6), Vector3(90.0, 0.0, 0.0))
-	_part(_box(Vector3(0.12, 1.0, 0.6)), dark, Vector3(0.0, 0.7, 4.15), Vector3(-15.0, 0.0, 0.0))
-	_part(_box(Vector3(1.4, 0.08, 0.4)), dark, Vector3(0.0, 0.25, 3.6))
-
-	_tail_rotor = Node3D.new()
-	_tail_rotor.position = Vector3(0.14, 0.75, 4.3)
-	_parts.add_child(_tail_rotor)
-	_part(_box(Vector3(0.05, 1.2, 0.14)), metal, Vector3.ZERO, Vector3.ZERO, Vector3.ONE, _tail_rotor)
-
-	var mast := CylinderMesh.new()
-	mast.top_radius = 0.1
-	mast.bottom_radius = 0.14
-	mast.height = 0.5
-	_part(mast, metal, Vector3(0.0, 1.05, 0.0))
-
-	_rotor = Node3D.new()
-	_rotor.position = Vector3(0.0, 1.3, 0.0)
-	_parts.add_child(_rotor)
-	var blade := _box(Vector3(7.0, 0.05, 0.3))
-	_part(blade, metal, Vector3.ZERO, Vector3.ZERO, Vector3.ONE, _rotor)
-	_part(blade, metal, Vector3.ZERO, Vector3(0.0, 90.0, 0.0), Vector3.ONE, _rotor)
+	var model: Node3D = _scene().instantiate()
+	_parts.add_child(model)
+	var materials := _materials()
+	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D"):
+		for k in mesh.mesh.get_surface_count():
+			var source := mesh.mesh.surface_get_material(k)
+			var name := source.resource_name if source else "paint"
+			mesh.set_surface_override_material(k, materials.get(name, materials.paint))
+		if own:
+			mesh.layers = OWN_LAYER
+	_rotor = model.find_child("rotor")
+	_tail_rotor = model.find_child("tail_rotor")
 
 	var disc := CylinderMesh.new()
-	disc.top_radius = 3.5
-	disc.bottom_radius = 3.5
+	disc.top_radius = 4.3
+	disc.bottom_radius = 4.3
 	disc.height = 0.02
-	disc.radial_segments = 24
+	disc.radial_segments = 32
 	_blur_material = StandardMaterial3D.new()
 	_blur_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_blur_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_blur_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_blur_material.albedo_color = Color(0.35, 0.35, 0.36, 0.0)
-	_part(disc, _blur_material, Vector3(0.0, 1.3, 0.0))
-
-	for side in [-1.0, 1.0]:
-		_part(_box(Vector3(0.1, 0.1, 3.0)), metal, Vector3(0.75 * side, -1.1, 0.0))
-		for z in [-0.7, 0.7]:
-			_part(
-				_box(Vector3(0.08, 0.55, 0.08)), metal,
-				Vector3(0.62 * side, -0.85, z), Vector3(0.0, 0.0, -20.0 * side)
-			)
-
-	var barrel := CylinderMesh.new()
-	barrel.top_radius = 0.07
-	barrel.bottom_radius = 0.09
-	barrel.height = 1.2
-	barrel.radial_segments = 6
-	for side in [-1.0, 1.0]:
-		_part(barrel, metal, Vector3(0.9 * side, -0.5, -1.4), Vector3(90.0, 0.0, 0.0))
-		_part(_box(Vector3(0.5, 0.12, 0.3)), metal, Vector3(0.65 * side, -0.5, -1.1))
+	_part(disc, _blur_material, Vector3(0.0, 1.8, 0.4))
 
 	cockpit = Marker3D.new()
-	cockpit.position = Vector3(0.0, 0.4, -1.25)
+	cockpit.position = Vector3(0.0, 0.55, -1.15)
 	add_child(cockpit)
 
 	var flash_mesh := SphereMesh.new()
@@ -108,7 +67,7 @@ func _ready() -> void:
 	flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	flash_material.albedo_color = Color(1.0, 0.85, 0.4)
 	for side in [-1.0, 1.0]:
-		var flash := _part(flash_mesh, flash_material, Vector3(0.9 * side, -0.5, -2.2), Vector3.ZERO, Vector3(1, 1, 2))
+		var flash := _part(flash_mesh, flash_material, Vector3(0.9 * side, -0.45, -2.3), Vector3.ZERO, Vector3(1, 1, 2))
 		flash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_flashes.append(flash)
 
@@ -139,7 +98,7 @@ func _ready() -> void:
 	_trail = Effects.puffs(Effects.gradient([
 		Color(1.0, 0.85, 0.4, 0.9), Color(1.0, 0.45, 0.1, 0.6), Color(0.4, 0.4, 0.4, 0.0),
 	]), 40, 0.45)
-	_trail.position = Vector3(0.0, 0.35, 1.3)
+	_trail.position = Vector3(0.0, 0.75, 2.1)
 	_trail.direction = Vector3.BACK
 	_trail.spread = 8.0
 	_trail.initial_velocity_min = 6.0
@@ -246,18 +205,53 @@ func update_pose(c: Choppa, delta: float) -> void:
 		_dust.global_position = c.global_position + Vector3.DOWN * (c.altitude + Choppa.GROUND_CLEARANCE - 0.3)
 
 
+static var _cached_scene: PackedScene
+
+
+static func _scene() -> PackedScene:
+	if _cached_scene == null:
+		_cached_scene = load("res://assets/models/choppa/choppa.glb")
+	return _cached_scene
+
+
+## Materials by the names the Blender script gives them. The paint is the team colour,
+## muted toward military olive.
+func _materials() -> Dictionary:
+	var hull := ShaderMaterial.new()
+	hull.shader = load("res://shaders/hull.gdshader")
+	var muted := color.lerp(Color(0.36, 0.38, 0.3), 0.42)
+	hull.set_shader_parameter("paint", muted)
+	var glass := StandardMaterial3D.new()
+	glass.albedo_color = Color(0.25, 0.32, 0.35, 0.35)
+	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glass.metallic = 0.2
+	glass.roughness = 0.05
+	glass.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var red := _material(Color(1.0, 0.1, 0.05), 0.0, 0.4)
+	red.emission_enabled = true
+	red.emission = Color(1.0, 0.1, 0.05)
+	red.emission_energy_multiplier = 4.0
+	var green := _material(Color(0.1, 1.0, 0.2), 0.0, 0.4)
+	green.emission_enabled = true
+	green.emission = Color(0.1, 1.0, 0.2)
+	green.emission_energy_multiplier = 4.0
+	return {
+		"paint": hull,
+		"metal": _material(Color(0.32, 0.32, 0.33), 0.85, 0.38),
+		"dark": _material(Color(0.1, 0.1, 0.11), 0.4, 0.6),
+		"glass": glass,
+		"brass": _material(Color(0.78, 0.6, 0.3), 0.9, 0.3),
+		"light_red": red,
+		"light_green": green,
+	}
+
+
 func _material(albedo: Color, metallic: float, roughness: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = albedo
 	material.metallic = metallic
 	material.roughness = roughness
 	return material
-
-
-func _box(size: Vector3) -> BoxMesh:
-	var box := BoxMesh.new()
-	box.size = size
-	return box
 
 
 func _part(

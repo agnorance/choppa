@@ -21,6 +21,9 @@ static func puffs(colors: Gradient, amount: int, lifetime: float) -> CPUParticle
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	m.billboard_keep_scale = true
 	m.albedo_texture = _soft_dot()
+	# Fade out where puffs cut into the ground or walls instead of a hard edge.
+	m.proximity_fade_enabled = true
+	m.proximity_fade_distance = 1.5
 	quad.material = m
 	p.mesh = quad
 	p.color_ramp = colors
@@ -47,21 +50,23 @@ static func gradient(stops: Array) -> Gradient:
 static var _dot: Texture2D
 
 
-## A round, soft-edged white dot, made once.
+## A soft, cloudy white puff (radial falloff times noise), made once.
 static func _soft_dot() -> Texture2D:
 	if _dot:
 		return _dot
-	var g := Gradient.new()
-	g.set_color(0, Color(1, 1, 1, 1))
-	g.set_color(1, Color(1, 1, 1, 0))
-	var tex := GradientTexture2D.new()
-	tex.gradient = g
-	tex.fill = GradientTexture2D.FILL_RADIAL
-	tex.fill_from = Vector2(0.5, 0.5)
-	tex.fill_to = Vector2(0.5, 0.0)
-	tex.width = 64
-	tex.height = 64
-	_dot = tex
+	var noise := FastNoiseLite.new()
+	noise.frequency = 0.045
+	noise.fractal_octaves = 4
+	var size := 128
+	var image := Image.create(size, size, true, Image.FORMAT_RGBA8)
+	for y in size:
+		for x in size:
+			var d := Vector2(x - size * 0.5, y - size * 0.5).length() / (size * 0.5)
+			var cloud := noise.get_noise_2d(x, y) * 0.5 + 0.5
+			var a := clampf((1.0 - d * d) * (0.35 + cloud * 0.9), 0.0, 1.0)
+			image.set_pixel(x, y, Color(1.0, 1.0, 1.0, a * a))
+	image.generate_mipmaps()
+	_dot = ImageTexture.create_from_image(image)
 	return _dot
 
 

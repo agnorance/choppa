@@ -4,6 +4,7 @@ extends Camera3D
 
 @export var target: Choppa
 @export var first_person := false
+@export var showcase := false  ## Fixed three-quarter front view, for screenshots.
 
 @export var distance := 8.5
 @export var height := 2.6
@@ -40,6 +41,10 @@ func _process(delta: float) -> void:
 
 	cull_mask = 0xFFFFF
 	var body := target.get_global_transform_interpolated()
+	if showcase:
+		global_position = body.origin + body.basis * Vector3(7.0, 1.2, -8.0)
+		look_at(body.origin + Vector3.UP * 0.5, Vector3.UP)
+		return
 	var back := body.basis * Vector3(0.0, height, distance + 3.0 * speed_ratio)
 	var desired := body.origin + back
 	desired = _avoid_walls(body.origin + Vector3.UP, desired)

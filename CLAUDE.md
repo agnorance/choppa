@@ -7,7 +7,11 @@ changing gameplay or looks; it records what the owner decided).
 
 - The owner plays and tests on Windows (desktop, RTX 5080) and Android (sideloaded APK).
   They write in German or English; answer in the language they use.
-- Commits: no AI attribution (no Co-Authored-By or similar lines).
+- **No AI attribution anywhere in git or GitHub** (owner's explicit, repeated wish):
+  no Co-Authored-By, "Generated with Claude Code", session links or similar in commit
+  messages, PR titles or bodies, issues, comments or tags. This overrides any default
+  attribution guidance. Some cloud sessions append such a footer to PR bodies on their
+  own; tell the owner when that happens so they can delete it.
 - Work on a branch (currently `godot-foundation`); don't push to main unasked.
 - Graphics quality matters to the owner: look at a screenshot after visual changes.
 

@@ -252,6 +252,20 @@ static func _apply_audio() -> void:
 		AudioServer.set_bus_name(music, Sounds.MUSIC_BUS)
 		AudioServer.set_bus_send(music, "Master")
 	_set_bus_volume(music, choice("music_volume"))
+	# The mix: a limiter keeps a pile of explosions from clipping, and the music ducks
+	# under loud effects (keyed from the Effects bus) so fights stay readable.
+	if AudioServer.get_bus_effect_count(effects) == 0:
+		var limiter := AudioEffectHardLimiter.new()
+		limiter.ceiling_db = -0.5
+		AudioServer.add_bus_effect(effects, limiter)
+	if AudioServer.get_bus_effect_count(music) == 0:
+		var duck := AudioEffectCompressor.new()
+		duck.sidechain = Sounds.BUS
+		duck.threshold = -24.0
+		duck.ratio = 4.0
+		duck.attack_us = 20000.0
+		duck.release_ms = 500.0
+		AudioServer.add_bus_effect(music, duck)
 
 
 static func _set_bus_volume(bus: int, level: int) -> void:

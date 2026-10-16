@@ -75,6 +75,8 @@ func _run() -> void:
 		"test_camo_reaches_the_hull",
 		"test_every_sound_exists_and_loops_loop",
 		"test_wrecking_a_part_tells_the_shooter_and_shows",
+		"test_loops_loop_and_takes_are_counted",
+		"test_music_crossfades_between_tracks",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
 		"test_net_survives_lag_and_loss",
@@ -1129,7 +1131,8 @@ func test_every_sound_exists_and_loops_loop() -> void:
 				used[m.get_string(1)] = file
 	_check(used.size() >= 12, "found the sound calls, %d" % used.size())
 	for name: String in used:
-		_check(ResourceLoader.exists("res://assets/sounds/%s.wav" % name), "%s.wav exists (used in %s)" % [name, used[name]])
+		var found := ResourceLoader.exists("res://assets/sounds/%s.wav" % name) or Sounds._take_count(name) > 0
+		_check(found, "%s.wav (or %s_1.wav ...) exists (used in %s)" % [name, name, used[name]])
 	for track in ["menu", "battle"]:
 		var stream := Sounds.stream("music_%s_loop" % track) as AudioStreamWAV
 		_check(stream != null and stream.loop_mode == AudioStreamWAV.LOOP_FORWARD, "music %s loops" % track)
@@ -1429,3 +1432,33 @@ func test_gun_spread_blooms_with_heat() -> void:
 		choppa.free()
 	_check(spreads[0] < 0.004, "cold: tight, %.4f rad" % spreads[0])
 	_check(spreads[1] > 0.012 and spreads[1] < 0.03, "hot: wider, %.4f rad" % spreads[1])
+
+
+## `*_loop` sounds loop even when their import settings forgot to; sounds without
+## numbered takes play their single file.
+func test_loops_loop_and_takes_are_counted() -> void:
+	var rotor := Sounds.stream("rotor_loop") as AudioStreamWAV
+	_check(rotor != null and rotor.loop_mode != AudioStreamWAV.LOOP_DISABLED, "the rotor loops")
+	_check(Sounds._take_count("gun") == 0 and Sounds.stream("gun") != null, "a single gun file plays")
+	_check(Sounds._take_count("no_such_sound") == 0, "no takes of a missing sound")
+
+
+## A new track fades in after the old one fades out, at the music level.
+func test_music_crossfades_between_tracks() -> void:
+	Sounds.music(self, "menu")
+	for t in 120:
+		await process_frame
+	_check(Sounds._music.playing and Sounds._music.stream.resource_path.contains("menu"), "the menu music plays")
+	Sounds.music(self, "battle")
+	for t in 20:
+		await process_frame
+	_check(Sounds._music.volume_db < Sounds.MUSIC_DB - 3.0 or Sounds._music.stream.resource_path.contains("battle"),
+		"the menu music fades out first")
+	for t in 200:
+		await process_frame
+	_check(Sounds._music.stream.resource_path.contains("battle") and is_equal_approx(Sounds._music.volume_db, Sounds.MUSIC_DB),
+		"then the battle music plays at full level, %.1f dB" % Sounds._music.volume_db)
+	Sounds.music(self, "")
+	for t in 120:
+		await process_frame
+	_check(not Sounds._music.playing, "and stops")

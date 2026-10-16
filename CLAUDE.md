@@ -91,10 +91,13 @@ Godot must be 4.7.2. Two environments:
   change check a screenshot on the owner's PC.
 - `Graphics.quality` (LOW / MEDIUM / HIGH) decides how much detail to spend. Headless
   runs are LOW (no grass), the Compatibility renderer is LOW, desktop HIGH (MEDIUM is a setting).
-- Sounds come from `tools/audio/make_sounds.py` (numpy only): synthesized, committed as
-  `assets/sounds/*.wav`. Loops (`*_loop`) need `edit/loop_mode=2` in their `.import`.
-  Play them through `Sounds` (`scripts/sounds.gd`). Nobody can listen in the cloud:
-  ask the owner how new sounds feel and tune the generator.
+- Sounds: recorded library sounds (owner's decision 2026-10-17: synthesis sounded cheap)
+  cut by `tools/audio/import_sounds.py` from `tools/audio/recipes.json`, with the
+  library folder in `CHOPPA_SFX`; `audition.py` renders candidates for the owner to
+  pick. Sounds without a recipe keep their synthesized stand-in from `make_sounds.py`.
+  Several takes are `name_1.wav ..`; `*_loop` sounds loop in code. Play everything
+  through `Sounds` (`scripts/sounds.gd`). Nobody can listen but the owner: they pick.
+  Library licences (Sonniss) forbid redistributing the raw files.
 - Procedural textures drawn in GDScript (dial, canopy cracks, muzzle star, scorch, puff)
   go through `Baked.texture(name)`: the generator stays next to its user and is listed
   in `Baked.generators()`; `tools/bake.ps1` draws them into `assets/textures/baked/`

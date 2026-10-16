@@ -1,10 +1,21 @@
 class_name Sounds
 extends RefCounted
-## Sound effects (assets/sounds, synthesized by tools/audio/make_sounds.py) and helpers
-## to play them. One-shots free themselves when done; loops are owned by the caller.
+## Sound effects (assets/sounds) and helpers to play them. A sound may come in takes,
+## `name_1.wav` .. `name_N.wav`, and every play picks one, so a burst of fire or a row
+## of impacts does not sound copied. The files are cut from recorded libraries by
+## tools/audio/import_sounds.py, or are the synthesized stand-ins of make_sounds.py.
+## One-shots free themselves when done; loops are owned by the caller.
 
 const BUS := "Effects"  ## Every effect plays through this bus (Settings makes it).
 const MUSIC_BUS := "Music"
+const MUSIC_DB := -6.0
+const MUSIC_FADE := 1.2  ## Seconds to fade one track out and the next in.
+
+## Sound name -> how many numbered takes it has (0: a single name.wav). Only numbers,
+## so nothing here keeps a stream alive past exit.
+static var _takes := {}
+static var _music: AudioStreamPlayer
+static var _music_track := ""
 
 
 ## The bus for effects, or Master until the settings have created it (tests).
@@ -12,10 +23,34 @@ static func bus() -> String:
 	return BUS if AudioServer.get_bus_index(BUS) >= 0 else "Master"
 
 
-## The ResourceLoader caches it, so no cache of our own (a static one would keep the
-## streams alive past exit).
+## A stream for `sound_name`: one of its takes at random. `*_loop` sounds always loop,
+## whatever their import settings say. The ResourceLoader caches the files.
 static func stream(sound_name: String) -> AudioStream:
-	return load("res://assets/sounds/%s.wav" % sound_name)
+	var takes := _take_count(sound_name)
+	var path := "res://assets/sounds/%s.wav" % sound_name
+	if takes > 0:
+		path = "res://assets/sounds/%s_%d.wav" % [sound_name, randi_range(1, takes)]
+	var s: AudioStream = load(path)
+	if sound_name.ends_with("_loop") and s is AudioStreamWAV:
+		_make_loop(s as AudioStreamWAV)
+	return s
+
+
+static func _take_count(sound_name: String) -> int:
+	if not _takes.has(sound_name):
+		var count := 0
+		while ResourceLoader.exists("res://assets/sounds/%s_%d.wav" % [sound_name, count + 1]):
+			count += 1
+		_takes[sound_name] = count
+	return _takes[sound_name]
+
+
+static func _make_loop(s: AudioStreamWAV) -> void:
+	if s.loop_mode != AudioStreamWAV.LOOP_DISABLED:
+		return
+	s.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	s.loop_begin = 0
+	s.loop_end = roundi(s.get_length() * s.mix_rate)
 
 
 ## A one-shot at a point in the world. `parent` should be a long-lived node (the map or
@@ -68,35 +103,43 @@ static func play_ui(parent: Node, sound_name: String, volume_db := 0.0) -> void:
 static func loop_on(parent: Node3D, sound_name: String, volume_db := 0.0, reach := 1.0) -> AudioStreamPlayer3D:
 	var player := AudioStreamPlayer3D.new()
 	player.bus = bus()
-	player.stream = stream(sound_name)
+	var s := stream(sound_name)
+	player.stream = s
 	player.volume_db = volume_db
 	player.unit_size = 12.0 * reach
 	player.max_distance = 450.0 * reach
 	player.attenuation_filter_cutoff_hz = 9000.0
 	parent.add_child(player)
-	player.play(randf() * (stream(sound_name) as AudioStreamWAV).get_length())
+	player.play(randf() * s.get_length())
 	return player
 
 
-static var _music: AudioStreamPlayer
-
-
-## Plays a music loop (assets/sounds/music_<name>_loop.wav) on the Music bus, or stops
-## the music with "". Keeps playing across scene reloads; the same track is not restarted.
+## Plays a music loop (assets/sounds/music_<name>_loop.wav) on the Music bus, or fades
+## the music out with "". A new track fades in after the old one fades out. Keeps
+## playing across scene reloads; the same track is not restarted.
 static func music(tree: SceneTree, track: String) -> void:
 	if _music == null or not is_instance_valid(_music):
 		_music = AudioStreamPlayer.new()
 		_music.bus = MUSIC_BUS if AudioServer.get_bus_index(MUSIC_BUS) >= 0 else "Master"
-		_music.volume_db = -6.0
+		_music.volume_db = MUSIC_DB
 		tree.root.add_child.call_deferred(_music)
-	var path := "music_%s_loop" % track
+		_music_track = ""
+	if track == _music_track:
+		return
+	_music_track = track
+	var player := _music
+	var fade := tree.create_tween().bind_node(tree.root)
+	if player.playing:
+		fade.tween_property(player, "volume_db", -40.0, MUSIC_FADE * 0.5)
 	if track == "":
-		_music.stop()
+		fade.tween_callback(player.stop)
 		return
-	if _music.stream and _music.stream.resource_path.ends_with(path + ".wav") and _music.playing:
-		return
-	_music.stream = stream(path)
-	_music.play.call_deferred()
+	var next := stream("music_%s_loop" % track)
+	fade.tween_callback(func() -> void:
+		player.stream = next
+		player.volume_db = -40.0
+		player.play())
+	fade.tween_property(player, "volume_db", MUSIC_DB, MUSIC_FADE)
 
 
 ## Like play_on, but returns the player so the caller can stop it early.

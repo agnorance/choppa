@@ -1,12 +1,30 @@
 ---
 name: sound
-description: Add, change or tune choppa's synthesized sound effects (tools/audio/make_sounds.py) and hook them into the game with the Sounds helper. Use for anything audio - new effects, mix levels, pitch behaviour, loops.
+description: Add, change or tune choppa's sound effects and music - recorded library sounds via tools/audio/import_sounds.py and recipes.json, synthesized stand-ins via make_sounds.py - and hook them into the game with the Sounds helper. Use for anything audio - new effects, mix levels, pitch behaviour, loops, music.
 ---
 
 # Sound effects
 
-All sounds are synthesized by `tools/audio/make_sounds.py` (Python + numpy, no samples)
-and committed as `assets/sounds/<name>.wav` (mono, 16-bit, 22050 Hz).
+The game uses recorded library sounds (owner's decision: synthesis sounded cheap).
+
+## From a library (the normal way)
+
+1. The library (e.g. the Sonniss GDC bundles) lives outside the repo; `CHOPPA_SFX`
+   points at it.
+2. Find candidates: `python tools/audio/audition.py gun machine gun --exclude silenced
+   --length 0.4` writes `build/audition/gun/a.wav ..` and `list.txt`. Pick several per
+   sound with different words. The owner listens and picks letters.
+3. Put the picks into `tools/audio/recipes.json` (takes, start or "auto", length,
+   pitch, loudness, filters, loop + crossfade, channels 2 for music) and run
+   `python tools/audio/import_sounds.py gun`. Several takes become `gun_1.wav ..`;
+   `Sounds.stream` picks one per play.
+4. Re-import, run the tests, ask the owner to judge it in the game.
+5. Python runs without `-I` here: numpy is in the user site-packages.
+
+## Synthesized stand-ins
+
+Sounds without a recipe are synthesized by `tools/audio/make_sounds.py` (numpy, no
+samples) as `assets/sounds/<name>.wav` (mono, 16-bit, 22050 Hz).
 
 ## Making or changing a sound
 

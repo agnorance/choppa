@@ -15,6 +15,7 @@ extends Node
 ##   --shot=<file.png>        save a screenshot after --frames physics ticks and quit
 ##   --frames=<n>             ticks before the screenshot (default 90)
 ##   --dummies=<n>            training targets in free flight (default 3)
+##   --health=<n>             start with this much health (to see damage effects)
 
 const RIVALS := [
 	["Hawk", Color(0.2, 0.6, 0.95), 1.0],
@@ -78,6 +79,8 @@ func _start() -> void:
 	choppa = _new_choppa("You", Color(0.95, 0.5, 0.1), map.spawn_points[slot], true)
 	if mode == "free" and _args.has("spawn"):
 		choppa.respawn(_spawn_arg())
+	if _args.has("health"):
+		choppa.health = float(_args.health)
 
 	var chase := ChaseCamera.new()
 	chase.target = choppa

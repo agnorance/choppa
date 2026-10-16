@@ -85,6 +85,8 @@ var rampage := 0.0  ## Seconds left of GET TO THE CHOPPA.
 var invulnerable := 0.0
 var clock := 0.0  ## Simulation seconds this choppa has existed.
 var last_shot_time := -10.0  ## `clock` at the last shot, for the muzzle flash.
+var last_shot_side := 1.0  ## Which gun fired it: -1 left, 1 right.
+var over_water := false  ## The ground below is water (for spray instead of dust).
 
 var trick := ""  ## Name of the trick in progress, "" when none.
 var trick_time := 0.0
@@ -430,6 +432,7 @@ func _update_gun(i: PilotInput, delta: float) -> void:
 
 func _shoot() -> void:
 	var muzzle := global_position + facing() * Vector3(1.12 * _gun_side, -0.8, -2.35)
+	last_shot_side = _gun_side
 	_gun_side = -_gun_side
 	var target := aim_target()
 	var direction := facing() * Vector3.FORWARD
@@ -526,5 +529,7 @@ func _update_altitude() -> void:
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if hit:
 		altitude = global_position.y - hit.position.y - GROUND_CLEARANCE
+		over_water = (hit.collider as Node).is_in_group("water")
 	else:
 		altitude = 500.0
+		over_water = false

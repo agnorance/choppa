@@ -853,6 +853,11 @@ def markings():
     return parts
 
 
+# Crack spots on the glass (azimuth in degrees, height from sill to top), in the order
+# they appear as the hull takes damage: sides first, then into the pilot's view.
+CRACKS = [(70, 0.35), (-60, 0.5), (25, 0.55), (-20, 0.3), (95, 0.6), (-100, 0.25), (5, 0.75), (-35, 0.8)]
+
+
 # --- assembly ----------------------------------------------------------------------
 
 def build():
@@ -878,6 +883,12 @@ def build():
     empty("eye", shared.EYE)
     empty("muzzle_l", (-GUN_X, MUZZLE_Y, GUN_Z))
     empty("muzzle_r", (GUN_X, MUZZLE_Y, GUN_Z))
+    # Where bullet hits crack the glass: on the canopy, local +Z along the surface normal.
+    for k, (az, height) in enumerate(CRACKS):
+        e = empty("crack_%d" % k, shared.canopy_point(math.radians(az), height, 0.004))
+        n = shared.egg_normal(e.location)
+        e.rotation_mode = "QUATERNION"
+        e.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(n)
     for side, name in ((-1, "exhaust_l"), (1, "exhaust_r")):
         empty(name, on_hull(side, -1.6, 0.72, 0.07) + Vector((side * 0.06, -0.3, -0.05)))
 

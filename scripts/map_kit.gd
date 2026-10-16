@@ -607,7 +607,7 @@ void fragment() {
 	mesh.position = center
 	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mesh)
-	block(parent, center + Vector3.DOWN * 1.0, Vector3(size, 2.0, size), Color.WHITE, 0.0, false)
+	block(parent, center + Vector3.DOWN * 1.0, Vector3(size, 2.0, size), Color.WHITE, 0.0, false).add_to_group("water")
 
 
 static func _mesh_child(parent: Node3D, mesh: Mesh, mat: Material, pos: Vector3) -> MeshInstance3D:

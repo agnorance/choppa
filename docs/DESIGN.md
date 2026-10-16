@@ -29,11 +29,14 @@ twist, heavy atmosphere, strong lighting and post-processing.
   bench (two machine guns, two rocket pods), riveted access panels and stencils. The
   canopy frame comes from `choppa_shared.py`, which the cockpit uses too, so the view
   from inside matches the outside. Other players see the cockpit through the glass.
-- Cockpit view (first draft, `make_cockpit.py` + `scripts/cockpit.gd`): mostly window,
-  a compact panel with live needle gauges, amber radar, nixie kill counter, hull lamp
-  bar, ordnance plate, warning lamps, missile beacon, and a reflector gunsight with a
-  green reticle. The 2D HUD steps back in this view. To refine: instrument faces,
-  panel placement, radar not hidden by the sight post.
+- Cockpit view (`make_cockpit.py` + `scripts/cockpit.gd`): mostly window, a compact
+  panel on a pedestal in the chin glass (all of it on screen at the default FOV):
+  gauges with aged faces, red zones, tapered needles and glass glints in brass bezels,
+  amber radar, nixie kill counter, hull lamp bar, ordnance plate, warning lamps,
+  missile beacon, and a reflector gunsight above the radar. The 2D HUD steps back.
+- Choppa effects: star muzzle flashes with light from the gun that fired, brass casings,
+  heat shimmer behind the exhausts, a downwash ring on the ground (spray over water),
+  and canopy cracks that spread as the hull takes damage (seen from inside too).
 - Next: proper trees, dense grass, water, effects polish.
 
 ## Game feel (decided)

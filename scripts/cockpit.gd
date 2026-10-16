@@ -164,6 +164,7 @@ func _build_radar(mount: Node3D) -> void:
 	tube.material_override = screen
 	tube.position.z = 0.001
 	mount.add_child(tube)
+	mount.add_child(glass_cover(0.084, 0.01))
 
 
 func _build_nixies(mount: Node3D) -> void:
@@ -306,24 +307,87 @@ func _build_beacon(mount: Node3D) -> void:
 	_beacon.add_child(_beacon_light)
 
 
-func _glass_disc(radius: float, offset: float) -> MeshInstance3D:
+## Convex-looking cover glass: faint tint plus a soft crescent glint.
+static func glass_cover(radius: float, offset: float) -> Node3D:
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE * radius * 2.0
 	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.7, 0.8, 0.8, 0.08)
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.albedo_texture = _glint_texture()
+	m.albedo_color = Color(0.55, 0.55, 0.5)
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.roughness = 0.02
-	m.metallic = 0.5
-	var disc := CylinderMesh.new()
-	disc.top_radius = radius
-	disc.bottom_radius = radius
-	disc.height = 0.001
-	disc.radial_segments = 40
 	var glass := MeshInstance3D.new()
-	glass.mesh = disc
+	glass.mesh = quad
 	glass.material_override = m
-	glass.rotation_degrees.x = 90.0
 	glass.position.z = offset
 	glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return glass
+
+
+static var _dial: Texture2D
+static var _glint: Texture2D
+
+
+## An old instrument face: near-black enamel, a faded track, grime toward the rim, and
+## a few stains and scratches. Made once, shared by every gauge.
+static func dial_texture() -> Texture2D:
+	if _dial:
+		return _dial
+	var size := 256
+	var noise := FastNoiseLite.new()
+	noise.seed = 7
+	noise.frequency = 0.03
+	noise.fractal_octaves = 5
+	var image := Image.create(size, size, true, Image.FORMAT_RGBA8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	var c := Vector2.ONE * size * 0.5
+	for y in size:
+		for x in size:
+			var d := (Vector2(x, y) - c).length() / (size * 0.5)
+			if d > 1.0:
+				image.set_pixel(x, y, Color(0, 0, 0, 0))
+				continue
+			var grime := noise.get_noise_2d(x, y) * 0.5 + 0.5
+			var col := Color(0.075, 0.07, 0.06).lerp(Color(0.17, 0.13, 0.08), smoothstep(0.55, 1.0, d) * grime)
+			col = col.lerp(Color(0.2, 0.17, 0.11), maxf(0.0, grime - 0.72) * 1.4)
+			# Faded cream track rings.
+			for r in [0.78, 0.97]:
+				col = col.lerp(Color(0.6, 0.55, 0.42), (1.0 - smoothstep(0.0, 0.012, absf(d - r))) * 0.5)
+			image.set_pixel(x, y, col)
+	for k in 5:  # Hairline scratches.
+		var from := c + Vector2(rng.randf_range(-90, 90), rng.randf_range(-90, 90))
+		var dir := Vector2.from_angle(rng.randf() * TAU)
+		for t in rng.randi_range(15, 50):
+			var p := from + dir * t
+			if (p - c).length() < size * 0.48:
+				image.set_pixelv(Vector2i(p), image.get_pixelv(Vector2i(p)).lightened(0.12))
+	image.generate_mipmaps()
+	_dial = ImageTexture.create_from_image(image)
+	return _dial
+
+
+static func _glint_texture() -> Texture2D:
+	if _glint:
+		return _glint
+	var size := 128
+	var image := Image.create(size, size, true, Image.FORMAT_RGBA8)
+	var c := Vector2.ONE * size * 0.5
+	for y in size:
+		for x in size:
+			var p := (Vector2(x, y) - c) / (size * 0.5)
+			if p.length() > 1.0:
+				image.set_pixel(x, y, Color(0, 0, 0, 0))
+				continue
+			# A crescent near the upper left rim, and a faint overall sheen.
+			var crescent := smoothstep(0.62, 0.86, p.length()) * (1.0 - smoothstep(0.88, 1.0, p.length()))
+			crescent *= clampf(-(p.x + p.y) * 0.9, 0.0, 1.0)
+			var a := crescent * 0.55 + 0.04
+			image.set_pixel(x, y, Color(1, 1, 1, a))
+	image.generate_mipmaps()
+	_glint = ImageTexture.create_from_image(image)
+	return _glint
 
 
 static func _label(parent: Node3D, text: String, font_size: int, color: Color, pos: Vector3) -> Label3D:
@@ -372,16 +436,31 @@ class Gauge extends Node3D:
 	var _needle: Node3D
 
 	func _ready() -> void:
-		var face := CylinderMesh.new()
-		face.top_radius = RADIUS
-		face.bottom_radius = RADIUS
-		face.height = 0.004
-		face.radial_segments = 40
+		var face := QuadMesh.new()
+		face.size = Vector2.ONE * RADIUS * 2.0
+		var face_material := StandardMaterial3D.new()
+		face_material.albedo_texture = Cockpit.dial_texture()
+		face_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		face_material.roughness = 0.8
 		var face_mesh := MeshInstance3D.new()
 		face_mesh.mesh = face
-		face_mesh.material_override = ChoppaModel._material(Color(0.05, 0.05, 0.045), 0.0, 0.85)
-		face_mesh.rotation_degrees.x = 90.0
+		face_mesh.material_override = face_material
+		face_mesh.position.z = 0.001
 		add_child(face_mesh)
+		# Red zone: a painted arc just inside the ticks.
+		if red_from <= 1.0:
+			var steps := ceili((1.0 - red_from) * 40.0)
+			for k in steps:
+				var t := lerpf(red_from, 1.0, (k + 0.5) / steps)
+				var arc := MeshInstance3D.new()
+				var bit := BoxMesh.new()
+				bit.size = Vector3(RADIUS * SWEEP * (1.0 - red_from) / steps * 1.05, 0.004, 0.0008)
+				arc.mesh = bit
+				arc.material_override = Cockpit._cell_material(Color(0.55, 0.06, 0.04))
+				var a := _angle(t)
+				arc.position = Vector3(-sin(a), cos(a), 0.0) * RADIUS * 0.94 + Vector3(0, 0, 0.0025)
+				arc.rotation.z = a
+				add_child(arc)
 		var ticks := majors * 5
 		for k in ticks + 1:
 			var t := float(k) / ticks
@@ -406,13 +485,28 @@ class Gauge extends Node3D:
 		_needle = Node3D.new()
 		_needle.position.z = 0.005
 		add_child(_needle)
+		# Tapered pointer with a luminous tip and a counterweight tail.
+		var pointer := PrismMesh.new()
+		pointer.size = Vector3(0.005, RADIUS * 0.78, 0.0012)
 		var needle := MeshInstance3D.new()
-		var stick := BoxMesh.new()
-		stick.size = Vector3(0.0028, RADIUS * 0.85, 0.0012)
-		needle.mesh = stick
-		needle.position.y = RADIUS * 0.33
-		needle.material_override = Cockpit._cell_material(Color(1.0, 0.45, 0.1))
+		needle.mesh = pointer
+		needle.position.y = RADIUS * 0.39
+		needle.material_override = ChoppaModel._material(Color(0.92, 0.88, 0.78), 0.0, 0.5)
 		_needle.add_child(needle)
+		var tip := MeshInstance3D.new()
+		var tip_box := BoxMesh.new()
+		tip_box.size = Vector3(0.0022, RADIUS * 0.22, 0.0014)
+		tip.mesh = tip_box
+		tip.position.y = RADIUS * 0.66
+		tip.material_override = Cockpit._cell_material(Color(1.0, 0.45, 0.1))
+		_needle.add_child(tip)
+		var tail := MeshInstance3D.new()
+		var tail_box := BoxMesh.new()
+		tail_box.size = Vector3(0.006, RADIUS * 0.25, 0.0012)
+		tail.mesh = tail_box
+		tail.position.y = -RADIUS * 0.12
+		tail.material_override = ChoppaModel._material(Color(0.08, 0.08, 0.08), 0.5, 0.4)
+		_needle.add_child(tail)
 		var cap := MeshInstance3D.new()
 		var hub := CylinderMesh.new()
 		hub.top_radius = 0.007
@@ -422,18 +516,7 @@ class Gauge extends Node3D:
 		cap.rotation_degrees.x = 90.0
 		cap.material_override = ChoppaModel._material(Color(0.78, 0.6, 0.3), 0.9, 0.3)
 		_needle.add_child(cap)
-		var glass := StandardMaterial3D.new()
-		glass.albedo_color = Color(0.7, 0.8, 0.8, 0.07)
-		glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		glass.roughness = 0.02
-		glass.metallic = 0.5
-		var glass_mesh := MeshInstance3D.new()
-		glass_mesh.mesh = face.duplicate()
-		(glass_mesh.mesh as CylinderMesh).height = 0.001
-		glass_mesh.material_override = glass
-		glass_mesh.rotation_degrees.x = 90.0
-		glass_mesh.position.z = 0.009
-		add_child(glass_mesh)
+		add_child(Cockpit.glass_cover(RADIUS, 0.009))
 
 	func _process(delta: float) -> void:
 		# Needles have a little inertia, like the real thing.

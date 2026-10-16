@@ -23,9 +23,11 @@ import choppa_shared as shared  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "models", "choppa", "cockpit.glb")
 MATS = {}
-PANEL_TILT = math.radians(-38.0)  # Lean the panel back so it faces the eye.
-# Low and compact: the panel only fills the bottom of the view, the rest is window.
-PANEL_CENTER = Vector((0.0, 0.66, -0.44))
+PANEL_TILT = math.radians(-30.0)  # Lean the panel back so it faces the eye.
+# Low and compact: the panel fills 13-32 degrees below the horizon (all of it on screen
+# at the 70 degree FOV), the rest is window. It stands on a pedestal in the chin glass.
+PANEL_CENTER = Vector((0.0, 0.64, -0.26))
+PANEL_HALF = (0.44, 0.12)
 
 
 def mat(name):
@@ -98,10 +100,28 @@ def cylinder_between(a, b, radius, material, verts=10):
     return o
 
 
-def strut(points, radius=0.022, material="paint"):
-    """A bent canopy frame member through model-space points, moved into eye space."""
+def strut(points, radius=0.022, material="paint", sides=12):
+    """A bent canopy frame member (a swept tube) through model-space points, in eye space."""
     points = [p - shared.EYE for p in points]
-    return [cylinder_between(a, b, radius, material, 10) for a, b in zip(points, points[1:])]
+    bm = bmesh.new()
+    rings = []
+    normal = None
+    for k, p in enumerate(points):
+        t = (points[min(k + 1, len(points) - 1)] - points[max(k - 1, 0)]).normalized()
+        normal = t.orthogonal().normalized() if normal is None else (normal - t * normal.dot(t)).normalized()
+        binormal = t.cross(normal)
+        rings.append([bm.verts.new(p + (normal * math.cos(a) + binormal * math.sin(a)) * radius)
+                      for a in (2 * math.pi * i / sides for i in range(sides))])
+    for r0, r1 in zip(rings, rings[1:]):
+        for i in range(sides):
+            j = (i + 1) % sides
+            bm.faces.new((r0[i], r0[j], r1[j], r1[i]))
+    bm.faces.new(list(reversed(rings[0])))
+    bm.faces.new(rings[-1])
+    o = _mesh_object(bm, "strut")
+    o.data.materials.clear()
+    o.data.materials.append(mat(material))
+    return [o]
 
 
 FLOOR_Z = shared.EYE.z - 1.0  # Model space.
@@ -157,77 +177,92 @@ def build():
     shell = []
 
     # Compact instrument panel: board, raised rim, rivets.
-    shell.append(panel_prim("cube", "paint", 0, 0, 0.0, (0.44, 0.025, 0.16), bevel_width=0.01))
-    for yu in (0.16, -0.16):
-        shell.append(panel_prim("cube", "dark", 0, yu, 0.02, (0.45, 0.03, 0.012), bevel_width=0.006))
-    for k in range(13):
-        x = -0.39 + k * 0.065
-        for yu in (0.14, -0.14):
-            shell.append(panel_prim("uv_sphere", "metal", x, yu, 0.027, (0.006, 0.006, 0.006), segments=8, ring_count=4))
+    hw, hh = PANEL_HALF
+    shell.append(panel_prim("cube", "paint", 0, 0, 0.0, (hw, 0.025, hh), bevel_width=0.01))
+    for yu in (hh, -hh):
+        shell.append(panel_prim("cube", "dark", 0, yu, 0.02, (hw + 0.01, 0.03, 0.012), bevel_width=0.006))
+    for k in range(5):
+        for x in (-hw + 0.02, hw - 0.02):
+            shell.append(panel_prim("uv_sphere", "metal", x, -0.08 + k * 0.04, 0.027, (0.006, 0.006, 0.006),
+                                    segments=8, ring_count=4))
     # Thin coaming rail along the top edge (no tall glare shield: keep the view open).
-    shell.append(prim("cube", "dark", location=on_panel(0, 0.17, 0.05) + Vector((0, 0, 0.015)),
-                      rotation=(math.radians(10), 0, 0), scale=(0.44, 0.05, 0.012), bevel_width=0.008))
+    shell.append(prim("cube", "dark", location=on_panel(0, hh + 0.01, 0.05) + Vector((0, 0, 0.015)),
+                      rotation=(math.radians(10), 0, 0), scale=(hw, 0.05, 0.012), bevel_width=0.008))
 
-    # Four small gauges in a 2x2 block on the left.
-    for (x, yu), name in zip([(-0.33, 0.06), (-0.2, 0.06), (-0.33, -0.07), (-0.2, -0.07)],
+    def bezel(x, yu, radius, material="brass", screws=4):
+        """Instrument bezel ring with screw heads."""
+        out = [panel_prim("torus", material, x, yu, 0.028, (1, 1, 1), rotation=(math.pi / 2, 0, 0),
+                          major_radius=radius, minor_radius=0.008, major_segments=40, minor_segments=8),
+               panel_prim("cylinder", "dark", x, yu, 0.024, (1, 1, 1), rotation=(math.pi / 2, 0, 0),
+                          vertices=40, radius=radius + 0.004, depth=0.008)]
+        for k in range(screws):
+            a = math.pi / 4 + k * 2 * math.pi / screws
+            out.append(panel_prim("cylinder", "metal", x + math.cos(a) * (radius + 0.016),
+                                  yu + math.sin(a) * (radius + 0.016), 0.03, (1, 1, 1),
+                                  rotation=(math.pi / 2, 0, 0), vertices=10, radius=0.006, depth=0.006))
+        return out
+
+    # Left: four gauges in a 2x2 block.
+    for (x, yu), name in zip([(-0.33, 0.054), (-0.2, 0.054), (-0.33, -0.058), (-0.2, -0.058)],
                              ["speed", "altitude", "boost", "heat"]):
-        shell.append(panel_prim("torus", "brass", x, yu, 0.028, (1, 1, 1), rotation=(math.pi / 2, 0, 0),
-                                major_radius=0.056, minor_radius=0.008, major_segments=36, minor_segments=8))
-        mount(name, x, yu, 0.025)
-    # Radar in the middle, in its own housing.
-    shell.append(panel_prim("cube", "dark", 0.1, 0.0, 0.04, (0.11, 0.05, 0.11), bevel_width=0.02))
-    shell.append(panel_prim("torus", "metal", 0.1, 0.0, 0.09, (1, 1, 1), rotation=(math.pi / 2, 0, 0),
+        shell += bezel(x, yu, 0.054)
+        mount(name, x, yu, 0.026)
+    # Centre: the radar in its own hooded housing, below the gunsight.
+    shell.append(panel_prim("cube", "dark", 0.0, -0.012, 0.04, (0.11, 0.05, 0.11), bevel_width=0.02))
+    shell.append(panel_prim("torus", "metal", 0.0, -0.012, 0.09, (1, 1, 1), rotation=(math.pi / 2, 0, 0),
                             major_radius=0.092, minor_radius=0.01, major_segments=44, minor_segments=8))
-    mount("radar", 0.1, 0.0, 0.088)
-    # Right block: nixie kill counter, hull lamp bar, item plate, warning lamp column.
-    shell.append(panel_prim("cube", "dark", 0.28, 0.075, 0.025, (0.055, 0.025, 0.04), bevel_width=0.006))
-    mount("kills", 0.28, 0.075, 0.05)
-    shell.append(panel_prim("cube", "dark", 0.27, -0.015, 0.02, (0.085, 0.015, 0.025), bevel_width=0.005))
-    mount("health", 0.27, -0.015, 0.036)
-    shell.append(panel_prim("cube", "dark", 0.27, -0.09, 0.02, (0.085, 0.015, 0.03), bevel_width=0.005))
-    mount("item", 0.27, -0.09, 0.036)
+    for k in range(6):
+        a = k * math.pi / 3
+        shell.append(panel_prim("uv_sphere", "brass", math.cos(a) * 0.104, -0.012 + math.sin(a) * 0.104, 0.092,
+                                (0.007, 0.007, 0.007), segments=8, ring_count=4))
+    mount("radar", 0.0, -0.012, 0.097)
+    # Right: nixie kill counter, hull lamp bar, ordnance plate, warning lamp column.
+    shell.append(panel_prim("cube", "dark", 0.21, 0.07, 0.025, (0.055, 0.025, 0.04), bevel_width=0.006))
+    mount("kills", 0.21, 0.07, 0.05)
+    shell.append(panel_prim("cube", "dark", 0.22, -0.015, 0.02, (0.085, 0.015, 0.025), bevel_width=0.005))
+    mount("health", 0.22, -0.015, 0.036)
+    shell.append(panel_prim("cube", "dark", 0.22, -0.08, 0.02, (0.085, 0.015, 0.028), bevel_width=0.005))
+    mount("item", 0.22, -0.08, 0.036)
     for k, name in enumerate(["missile", "overheat", "shield", "scrambled"]):
-        yu = 0.09 - k * 0.055
-        shell.append(panel_prim("cylinder", "metal", 0.39, yu, 0.025, (1, 1, 1), rotation=(math.pi / 2, 0, 0),
-                                vertices=16, radius=0.018, depth=0.016))
-        mount("lamp_" + name, 0.39, yu, 0.035)
-    # Switches along the bottom edge.
-    for k in range(10):
-        x = -0.36 + k * 0.08
-        shell.append(panel_prim("cylinder", "metal", x, -0.125, 0.03, (1, 1, 1), rotation=(math.pi / 2, 0, 0),
-                                vertices=12, radius=0.009, depth=0.012))
-        shell.append(panel_prim("cylinder", "metal", x, -0.11, 0.045, (1, 1, 1), rotation=(math.pi / 2 - 0.5, 0, 0),
-                                vertices=8, radius=0.0035, depth=0.035))
-    mount("beacon", 0.36, 0.17, 0.05)
+        yu = 0.075 - k * 0.05
+        shell.append(panel_prim("cylinder", "brass", 0.37, yu, 0.025, (1, 1, 1), rotation=(math.pi / 2, 0, 0),
+                                vertices=16, radius=0.021, depth=0.016))
+        mount("lamp_" + name, 0.37, yu, 0.035)
+    mount("beacon", 0.36, hh + 0.01, 0.05)
 
-    # Reflector gunsight on a bracket in front of the eye. Its glass plate crosses the
-    # line of sight; the game draws the reticle at "mount_sight" (dead ahead).
-    shell.append(cylinder_between((0, 0.6, -0.3), (0, 0.6, -0.17), 0.016, "metal", 10))
-    shell.append(prim("cylinder", "dark", location=(0, 0.6, -0.13), vertices=24, radius=0.05, depth=0.06,
+    # Reflector gunsight on a short post from the coaming, its glass dead ahead of the eye.
+    # The game draws the reticle at "mount_sight". It stands above the radar, not in front.
+    top = on_panel(0, hh + 0.01, 0.05) + Vector((0, 0, 0.02))
+    shell.append(cylinder_between(top, (0, 0.6, -0.13), 0.014, "metal", 10))
+    shell.append(prim("cylinder", "dark", location=(0, 0.6, -0.11), vertices=24, radius=0.045, depth=0.04,
                       bevel_width=0.008))
-    shell.append(prim("torus", "metal", location=(0, 0.6, -0.1), major_radius=0.05, minor_radius=0.007,
+    shell.append(prim("torus", "brass", location=(0, 0.6, -0.09), major_radius=0.045, minor_radius=0.006,
                       major_segments=28, minor_segments=6))
     for side in (-1, 1):
-        shell.append(cylinder_between((side * 0.045, 0.6, -0.1), (side * 0.045, 0.6, 0.06), 0.005, "metal", 6))
+        shell.append(cylinder_between((side * 0.04, 0.6, -0.09), (side * 0.04, 0.6, 0.06), 0.005, "metal", 6))
     sight = bpy.data.objects.new("mount_sight", None)
     sight.location = (0, 0.6, 0.0)
     bpy.context.collection.objects.link(sight)
 
-    # Centre pedestal and side consoles: low, mostly out of view.
-    shell.append(prim("cube", "paint", location=(0, 0.5, -0.82), rotation=(math.radians(-30), 0, 0),
-                      scale=(0.14, 0.1, 0.2), bevel_width=0.015))
+    # Side consoles with toggle switches and rotary knobs.
     for side in (-1, 1):
-        shell.append(prim("cube", "paint", location=(side * 0.58, 0.1, -0.68), rotation=(0, side * math.radians(12), 0),
-                          scale=(0.12, 0.4, 0.14), bevel_width=0.02))
-        for k in range(5):
-            shell.append(prim("cylinder", "metal", location=(side * 0.55, -0.15 + k * 0.1, -0.53),
-                              vertices=10, radius=0.012, depth=0.02))
+        shell.append(prim("cube", "paint", location=(side * 0.56, 0.1, -0.66), rotation=(0, side * math.radians(12), 0),
+                          scale=(0.11, 0.38, 0.13), bevel_width=0.02))
+        for k in range(6):
+            y = -0.17 + k * 0.08
+            shell.append(prim("cylinder", "metal", location=(side * 0.54, y, -0.525), vertices=12, radius=0.01,
+                              depth=0.012))
+            shell.append(cylinder_between((side * 0.54, y, -0.52), (side * 0.54, y + 0.015, -0.49), 0.0035,
+                                          "metal", 8))
+        for k in range(2):
+            shell.append(prim("cylinder", "dark", location=(side * 0.6, 0.0 + k * 0.2, -0.52), vertices=16,
+                              radius=0.022, depth=0.025, bevel_width=0.005))
 
     # Cockpit tub: floor and walls hanging from the sill.
     shell.append(floor())
     shell.append(tub_wall())
     # Centre pedestal holding up the panel, and the pedals in the chin glass.
-    shell.append(prim("cube", "paint", location=(0, 0.6, -0.8), scale=(0.1, 0.07, 0.21), bevel_width=0.015))
+    shell.append(prim("cube", "paint", location=(0, 0.56, -0.71), scale=(0.1, 0.07, 0.3), bevel_width=0.015))
     for side in (-1, 1):
         shell.append(prim("cube", "dark", location=(side * 0.17, 0.8, -0.93), rotation=(math.radians(-50), 0, 0),
                           scale=(0.05, 0.1, 0.012), bevel_width=0.006))
@@ -238,6 +273,7 @@ def build():
     shell += strut(shared.sill_points(-0.03, 30), 0.03)
     shell += strut(shared.roof_points(-0.025, 24), 0.024)
     shell += strut(shared.rear_hoop_points(-0.03, 16), 0.035)
+    shell += strut(shared.chin_points(-0.025, 12), 0.02)
     for side in (-1, 1):
         shell += strut(shared.pillar_points(side, -0.025, 8), 0.024)
 

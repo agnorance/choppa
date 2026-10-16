@@ -22,7 +22,15 @@ var _rotor_speed := 0.0
 var _dust: CPUParticles3D
 var _trails: Array[CPUParticles3D] = []
 var _smoke: CPUParticles3D
-var _flashes: Array[MeshInstance3D] = []
+var _flashes: Array[Node3D] = []  ## Left, right.
+var _flash_lights: Array[OmniLight3D] = []
+var _casings: Array[CPUParticles3D] = []
+var _haze: Array[CPUParticles3D] = []
+var _downwash: MeshInstance3D
+var _downwash_material: ShaderMaterial
+var _dust_colors: Gradient
+var _spray_colors: Gradient
+var _cracks: Array[MeshInstance3D] = []
 var _bubble: MeshInstance3D
 var _bubble_material: StandardMaterial3D
 var _sparks: CPUParticles3D
@@ -71,24 +79,20 @@ func _ready() -> void:
 		shell.position = eye
 		_parts.add_child(shell)
 
-	var flash_mesh := SphereMesh.new()
-	flash_mesh.radius = 0.35
-	flash_mesh.height = 0.7
-	flash_mesh.radial_segments = 6
-	flash_mesh.rings = 3
-	var flash_material := StandardMaterial3D.new()
-	flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	flash_material.albedo_color = Color(1.0, 0.85, 0.4)
-	for muzzle in ["muzzle_l", "muzzle_r"]:
-		var at := _marker(model, muzzle) + Vector3(0.0, 0.0, -0.25)
-		var flash := _part(flash_mesh, flash_material, at, Vector3.ZERO, Vector3(0.7, 0.7, 1.6))
-		flash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		_flashes.append(flash)
+	_build_guns(model)
+	_build_cracks(model)
+	for exhaust in ["exhaust_l", "exhaust_r"]:
+		_haze.append(_build_haze(_marker(model, exhaust)))
+	_build_downwash()
 
-	# Rotor downwash kicking up dust when flying low.
-	_dust = Effects.puffs(Effects.gradient([
+	# Rotor downwash kicking up dust (or spray over water) when flying low.
+	_dust_colors = Effects.gradient([
 		Color(0.8, 0.77, 0.7, 0.0), Color(0.8, 0.77, 0.7, 0.55), Color(0.78, 0.75, 0.68, 0.0),
-	]), 48, 1.4)
+	])
+	_spray_colors = Effects.gradient([
+		Color(0.9, 0.95, 1.0, 0.0), Color(0.88, 0.94, 1.0, 0.6), Color(0.85, 0.92, 1.0, 0.0),
+	])
+	_dust = Effects.puffs(_dust_colors, 48, 1.4)
 	_dust.top_level = true
 	_dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
 	_dust.emission_ring_axis = Vector3.UP
@@ -205,8 +209,21 @@ func update_pose(c: Choppa, delta: float) -> void:
 	_blur_material.albedo_color.a = clampf((_rotor_speed - 8.0) / 80.0, 0.0, 0.1)
 
 	_parts.visible = c.invulnerable <= 0.0 or fmod(c.invulnerable, 0.2) > 0.08
-	for flash in _flashes:
-		flash.visible = c.clock - c.last_shot_time < 0.05
+	var firing := c.clock - c.last_shot_time < 0.05
+	for k in 2:
+		var on := firing and (k == 1) == (c.last_shot_side > 0.0)
+		if on and not _flashes[k].visible:
+			# A fresh star every shot.
+			_flashes[k].rotation.z = randf() * TAU
+			_flashes[k].scale = Vector3.ONE * randf_range(0.8, 1.25)
+		_flashes[k].visible = on
+		_flash_lights[k].visible = on
+		_casings[k].emitting = c.alive and c.clock - c.last_shot_time < Choppa.GUN_INTERVAL * 1.5
+	for haze in _haze:
+		haze.emitting = c.alive
+	var visible_cracks := clampi(floori((Choppa.MAX_HEALTH - c.health) / 12.0), 0, _cracks.size()) if c.alive else 0
+	for k in _cracks.size():
+		_cracks[k].visible = k < visible_cracks
 	for trail in _trails:
 		trail.emitting = c.is_boosting()
 	_sparks.emitting = c.scrambled > 0.0
@@ -218,8 +235,171 @@ func update_pose(c: Choppa, delta: float) -> void:
 			else Color(0.3, 0.85, 1.0, 0.12 + 0.12 * c.shield / Choppa.SHIELD_HP)
 	_smoke.emitting = c.health < 35.0
 	_dust.emitting = c.altitude < 14.0
+	var ground := c.global_position + Vector3.DOWN * (c.altitude + Choppa.GROUND_CLEARANCE - 0.3)
 	if _dust.emitting:
-		_dust.global_position = c.global_position + Vector3.DOWN * (c.altitude + Choppa.GROUND_CLEARANCE - 0.3)
+		_dust.global_position = ground
+		_dust.color_ramp = _spray_colors if c.over_water else _dust_colors
+	var wash := clampf(1.0 - c.altitude / 16.0, 0.0, 1.0) if c.alive else 0.0
+	_downwash.visible = wash > 0.0
+	if _downwash.visible:
+		_downwash.global_position = ground + Vector3.UP * 0.15
+		_downwash_material.set_shader_parameter("power", wash * 0.7)
+		_downwash_material.set_shader_parameter("tint",
+			Color(0.88, 0.94, 1.0) if c.over_water else Color(0.8, 0.76, 0.66))
+
+
+## Twin machine guns: a star-shaped flash with a light at each muzzle (shown for the gun
+## that just fired), and brass casings spilling out of the receivers.
+func _build_guns(model: Node3D) -> void:
+	var star := StandardMaterial3D.new()
+	star.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	star.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	star.cull_mode = BaseMaterial3D.CULL_DISABLED
+	star.albedo_texture = Effects.star_texture()
+	star.albedo_color = Color(1.0, 0.75, 0.4)
+	star.disable_receive_shadows = true
+	var side_quad := QuadMesh.new()
+	side_quad.size = Vector2(0.55, 1.1)
+	var front_quad := QuadMesh.new()
+	front_quad.size = Vector2(0.75, 0.75)
+	var brass := _material(Color(0.8, 0.6, 0.28), 0.9, 0.3)
+	var casing := CylinderMesh.new()
+	casing.top_radius = 0.009
+	casing.bottom_radius = 0.009
+	casing.height = 0.035
+	casing.radial_segments = 6
+	casing.rings = 1
+	casing.material = brass
+	for muzzle in ["muzzle_l", "muzzle_r"]:
+		var at := _marker(model, muzzle)
+		var flash := Node3D.new()
+		flash.position = at + Vector3(0.0, 0.0, -0.3)
+		flash.visible = false
+		add_child(flash)
+		# Two crossed planes along the barrel and one facing forward.
+		for roll in [0.0, PI * 0.5]:
+			var plane := MeshInstance3D.new()
+			plane.mesh = side_quad
+			plane.material_override = star
+			plane.rotation = Vector3(PI * 0.5, 0.0, roll)
+			plane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			if own:
+				plane.layers = OWN_LAYER
+			flash.add_child(plane)
+		var front := MeshInstance3D.new()
+		front.mesh = front_quad
+		front.material_override = star
+		front.position.z = 0.25
+		front.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if own:
+			front.layers = OWN_LAYER
+		flash.add_child(front)
+		_flashes.append(flash)
+		var light := OmniLight3D.new()
+		light.light_color = Color(1.0, 0.7, 0.35)
+		light.light_energy = 3.0
+		light.omni_range = 7.0
+		light.position = at + Vector3(0.0, 0.3, -0.2)
+		light.visible = false
+		add_child(light)
+		_flash_lights.append(light)
+
+		var shells := CPUParticles3D.new()
+		shells.mesh = casing
+		shells.amount = 16
+		shells.lifetime = 1.2
+		shells.local_coords = false
+		shells.position = at + Vector3(0.12 * signf(at.x), 0.0, 1.75)  # The receiver's ejection port.
+		shells.direction = Vector3(signf(at.x), -0.4, 0.3)
+		shells.spread = 18.0
+		shells.initial_velocity_min = 2.5
+		shells.initial_velocity_max = 4.0
+		shells.gravity = Vector3(0.0, -12.0, 0.0)
+		shells.angular_velocity_min = -720.0
+		shells.angular_velocity_max = 720.0
+		shells.particle_flag_rotate_y = true
+		shells.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		shells.emitting = false
+		add_child(shells)
+		_casings.append(shells)
+
+
+## Cracks in the canopy glass at the "crack_*" markers; more show as the hull takes
+## damage. On the default layer so the pilot sees them from inside too.
+func _build_cracks(model: Node3D) -> void:
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = Effects.crack_texture()
+	m.albedo_color = Color(0.95, 0.97, 1.0)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.roughness = 0.1
+	m.metallic_specular = 1.0
+	m.emission_enabled = true
+	m.emission = Color(0.25, 0.27, 0.3)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var markers := model.find_children("crack_*", "Node3D")
+	markers.sort_custom(func(a: Node, b: Node) -> bool: return a.name.naturalnocasecmp_to(b.name) < 0)
+	for marker: Node3D in markers:
+		var quad := QuadMesh.new()
+		quad.size = Vector2.ONE * rng.randf_range(0.3, 0.45)
+		var crack := MeshInstance3D.new()
+		crack.mesh = quad
+		crack.material_override = m
+		# Blender's marker +Z (the glass normal) arrives as +Y; the quad faces +Z.
+		crack.transform = marker.transform * Transform3D(Basis(Vector3.RIGHT, -PI * 0.5), Vector3.ZERO)
+		crack.rotate_object_local(Vector3.BACK, rng.randf() * TAU)
+		crack.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		crack.visible = false
+		add_child(crack)
+		_cracks.append(crack)
+
+
+
+## Heat shimmer trailing from an exhaust stub.
+func _build_haze(at: Vector3) -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE
+	var haze := ShaderMaterial.new()
+	haze.shader = preload("res://shaders/heat_haze.gdshader")
+	quad.material = haze
+	p.mesh = quad
+	p.amount = 10
+	p.lifetime = 0.7
+	p.local_coords = false
+	p.position = at
+	p.direction = Vector3(0.15 * signf(at.x), 0.35, 1.0)
+	p.spread = 10.0
+	p.initial_velocity_min = 2.0
+	p.initial_velocity_max = 3.0
+	p.gravity = Vector3(0.0, 1.5, 0.0)
+	var grow := Curve.new()
+	grow.add_point(Vector2(0.0, 0.5))
+	grow.add_point(Vector2(1.0, 1.4))
+	p.scale_amount_curve = grow
+	p.scale_amount_min = 0.5
+	p.scale_amount_max = 0.8
+	p.color_initial_ramp = Effects.gradient([Color(0, 0, 1, 1), Color(1, 1, 1, 1)])  # Random phase per puff.
+	p.color_ramp = Effects.gradient([Color(1, 1, 1, 0.0), Color(1, 1, 1, 1.0), Color(1, 1, 1, 0.0)])
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(p)
+	return p
+
+
+## A disc on the ground under the rotor, rings racing outward.
+func _build_downwash() -> void:
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(18.0, 18.0)
+	_downwash_material = ShaderMaterial.new()
+	_downwash_material.shader = preload("res://shaders/downwash.gdshader")
+	_downwash = MeshInstance3D.new()
+	_downwash.mesh = plane
+	_downwash.material_override = _downwash_material
+	_downwash.top_level = true
+	_downwash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_downwash.visible = false
+	add_child(_downwash)
 
 
 static var _cached_scene: PackedScene

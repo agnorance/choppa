@@ -77,6 +77,7 @@ class PowerLine extends Node3D:
 			get_parent().add_child(sparks)
 			sparks.global_position = hit
 			c.bumped.emit(10.0)
+			Sounds.play_at(get_parent(), "cable_strike", hit, 0.0, randf_range(0.9, 1.1), 1.2)
 
 	## The point on a cable the choppa touches, or Vector3.INF. Tests the body and the
 	## rotor disc (a ring of points around the mast).
@@ -174,6 +175,8 @@ class WindZone extends Area3D:
 		_dust.scale_amount_max = 5.0
 		add_child(_dust)
 		_dust.emitting = true
+		var howl := Sounds.loop_on(self, "wind_loop", -6.0, 2.0)
+		howl.max_distance = maxf(size.x, size.z) * 1.5
 
 	## The push on a body at `at` right now: strongest in the middle, gusting.
 	func force_at(at: Vector3) -> Vector3:

@@ -49,7 +49,8 @@ const DEFAULTS := {
 	"deadzone": 0.2,  ## Gamepad sticks, 0.1..0.4.
 	# Audio
 	"volume": 8,  ## Master, 0..10.
-	"effects_volume": 10,  ## Sound effects, 0..10 (everything today; music comes later).
+	"effects_volume": 10,  ## Sound effects, 0..10.
+	"music_volume": 6,  ## Music, 0..10.
 }
 
 const HUD_SCALES := [0.85, 1.0, 1.2]
@@ -242,6 +243,13 @@ static func _apply_audio() -> void:
 		AudioServer.set_bus_name(effects, Sounds.BUS)
 		AudioServer.set_bus_send(effects, "Master")
 	_set_bus_volume(effects, choice("effects_volume"))
+	var music := AudioServer.get_bus_index(Sounds.MUSIC_BUS)
+	if music < 0:
+		music = AudioServer.bus_count
+		AudioServer.add_bus(music)
+		AudioServer.set_bus_name(music, Sounds.MUSIC_BUS)
+		AudioServer.set_bus_send(music, "Master")
+	_set_bus_volume(music, choice("music_volume"))
 
 
 static func _set_bus_volume(bus: int, level: int) -> void:

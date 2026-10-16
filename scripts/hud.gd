@@ -5,6 +5,7 @@ extends CanvasLayer
 ## the cockpit view hides most of it because the instruments show the same.
 
 const CALLOUT_TIME := 1.2
+const PART_NAMES := {Choppa.Part.ROTOR: "ROTOR", Choppa.Part.TAIL: "TAIL ROTOR", Choppa.Part.ENGINE: "ENGINE"}
 
 var choppa: Choppa
 var camera: Camera3D
@@ -166,7 +167,14 @@ func _ready() -> void:
 
 	refresh_settings()
 
-	choppa.scored_hit.connect(func(_target: Choppa) -> void: _hit_flash = 0.12)
+	choppa.scored_hit.connect(func(_target: Choppa) -> void:
+		_hit_flash = 0.12
+		Sounds.play_ui(self, "hit_marker", -10.0))
+	choppa.wrecked_part.connect(func(target: Choppa, part: Choppa.Part) -> void:
+		Sounds.play_ui(self, "part_hit", -4.0)
+		_show_callout("%s  ·  %s" % [PART_NAMES[part], target.pilot_name.to_upper()], UiKit.ACCENT))
+	choppa.part_wrecked.connect(func(part: Choppa.Part, _by: Choppa) -> void:
+		_show_callout("%s DOWN" % PART_NAMES[part], UiKit.DANGER))
 	choppa.damaged.connect(func(amount: float, _attacker: Choppa) -> void:
 		if Settings.flag("damage_flash"):
 			_vignette.modulate.a = minf(1.0, _vignette.modulate.a + amount / 20.0))
@@ -259,6 +267,10 @@ func _draw_crosshair() -> void:
 	var c := camera.unproject_position(ahead)
 	for d: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
 		_crosshair.draw_line(c + d * 5.0, c + d * 13.0, color, 1.5, true)
+	if _hit_flash > 0.0:
+		# Hit marker: four short diagonal ticks around the cross.
+		for d: Vector2 in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
+			_crosshair.draw_line(c + d * 9.0, c + d * 17.0, UiKit.TEXT, 2.0, true)
 
 
 func _show_callout(text: String, color: Color) -> void:

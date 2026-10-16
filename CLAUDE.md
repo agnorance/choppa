@@ -100,6 +100,10 @@ Godot must be 4.7.2. Two environments:
   mipmaps (and `normal_map=1` for normal maps). Details: the `blender-assets` skill.
 - Known harmless noise: the test run ends with "3 resources still in use at exit"
   (an audio playback still registered when the headless run quits).
+- Progression (`scripts/progression.gd`): levels, XP, the camo catalogue and unlock rules,
+  the Profile. Earned camos never become purchasable and Apex is never earnable or
+  buyable (tests guard both). Camos are hull shader patterns (`shaders/hull.gdshader`).
+  Screenshot runs with `--level/--entitle/--camo` never save the profile.
 - 2D UI: every control goes through `UiKit` (theme, colours, fonts, `Bar`, `keycap`,
   `panel`, `button`) so the look stays one thing (DESIGN.md, "UI"). A new player
   setting is a key in `Settings.DEFAULTS`, read with `Settings.flag/choice/number`, and a

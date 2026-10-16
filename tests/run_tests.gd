@@ -70,6 +70,8 @@ func _run() -> void:
 		"test_battle_xp_and_profile",
 		"test_match_stats_count_what_you_did",
 		"test_camo_reaches_the_hull",
+		"test_every_sound_exists_and_loops_loop",
+		"test_wrecking_a_part_tells_the_shooter_and_shows",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -1100,3 +1102,40 @@ func test_camo_reaches_the_hull() -> void:
 	_check(hull.get_shader_parameter("pattern") == Progression.CAMOS.tiger.pattern, "the hull wears the tiger pattern")
 	c.model.set_camo("apex")
 	_check(hull.get_shader_parameter("seam_glow") > 0.0, "apex lights the seams")
+
+
+func test_every_sound_exists_and_loops_loop() -> void:
+	# Every name the game plays, so a typo or a missing file fails here, not in a match.
+	var used := {}
+	var re := RegEx.create_from_string(r'Sounds\.(?:play_at|play_on|play_ui|loop_on|play_on_returning)\([^"]*"([a-z_]+)"')
+	for path in ["res://scripts/"]:
+		for file in DirAccess.get_files_at(path):
+			if not file.ends_with(".gd"):
+				continue
+			var text := FileAccess.get_file_as_string(path + file)
+			for m in re.search_all(text):
+				used[m.get_string(1)] = file
+	_check(used.size() >= 12, "found the sound calls, %d" % used.size())
+	for name: String in used:
+		_check(ResourceLoader.exists("res://assets/sounds/%s.wav" % name), "%s.wav exists (used in %s)" % [name, used[name]])
+	for track in ["menu", "battle"]:
+		var stream := Sounds.stream("music_%s_loop" % track) as AudioStreamWAV
+		_check(stream != null and stream.loop_mode == AudioStreamWAV.LOOP_FORWARD, "music %s loops" % track)
+	for name in ["rotor_loop", "engine_loop", "boost_loop", "missile_loop", "warning_loop", "wind_loop"]:
+		_check((Sounds.stream(name) as AudioStreamWAV).loop_mode == AudioStreamWAV.LOOP_FORWARD, "%s loops" % name)
+
+
+func test_wrecking_a_part_tells_the_shooter_and_shows() -> void:
+	var shooter := _choppa(Vector3(0.0, 30.0, 0.0))
+	var target := _choppa(Vector3(0.0, 30.0, -40.0))
+	var told := []
+	shooter.wrecked_part.connect(func(who: Choppa, part: Choppa.Part) -> void: told.append([who, part]))
+	target.damage_part(Choppa.Part.TAIL, 999.0, shooter)
+	target.damage_part(Choppa.Part.TAIL, 10.0, shooter)  # Already wrecked: no second report.
+	_check(told == [[target, Choppa.Part.TAIL]], "the shooter heard once, got %s" % [told])
+	target.model.update_pose(target, TICK)
+	var tail := target.model.find_child("tail_rotor", true, false) as Node3D
+	_check(tail != null and not tail.visible, "the wrecked tail rotor is gone from the model")
+	target.repair(1.0)
+	target.model.update_pose(target, TICK)
+	_check(tail.visible, "and back after a repair")

@@ -39,7 +39,7 @@ mouse, Q / E or the shoulder buttons.
   damage flash, aim assist, flight assist, controls overlay.
 - **Controls:** mouse steering, mouse controls (pitch & roll / pitch & yaw), sensitivity,
   invert, gamepad deadzone; key bindings beside them.
-- **Audio:** master and effects volume.
+- **Audio:** master, effects and music volume.
 - **Reset to defaults** at the bottom.
 
 ## Controls
@@ -122,7 +122,7 @@ godot --path . -- --mode=free --map=basin --autopilot=hover --cam=showcase --exp
 
 ```powershell
 tools\try.ps1              # lists the scenes
-tools\try.ps1 settings     # straight into a scene: menu, settings, battle, free, easy, race, cockpit,
+tools\try.ps1 settings     # straight into a scene: menu, settings, hangar, hangarmax, battle, free, easy, race, cockpit,
                            # lake, damaged, tailrotor, engine, bots, missile, rockets,
                            # gunship, heavy, canyon, canyonbattle, explode
 tools\check.ps1            # import, all tests, and screenshots of every screen into build\shots\

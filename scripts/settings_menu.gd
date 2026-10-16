@@ -237,6 +237,8 @@ func _build_audio(page: VBoxContainer) -> void:
 	_row(page, "Master volume", levels, Settings.choice("volume"), func(i: int) -> void: Settings.set_value("volume", i))
 	_row(page, "Effects volume", levels, Settings.choice("effects_volume"),
 		func(i: int) -> void: Settings.set_value("effects_volume", i))
+	_row(page, "Music volume", levels, Settings.choice("music_volume"),
+		func(i: int) -> void: Settings.set_value("music_volume", i))
 
 
 ## Small print under a group of rows; wraps instead of widening the panel.

@@ -94,6 +94,7 @@ func _ready() -> void:
 
 
 func _show_menu() -> void:
+	Sounds.music(get_tree(), "menu")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	camera = Camera3D.new()
 	camera.fov = 60.0
@@ -112,6 +113,8 @@ func _show_menu() -> void:
 
 
 func _start() -> void:
+	if mode == "free":
+		Sounds.music(get_tree(), "")  # Free flight: just the helicopter.
 	var slot := RACE_GRID_SLOT if mode == "race" else 0
 	var mine: String = _args.get("airframe", Airframe.ORDER[Settings.choice("airframe")])
 	choppa = _new_choppa("You", Color(0.95, 0.5, 0.1), map.spawn_points[slot], true, mine,
@@ -195,6 +198,7 @@ func _rivals(player_slot: int) -> Array[Choppa]:
 
 
 func _start_race() -> void:
+	Sounds.music(get_tree(), "battle")
 	var field: Array[Choppa] = [choppa]
 	field.append_array(_rivals(RACE_GRID_SLOT))
 	race = Race.new()
@@ -214,6 +218,7 @@ func _start_race() -> void:
 
 
 func _start_battle() -> void:
+	Sounds.music(get_tree(), "battle")
 	var field: Array[Choppa] = [choppa]
 	# Spread out: rivals take every other spawn point around the arena.
 	var spawns := map.spawn_points

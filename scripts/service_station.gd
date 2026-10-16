@@ -17,6 +17,7 @@ const DOWN_COLOR := Color(1.0, 0.15, 0.1)
 
 var occupant: Choppa  ## Who is being serviced, or null.
 var cooldown := 0.0
+var _work_sound: AudioStreamPlayer3D
 var _progress := 0.0
 var _lamp: StandardMaterial3D
 var _light: OmniLight3D
@@ -57,10 +58,13 @@ func tick(delta: float) -> void:
 	if occupant and not _is_landed(occupant):
 		occupant = null
 		_progress = 0.0
+		if is_instance_valid(_work_sound):
+			_work_sound.stop()
 	if occupant == null:
 		for node in get_tree().get_nodes_in_group("choppas"):
 			if _is_landed(node as Choppa):
 				occupant = node as Choppa
+				_work_sound = Sounds.play_on_returning(self, "station_service", -4.0)
 				break
 	if occupant == null:
 		_show(READY_COLOR)
@@ -71,6 +75,7 @@ func tick(delta: float) -> void:
 	if _progress >= SERVICE_TIME:
 		occupant.restock()
 		served.emit(occupant)
+		Sounds.play_at(get_parent(), "station_done", global_position + Vector3.UP * 2.0, -2.0)
 		occupant = null
 		_progress = 0.0
 		cooldown = COOLDOWN

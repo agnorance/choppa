@@ -34,5 +34,9 @@ and committed as `assets/sounds/<name>.wav` (mono, 16-bit, 22050 Hz).
   `pitch_scale` / `stream_paused` every frame (see `ChoppaModel.update_pose`).
 
 Where sounds are wired today: rotor, engine, boost and gun in `ChoppaModel`;
-explosions and impacts in `Effects`; missile launch and motor in `Weapons.Missile`;
-missile lock warning in `Cockpit`. Sounds are visuals: keep them out of `Choppa.step`.
+explosions and impacts in `Effects`; missile launch and motor, rocket launch and flares
+in `Weapons`; station work and done in `ServiceStation`; cable strikes and wind in
+`Hazards`; hit marker and part hits in `Hud`; missile lock warning in `Cockpit`.
+Music: `Sounds.music(tree, "menu" | "battle" | "")` plays `music_<name>_loop.wav` on
+the Music bus (`make_sounds.py` composes it from `_song`). A test checks that every
+name passed to `Sounds.*` has a file and that loops loop. Sounds are visuals: keep them out of `Choppa.step`.

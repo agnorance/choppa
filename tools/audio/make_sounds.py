@@ -109,7 +109,7 @@ def rotor_loop():
     """Blade slap: 'wop-wop' pulses at 12 per second (the game bends the pitch)."""
     def build(seconds):
         x = np.zeros(int(seconds * RATE))
-        # Mid-range 'wop' so it carries on phone speakers, plus a little low thump.
+        # Mid-range 'wop' so it carries on laptop speakers, plus a little low thump.
         slap = bandpass(noise(0.09), 180.0, 1100.0) * env(0.09, 0.004, 0.025) * 3.0
         slap += sine(0.09, 85.0) * env(0.09, 0.003, 0.03) * 0.5
         for k in range(int(seconds * 12)):
@@ -229,11 +229,163 @@ def pickup():
     return x
 
 
+def rocket_launch():
+    """Unguided rocket leaving the pod: a hard crack and a short tearing whoosh."""
+    s = 0.6
+    crack = bandpass(noise(0.05), 600.0, 3000.0) * env(0.05, 0.001, 0.012) * 2.0
+    sweep = np.geomspace(2500.0, 700.0, int(s * RATE))
+    whoosh = lowpass(noise(s), sweep) * env(s, 0.01, 0.18)
+    x = whoosh.copy()
+    place(x, crack, 0.0)
+    return x
+
+
+def flares():
+    """Flare dispenser: a string of dull pops, then a fizz as they burn."""
+    s = 1.4
+    x = np.zeros(int(s * RATE))
+    pop = bandpass(noise(0.06), 250.0, 1500.0) * env(0.06, 0.001, 0.015) * 2.0
+    for k in range(6):
+        place(x, pop, k * 0.07, 1.0 - k * 0.08)
+    fizz = bandpass(noise(s), 1200.0, 5000.0) * env(s, 0.15, 0.5) * 0.35
+    return x + fizz
+
+
+def station_service():
+    """Service station at work: a ratcheting impact wrench and a hydraulic hum."""
+    s = 4.0
+    x = lowpass(noise(s), 300.0) * 0.25 + sine(s, 120.0) * 0.08
+    rattle = bandpass(noise(0.025), 800.0, 3200.0) * env(0.025, 0.001, 0.006) * 1.5
+    for burst in (0.2, 1.3, 2.5):
+        for k in range(14):
+            place(x, rattle, burst + k * 0.035, 0.8)
+    return x * np.minimum(1.0, t_axis(s) * 6.0)
+
+
+def station_done():
+    """Service finished: two clean bell tones, up a fifth."""
+    s = 0.7
+    x = np.zeros(int(s * RATE))
+    for k, f in enumerate([659.25, 987.77]):
+        note = (sine(0.5, f) + 0.25 * sine(0.5, f * 2.76)) * env(0.5, 0.002, 0.18)
+        place(x, note, k * 0.12)
+    return x
+
+
+def cable_strike():
+    """Rotor blades hitting a power cable: a metallic twang and an electric crackle."""
+    s = 0.9
+    twang = sine(s, np.geomspace(420.0, 300.0, int(s * RATE))) * env(s, 0.001, 0.25)
+    twang += sine(s, np.geomspace(1150.0, 900.0, int(s * RATE))) * env(s, 0.001, 0.12) * 0.4
+    crackle = bandpass(noise(s), 1500.0, 6000.0) * (np.random.default_rng(3).random(int(s * RATE)) > 0.985) * 3.0
+    return twang + lowpass(crackle, 7000.0) * env(s, 0.0, 0.3)
+
+
+def wind_loop():
+    """Gusting canyon wind: band-limited noise that swells and fades."""
+    def build(seconds):
+        t = t_axis(seconds)
+        gust = 0.6 + 0.4 * np.sin(2.0 * math.pi * t / 4.0) * np.sin(2.0 * math.pi * t / 2.0 + 1.0)
+        sweep = 500.0 + 400.0 * gust
+        return bandpass(noise(seconds), 150.0, 900.0) * 0.6 * gust + lowpass(noise(seconds), sweep) * 0.3
+    return seamless(build, 8.0)
+
+
+def hit_marker():
+    """Your round connected: a short dry tick (non-positional)."""
+    s = 0.08
+    return (bandpass(noise(s), 1500.0, 4000.0) * 0.6 + sine(s, 1800.0) * 0.5) * env(s, 0.0005, 0.012)
+
+
+def part_hit():
+    """You wrecked part of a rival: a heavy metallic clank."""
+    s = 0.5
+    clank = sine(s, 310.0) * env(s, 0.001, 0.09) + sine(s, 760.0) * env(s, 0.001, 0.05) * 0.6
+    return clank + bandpass(noise(s), 300.0, 2500.0) * env(s, 0.001, 0.04) * 1.2
+
+
+# --- music: a dieselpunk march (drums, bass, a brass-ish lead), 96 bpm, D minor ------
+
+BPM = 96.0
+BEAT = 60.0 / BPM
+
+
+def _kick():
+    s = 0.35
+    return sine(s, np.geomspace(140.0, 45.0, int(s * RATE))) * env(s, 0.002, 0.09) * 1.4
+
+
+def _snare():
+    s = 0.25
+    return bandpass(noise(s), 400.0, 5000.0) * env(s, 0.001, 0.06) + sine(s, 190.0) * env(s, 0.001, 0.04) * 0.5
+
+
+def _hat():
+    s = 0.06
+    return highpass(noise(s), 6000.0) * env(s, 0.0005, 0.015) * 0.5
+
+
+def _tone(freq, seconds, bright=0.6):
+    """A brass-ish note: a few harmonics, a soft attack, a gentle fall."""
+    x = sum(sine(seconds, freq * h) * (bright ** (h - 1)) / h for h in range(1, 6))
+    return lowpass(x, 2500.0) * env(seconds, 0.03, seconds * 0.7)
+
+
+NOTE = {"D2": 73.42, "F2": 87.31, "G2": 98.0, "A2": 110.0, "C3": 130.81, "D3": 146.83, "E3": 164.81,
+        "F3": 174.61, "G3": 196.0, "A3": 220.0, "Bb3": 233.08, "C4": 261.63, "D4": 293.66, "E4": 329.63,
+        "F4": 349.23, "G4": 392.0, "A4": 440.0}
+
+
+def _song(bars, drums, bass, lead, lead_gain):
+    seconds = bars * 4 * BEAT
+    x = np.zeros(int(seconds * RATE))
+    for bar in range(bars):
+        for beat in range(4):
+            at = (bar * 4 + beat) * BEAT
+            if drums:
+                if beat in (0, 2):
+                    place(x, _kick(), at, 0.9)
+                if beat in (1, 3):
+                    place(x, _snare(), at, 0.55)
+                for h in range(2):
+                    place(x, _hat(), at + h * BEAT / 2, 0.5)
+        root = bass[bar % len(bass)]
+        for k, step in enumerate([0, 0, 7, 0]):  # Root, root, fifth, root.
+            f = NOTE[root] * (1.5 if step == 7 else 1.0)
+            place(x, _tone(f, BEAT * 0.9, 0.4), (bar * 4 + k) * BEAT, 0.55)
+    at = 0.0
+    for name, beats in lead:
+        if name != "-":
+            place(x, _tone(NOTE[name], beats * BEAT, 0.7), at, lead_gain)
+        at += beats * BEAT
+    return lowpass(x, 6000.0)
+
+
+def music_menu():
+    """Title screen: slow and moody, no drums, the lead stated once."""
+    lead = [("D4", 2), ("F4", 1), ("E4", 1), ("D4", 3), ("-", 1), ("A3", 2), ("C4", 2), ("D4", 4),
+            ("F4", 2), ("G4", 1), ("F4", 1), ("E4", 3), ("-", 1), ("D4", 2), ("C4", 2), ("D4", 4)]
+    return _song(8, False, ["D2", "D2", "F2", "C3", "G2", "G2", "A2", "A2"], lead, 0.45)
+
+
+def music_battle():
+    """Battle: the same theme as a march, drums driving it."""
+    lead = [("D4", 1), ("D4", 0.5), ("F4", 0.5), ("A4", 1), ("G4", 1), ("F4", 1), ("E4", 1), ("D4", 2),
+            ("C4", 1), ("D4", 0.5), ("E4", 0.5), ("F4", 1), ("E4", 1), ("D4", 1), ("C4", 1), ("A3", 2),
+            ("D4", 1), ("D4", 0.5), ("F4", 0.5), ("A4", 1), ("G4", 1), ("F4", 1), ("G4", 1), ("A4", 2),
+            ("G4", 1), ("F4", 1), ("E4", 1), ("C4", 1), ("D4", 4)]
+    return _song(8, True, ["D2", "D2", "C3", "C3", "D2", "F2", "G2", "A2"], lead, 0.4)
+
+
+
 SOUNDS = {
     "rotor_loop": rotor_loop, "engine_loop": engine_loop, "boost_loop": boost_loop,
     "missile_loop": missile_loop, "warning_loop": warning_loop, "gun": gun, "explosion": explosion,
     "impact_metal": impact_metal, "impact_dirt": impact_dirt, "splash": splash,
-    "missile_launch": missile_launch, "pickup": pickup,
+    "missile_launch": missile_launch, "pickup": pickup, "rocket_launch": rocket_launch, "flares": flares,
+    "station_service": station_service, "station_done": station_done, "cable_strike": cable_strike,
+    "wind_loop": wind_loop, "hit_marker": hit_marker, "part_hit": part_hit,
+    "music_menu_loop": music_menu, "music_battle_loop": music_battle,
 }
 
 if __name__ == "__main__":

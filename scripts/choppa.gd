@@ -13,6 +13,7 @@ signal gun_overheated
 signal damaged(amount: float, attacker: Choppa)
 signal part_damaged(part: Part, left: float)  ## A rotor, the tail rotor or the engine took a hit.
 signal part_wrecked(part: Part, by: Choppa)  ## It just reached zero; `by` did it (or null).
+signal wrecked_part(target: Choppa, part: Part)  ## On the shooter: we wrecked target's part.
 signal died(killer: Choppa)
 signal healed(amount: float)
 signal restocked
@@ -402,6 +403,8 @@ func damage_part(part: Part, amount: float, by: Choppa = null) -> void:
 	part_damaged.emit(part, parts[part])
 	if before > 0.0 and parts[part] <= 0.0:
 		part_wrecked.emit(part, by)
+		if by and by != self:
+			by.wrecked_part.emit(self, part)
 
 
 ## How wrecked a part is: 0 intact .. 1 gone.

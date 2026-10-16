@@ -412,9 +412,11 @@ Apex are entitlements the server grants; offline they can only be previewed
 9. **Service stations and loadout** *(done)*.
 10. **Slot Canyon** *(done)* with power lines, wind and Blender props.
 11. **PC only** *(done)*: phones dropped (owner's decision).
-12. **Polish**: weapon and hazard sounds, hit markers and part callouts, visible damage
-    on the models, music.
-13. **Progression foundation** *(offline, see above)*: levels, XP, earned camos, hangar.
+12. **Polish** *(done)*: sounds for rockets, flares, stations, cables, wind, hit markers
+    and wrecked parts; hit markers and part callouts; visible damage (the tail rotor
+    gone, a wobbling main rotor, a burning engine); a synthesized dieselpunk march for
+    the menu and battles on its own Music bus.
+13. **Progression foundation** *(done, offline, see above)*: levels, XP, earned camos, hangar.
 14. **Internet multiplayer**, steps 1 to 4 above.
 15. **Ranked, store and Apex** on the backend.
 16. Feel pass on the owner's PC throughout; more arenas and battle variants after.

@@ -223,7 +223,7 @@ class Rocket extends Node3D:
 		trail.scale_amount_max = 0.9
 		add_child(trail)
 		trail.emitting = true
-		Sounds.play_on(self, "missile_launch", -8.0, 1.5)
+		Sounds.play_on(self, "rocket_launch", -4.0, randf_range(0.92, 1.08))
 		_face()
 
 	func _physics_process(delta: float) -> void:
@@ -267,6 +267,7 @@ class Flares extends Node3D:
 		_start.call_deferred()  # World-space particles: only after the caller placed us.
 
 	func _start() -> void:
+		Sounds.play_at(get_parent(), "flares", global_position, -2.0)
 		var burst := Effects.puffs(Effects.gradient([
 			Color(1.0, 0.95, 0.8, 1.0), Color(1.0, 0.6, 0.2, 0.9), Color(0.6, 0.6, 0.6, 0.0),
 		]), 14, 1.6)

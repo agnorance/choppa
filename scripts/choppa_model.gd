@@ -26,6 +26,8 @@ var _dust: CPUParticles3D
 var _trails: Array[CPUParticles3D] = []
 var _smoke: CPUParticles3D
 var _tail_smoke: CPUParticles3D
+var _fire: CPUParticles3D  ## A wrecked engine burns.
+var _tail_sparks: CPUParticles3D  ## Where the tail rotor was.
 var _flashes: Array[Node3D] = []  ## Left, right.
 var _flash_lights: Array[OmniLight3D] = []
 var _casings: Array[CPUParticles3D] = []
@@ -237,6 +239,22 @@ func _build() -> void:
 	_tail_smoke.scale_amount_max = 4.5
 	_tail_smoke.emitting = false
 	add_child(_tail_smoke)
+	_fire = Effects.puffs(Effects.gradient([
+		Color(1.0, 0.85, 0.4, 0.0), Color(1.0, 0.55, 0.15, 0.9), Color(0.8, 0.25, 0.05, 0.6), Color(0.2, 0.2, 0.2, 0.0),
+	]), 40, 0.7)
+	_fire.position = _rotor.position * Vector3(1.0, 0.75, 1.0) + Vector3(0.0, 0.0, 0.6)
+	_fire.direction = Vector3.UP
+	_fire.spread = 25.0
+	_fire.initial_velocity_min = 2.0
+	_fire.initial_velocity_max = 4.0
+	_fire.scale_amount_min = 0.6
+	_fire.scale_amount_max = 1.4
+	_fire.emitting = false
+	add_child(_fire)
+	_tail_sparks = Effects.sparks(18, 0.4, Vector2(3.0, 9.0), Color(4.0, 2.2, 0.7), 0.2)
+	_tail_sparks.position = _tail_rotor.position
+	_tail_sparks.emitting = false
+	add_child(_tail_sparks)
 
 
 ## Spins the rotors and drives the effects; the body's attitude is the choppa's own
@@ -244,8 +262,16 @@ func _build() -> void:
 func update_pose(c: Choppa, delta: float) -> void:
 	var target_rotor := 20.0 + (10.0 if c.is_boosting() else 0.0) + c.velocity.y * 0.3
 	_rotor_speed = lerpf(_rotor_speed, target_rotor, 1.0 - exp(-3.0 * delta))
-	_rotor.rotate_y(_rotor_speed * delta)
-	_tail_rotor.rotate_x(_rotor_speed * 1.6 * delta)
+	# A chewed-up main rotor wobbles on its mast; a wrecked tail rotor is gone.
+	var rotor_wear := c.wear(Choppa.Part.ROTOR)
+	var wobble := 0.08 * rotor_wear * rotor_wear
+	_rotor.rotation = Vector3(sin(c.clock * 21.0) * wobble, _rotor.rotation.y + _rotor_speed * delta, cos(c.clock * 17.0) * wobble)
+	var tail_gone := c.wear(Choppa.Part.TAIL) >= 1.0
+	_tail_rotor.visible = not tail_gone
+	if not tail_gone:
+		_tail_rotor.rotate_x(_rotor_speed * 1.6 * delta)
+	_tail_sparks.emitting = tail_gone and c.alive and fmod(c.clock, 1.3) < 0.25
+	_fire.emitting = c.alive and c.wear(Choppa.Part.ENGINE) >= 1.0
 	_blur_material.albedo_color.a = clampf((_rotor_speed - 8.0) / 80.0, 0.0, 0.1)
 	_rotor_sound.pitch_scale = clampf(_rotor_speed / 22.0, 0.5, 1.6)
 	_engine_sound.pitch_scale = clampf(0.85 + _rotor_speed / 80.0 + c.input.collective * 0.08, 0.6, 1.5)

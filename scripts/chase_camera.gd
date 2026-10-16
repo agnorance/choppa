@@ -9,7 +9,7 @@ extends Camera3D
 @export var distance := 8.5
 @export var height := 2.6
 @export var look_ahead := 6.0
-@export var follow_sharpness := 9.0
+@export var follow_sharpness := 6.0  ## Lower is lazier: the camera trails the body a touch, for weight.
 @export var base_fov := 70.0
 @export var speed_fov := 18.0  ## Extra FOV at boost speed.
 

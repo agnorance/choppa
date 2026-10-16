@@ -76,9 +76,11 @@ mouse, Q / E or the shoulder buttons.
 | Pause | Esc | Start | Back button |
 | Controls overlay on/off | F1 | | |
 
-The mouse flies the choppa: push forward to put the nose down and accelerate, pull
-back to climb or loop, move sideways to bank. Nothing levels the nose for you; the
-attitude stays where you leave it. "Mouse controls" in the settings swaps roll for yaw
+Two flight models, chosen on the title screen. **Realistic** (default): the mouse flies
+the choppa, push forward to put the nose down and accelerate, pull back to climb or
+loop, move sideways to bank; nothing levels the nose for you. **Easy**: a drone that
+hovers by itself, WASD moves and strafes, Q/E or the mouse turn, mouse Y aims the nose
+and you fly where it points, Space/C climb and dive. "Mouse controls" in the settings swaps roll for yaw
 on the mouse (then A/D roll), "Flight assist" adds auto-level and height hold, and
 "Aim assist" (off by default) snaps the guns onto targets. Rolling hard throws off
 bullets and missiles.
@@ -126,7 +128,7 @@ godot --path . -- --mode=free --map=basin --autopilot=hover --cam=showcase --exp
 
 ```powershell
 tools\try.ps1              # lists the scenes
-tools\try.ps1 settings     # straight into a scene: menu, settings, battle, free, race, cockpit,
+tools\try.ps1 settings     # straight into a scene: menu, settings, battle, free, easy, race, cockpit,
                            # lake, damaged, tailrotor, engine, touch, bots, missile, explode
 tools\check.ps1            # import, all tests, and screenshots of every screen into build\shots\
 ```

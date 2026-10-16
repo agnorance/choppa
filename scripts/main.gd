@@ -19,6 +19,7 @@ extends Node
 ##   --dummies=<n>            training targets in free flight (default 3)
 ##   --health=<n>             start with this much health (to see damage effects)
 ##   --wear=tail,rotor,engine start with these parts wrecked (spin, shaking, weak engine)
+##   --easy                   fly the easy model whatever the setting says
 ##   --explode=<tick>         set off an explosion 26 m ahead of you at that tick
 ##   --timing                 print how long the map build and the first frame took
 
@@ -105,6 +106,7 @@ func _start() -> void:
 	choppa = _new_choppa("You", Color(0.95, 0.5, 0.1), map.spawn_points[slot], true)
 	choppa.aim_assist = Settings.flag("aim_assist")
 	choppa.flight_assist = Settings.flag("flight_assist")
+	choppa.easy = Settings.choice("flight_model") == 0 or _args.has("easy")
 	if mode == "free" and _args.has("spawn"):
 		choppa.respawn(_spawn_arg())
 	if _args.has("health"):
@@ -351,6 +353,7 @@ func _on_settings_changed() -> void:
 	hud.refresh_settings()
 	choppa.aim_assist = Settings.flag("aim_assist")
 	choppa.flight_assist = Settings.flag("flight_assist")
+	choppa.easy = Settings.choice("flight_model") == 0 or _args.has("easy")
 	_update_mouse()
 
 

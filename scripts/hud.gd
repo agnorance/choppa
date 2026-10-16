@@ -297,7 +297,7 @@ func _controls_sheet() -> Control:
 	grid.add_theme_constant_override("h_separation", 18)
 	grid.add_theme_constant_override("v_separation", 5)
 	box.add_child(grid)
-	for row: Array in Controls.cheat_sheet(Settings.flag("mouse_steer"), Settings.choice("mouse_mode") == 1):
+	for row: Array in Controls.cheat_sheet(Settings.flag("mouse_steer"), Settings.choice("mouse_mode") == 1, Settings.choice("flight_model") == 0):
 		var what := UiKit.label(row[0], 15, UiKit.MUTED)
 		what.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		grid.add_child(what)

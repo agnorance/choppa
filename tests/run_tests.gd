@@ -61,6 +61,8 @@ func _run() -> void:
 		"test_engine_hit_loses_lift",
 		"test_crash_damages_hull_and_parts",
 		"test_blast_wrecks_the_nearest_part",
+		"test_landing_is_gentle_slamming_is_not",
+		"test_easy_model_hovers_and_flies_where_it_looks",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -377,7 +379,7 @@ func test_bot_flies_the_course() -> void:
 	print("    laps started at %s, finished=%s in %.1fs, bumps=%s, stuck at gate %d" % [
 		laps, race.is_done(bot_choppa), race.time, bumps, race.next_gate(bot_choppa).index])
 	_check(race.is_done(bot_choppa), "bot finished 2 laps")
-	_check(race.time < 150.0, "in reasonable time, %.1fs" % race.time)
+	_check(race.time < 220.0, "in reasonable time, %.1fs" % race.time)  # Heavier model: laps take ~100 s.
 	_check(bumps.is_empty(), "no wall hits, got %d" % bumps.size())
 
 
@@ -869,3 +871,35 @@ func test_blast_wrecks_the_nearest_part() -> void:
 	var other := _choppa(Vector3(0.0, 30.0, 50.0))
 	other.blast_damage(20.0, null, other.to_global(Vector3(0.0, 2.0, 0.0)))
 	_check(other.parts[Choppa.Part.ROTOR] < Choppa.PART_HEALTH[Choppa.Part.ROTOR], "blast above hit the main rotor")
+
+
+func test_landing_is_gentle_slamming_is_not() -> void:
+	_ground()
+	var choppa := _choppa(Vector3(0.0, 4.0, 0.0))
+	choppa.velocity = Vector3(12.0, -4.0, 0.0)  # A brisk touchdown with some run-on.
+	await _fly(choppa, 90, func(i: PilotInput, _t: int) -> void: i.collective = -0.3)
+	_check(choppa.health == Choppa.MAX_HEALTH, "a 4 m/s touchdown does not hurt, hp=%f" % choppa.health)
+	_check(choppa.altitude < 0.3, "on the ground, alt=%f" % choppa.altitude)
+	_check(Vector2(choppa.velocity.x, choppa.velocity.z).length() < 2.0, "the skids brought it to a stop, v=%s" % choppa.velocity)
+	var slammed := _choppa(Vector3(0.0, 6.0, 50.0))
+	slammed.velocity = Vector3(0.0, -14.0, 0.0)
+	await _fly(slammed, 30, func(i: PilotInput, _t: int) -> void: i.collective = -1.0)
+	_check(slammed.health < Choppa.MAX_HEALTH and slammed.alive, "a 14 m/s slam hurts but does not kill, hp=%f" % slammed.health)
+
+
+func test_easy_model_hovers_and_flies_where_it_looks() -> void:
+	_ground()
+	var choppa := _choppa(Vector3(0.0, 30.0, 0.0))
+	choppa.easy = true
+	await _fly(choppa, 60)
+	_check(absf(choppa.global_position.y - 30.0) < 0.1 and choppa.velocity.length() < 0.1, "hovers by itself")
+	# Aim the nose down a little, then push forward: it descends while flying ahead.
+	await _fly(choppa, 120, func(i: PilotInput, t: int) -> void:
+		i.cyclic.y = 1.0 if t < 15 else 0.0
+		i.move.y = 1.0)
+	_check(choppa.global_position.z < -20.0, "flew forward, z=%f" % choppa.global_position.z)
+	_check(choppa.global_position.y < 27.0, "and down along the nose, y=%f" % choppa.global_position.y)
+	_check(choppa.nose_down() > 0.2, "the nose stays where it was aimed, %f" % choppa.nose_down())
+	choppa.input.clear()  # Let go of the move stick before pulling collective.
+	await _fly(choppa, 60, func(i: PilotInput, _t: int) -> void: i.collective = 1.0)
+	_check(choppa.velocity.y > 8.0, "collective climbs, vy=%f" % choppa.velocity.y)

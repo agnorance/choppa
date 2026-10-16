@@ -64,6 +64,12 @@ func _ready() -> void:
 	map_row.custom_minimum_size = Vector2(380, 46)
 	map_row.changed.connect(func(i: int) -> void: map_index = i)
 	_home.add_child(map_row)
+	var model_row := SettingRow.new("FLIGHT", ["Easy", "Realistic"], Settings.choice("flight_model"))
+	model_row.custom_minimum_size = Vector2(380, 46)
+	model_row.changed.connect(func(i: int) -> void:
+		Settings.set_value("flight_model", i)
+		Settings.save())
+	_home.add_child(model_row)
 	var bots_row := SettingRow.new("BOTS", ["Easy", "Normal", "Hard"], Settings.choice("bot_difficulty"))
 	bots_row.custom_minimum_size = Vector2(380, 46)
 	bots_row.changed.connect(func(i: int) -> void:

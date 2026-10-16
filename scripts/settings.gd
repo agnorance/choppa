@@ -38,6 +38,7 @@ const DEFAULTS := {
 	"damage_flash": true,  ## Red screen edges when hit.
 	"aim_assist": false,
 	"flight_assist": false,  ## Level out and hold height when the stick is centred.
+	"flight_model": 1,  ## 0 easy (drone, hovers by itself), 1 realistic (forces). Also on the title screen.
 	"show_controls": true,  ## Key overlay on the HUD (desktop only).
 	# Controls
 	"mouse_steer": true,  ## The mouse flies the choppa.

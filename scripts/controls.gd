@@ -16,6 +16,11 @@ var _bindings := {
 	"yaw_right": [KEY_D, KEY_E, [JOY_AXIS_RIGHT_X, 1.0]],
 	"collective_up": [KEY_W, KEY_SPACE, [JOY_AXIS_RIGHT_Y, -1.0]],
 	"collective_down": [KEY_S, KEY_C, [JOY_AXIS_RIGHT_Y, 1.0]],
+	# The easy model reads these instead of sharing A/D and W/S with turning and climbing.
+	"turn_left": [KEY_Q, [JOY_AXIS_RIGHT_X, -1.0]],
+	"turn_right": [KEY_E, [JOY_AXIS_RIGHT_X, 1.0]],
+	"vertical_up": [KEY_SPACE, [JOY_AXIS_RIGHT_Y, -1.0]],
+	"vertical_down": [KEY_C, [JOY_AXIS_RIGHT_Y, 1.0]],
 	"boost": [KEY_SHIFT, JOY_BUTTON_RIGHT_SHOULDER],
 	"fire": [KEY_CTRL, "mouse:%d" % MOUSE_BUTTON_LEFT, [JOY_AXIS_TRIGGER_RIGHT, 1.0]],
 	"use_item": [KEY_R, JOY_BUTTON_X],
@@ -31,9 +36,14 @@ var _bindings := {
 ## Key bindings for the HUD overlay and the settings screen: [what, [keys...]] in display
 ## order. Entries starting with "~" are notes, not keys. Keyboard and mouse only; the
 ## gamepad follows the same actions. `mouse_yaws`: the "pitch & yaw" mouse layout.
-static func cheat_sheet(mouse: bool, mouse_yaws := false) -> Array:
+static func cheat_sheet(mouse: bool, mouse_yaws := false, easy := false) -> Array:
 	var rows := []
-	if mouse and mouse_yaws:
+	if easy:
+		rows.append(['Fly', ['W', 'A', 'S', 'D']])
+		rows.append(['Turn', ['Q', 'E'] + (['~or mouse'] if mouse else [])])
+		rows.append(['Nose up / down', ['~mouse'] if mouse else ['Up', 'Down']])
+		rows.append(['Climb / dive', ['Space', 'C']])
+	elif mouse and mouse_yaws:
 		rows.append(["Pitch / turn", ["~mouse"]])
 		rows.append(["Roll", ["A", "D"]])
 	elif mouse:
@@ -42,8 +52,9 @@ static func cheat_sheet(mouse: bool, mouse_yaws := false) -> Array:
 	else:
 		rows.append(["Pitch / roll", ["Up", "Down", "Left", "Right"]])
 		rows.append(["Turn", ["A", "D"]])
+	if not easy:
+		rows.append(["Collective", ["W", "S"]])
 	rows.append_array([
-		["Collective", ["W", "S"]],
 		["Afterburner", ["Shift"]],
 		["Fire", ["LMB", "Ctrl"]],
 		["Item", ["R"]],

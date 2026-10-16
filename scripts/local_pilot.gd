@@ -2,10 +2,10 @@ class_name LocalPilot
 extends Node
 ## Feeds keyboard, mouse, gamepad and on-screen touch controls into a choppa's PilotInput.
 ##
-## Two mouse layouts (Settings "mouse_mode"): 0 puts pitch and roll on the mouse with
-## yaw on A/D (the usual shooter helicopter layout); 1 puts pitch and yaw on the mouse
-## with roll on A/D. Arrow keys and the left stick always give pitch and roll, W/S,
-## Space/C and the right stick Y the collective.
+## Realistic model: two mouse layouts (Settings "mouse_mode"), 0 pitch and roll on the
+## mouse with yaw on A/D, 1 pitch and yaw on the mouse with roll on A/D; arrows and the
+## left stick are the cyclic, W/S the collective. Easy model: WASD moves, Q/E and the
+## mouse turn, mouse Y aims the nose, Space/C climb and dive.
 
 ## Stick per pixel of mouse travel at sensitivity 1; the setting scales it 1..10.
 const MOUSE_GAIN := 0.012
@@ -34,31 +34,44 @@ func feed_mouse(relative: Vector2) -> void:
 
 func _physics_process(_delta: float) -> void:
 	var i := choppa.input
-	var pitch_roll := Input.get_vector("roll_left", "roll_right", "pitch_up", "pitch_down")
-	var side := Input.get_axis("yaw_left", "yaw_right")  # A/D, Q/E, right stick X.
-	i.collective = Input.get_axis("collective_down", "collective_up")
 	i.boost = Input.is_action_pressed("boost")
 	i.fire = Input.is_action_pressed("fire")
 	i.use_item = Input.is_action_pressed("use_item")
-	var mouse_yaws := Settings.choice("mouse_mode") == 1
-	i.cyclic = pitch_roll
-	i.yaw = 0.0
-	if mouse_yaws:
-		i.cyclic.x = clampf(i.cyclic.x + side, -1.0, 1.0)
-	else:
-		i.yaw = side
-	if Settings.flag("mouse_steer") and _mouse != Vector2.ZERO:
-		var gain := Settings.choice("mouse_sensitivity") * MOUSE_GAIN
-		# Pushing the mouse forward (negative y) puts the nose down, unless inverted.
-		var pitch := -_mouse.y * gain * (-1.0 if Settings.flag("invert_mouse") else 1.0)
-		i.cyclic.y = clampf(i.cyclic.y + pitch, -1.0, 1.0)
-		if mouse_yaws:
-			i.yaw = clampf(i.yaw + _mouse.x * gain, -1.0, 1.0)
-		else:
-			i.cyclic.x = clampf(i.cyclic.x + _mouse.x * gain, -1.0, 1.0)
+	var gain := Settings.choice("mouse_sensitivity") * MOUSE_GAIN
+	var mouse := _mouse if Settings.flag("mouse_steer") else Vector2.ZERO
 	_mouse = Vector2.ZERO
+	var invert := -1.0 if Settings.flag("invert_mouse") else 1.0
+	if choppa.easy:
+		# Drone layout: W/S forward and back, A/D strafe, Q/E and mouse X turn, mouse Y
+		# aims the nose up or down, Space/C (or W/S on the right stick) climb and dive.
+		i.move = Input.get_vector("yaw_left", "yaw_right", "collective_down", "collective_up")
+		i.yaw = Input.get_axis("turn_left", "turn_right")
+		i.collective = Input.get_axis("vertical_down", "vertical_up")
+		i.cyclic = Vector2(0.0, Input.get_axis("pitch_up", "pitch_down"))
+		i.yaw = clampf(i.yaw + mouse.x * gain, -1.0, 1.0)
+		i.cyclic.y = clampf(i.cyclic.y - mouse.y * gain * invert, -1.0, 1.0)
+	else:
+		var pitch_roll := Input.get_vector("roll_left", "roll_right", "pitch_up", "pitch_down")
+		var side := Input.get_axis("yaw_left", "yaw_right")  # A/D, Q/E, right stick X.
+		i.collective = Input.get_axis("collective_down", "collective_up")
+		var mouse_yaws := Settings.choice("mouse_mode") == 1
+		i.cyclic = pitch_roll
+		i.yaw = 0.0
+		if mouse_yaws:
+			i.cyclic.x = clampf(i.cyclic.x + side, -1.0, 1.0)
+		else:
+			i.yaw = side
+		# Pushing the mouse forward (negative y) puts the nose down, unless inverted.
+		i.cyclic.y = clampf(i.cyclic.y - mouse.y * gain * invert, -1.0, 1.0)
+		if mouse_yaws:
+			i.yaw = clampf(i.yaw + mouse.x * gain, -1.0, 1.0)
+		else:
+			i.cyclic.x = clampf(i.cyclic.x + mouse.x * gain, -1.0, 1.0)
 	if touch and touch.visible:
-		i.cyclic = (i.cyclic + touch.cyclic).limit_length(1.0)
+		if choppa.easy:
+			i.move = (i.move + touch.cyclic).limit_length(1.0)
+		else:
+			i.cyclic = (i.cyclic + touch.cyclic).limit_length(1.0)
 		i.yaw = clampf(i.yaw + touch.look.x, -1.0, 1.0)
 		i.collective = clampf(i.collective + touch.look.y, -1.0, 1.0)
 		i.boost = i.boost or touch.is_pressed("boost")

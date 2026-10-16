@@ -1,7 +1,8 @@
 class_name Choppa
 extends CharacterBody3D
-## Arcade helicopter with real forces: gravity, rotor thrust along the body, drag, inertia
-## in the turns. Reads `input` every physics tick and never touches Input directly,
+## Arcade helicopter. Two flight models (Settings "flight_model"): the realistic one
+## integrates real forces (gravity, rotor thrust along the body, drag, inertia in the
+## turns); the easy one is a drone that hovers by itself and flies where the nose points. Reads `input` every physics tick and never touches Input directly,
 ## so the same code runs for local players, bots and (later) network peers.
 
 signal bumped(impact: float)
@@ -24,7 +25,7 @@ const GRAVITY := 9.81
 ## Where a hit lands. HULL is everything that only costs health; the others also wreck
 ## something: ROTOR shakes and loses lift, TAIL spins you, ENGINE loses power.
 enum Part { HULL, ROTOR, TAIL, ENGINE }
-const DODGE_ROLL_RATE := 2.8  ## rad/s: rolling this fast throws off bullets and missiles.
+const DODGE_ROLL_RATE := 2.2  ## rad/s: rolling this fast throws off bullets and missiles (full stick is 2.8).
 const LEVEL_GAIN := 2.5  ## Flight assist: rate per radian of tilt that brings the body level.
 const GROUND_EFFECT := 0.08  ## Extra thrust fraction right above the ground...
 const GROUND_EFFECT_HEIGHT := 6.0  ## ...fading out by this altitude.
@@ -50,6 +51,8 @@ const MISSILE_CONE := deg_to_rad(45.0)
 const MISSILE_RANGE := 250.0
 ## A crash this soon after being shot counts as a kill for whoever shot you.
 const CRASH_CREDIT_TIME := 4.0
+const CRASH_WINDOW := 0.4  ## Seconds between crash damage events while scraping along.
+const SKID_FRICTION := 4.0  ## How fast horizontal speed bleeds off with the skids on the ground, per second.
 @export var team_color := Color(0.95, 0.5, 0.1)
 @export var pilot_name := "Pilot"
 var aim_assist := true  ## Guns snap onto a target in the cone; the player can turn it off in the settings.
@@ -57,14 +60,14 @@ var aim_assist := true  ## Guns snap onto a target in the cone; the player can t
 
 @export_group("Flight")
 @export var hover_thrust := 9.81  ## Rotor thrust at collective 0: holds a level hover.
-@export var collective_range := 0.6  ## Collective +-1 adds or takes this fraction of hover thrust.
-@export var pitch_rate := 2.4  ## rad/s at full stick.
-@export var roll_rate := 3.6
-@export var yaw_rate := 2.0
-@export var angular_accel := 10.0  ## How fast the rates follow the stick (inertia).
+@export var collective_range := 0.5  ## Collective +-1 adds or takes this fraction of hover thrust.
+@export var pitch_rate := 2.0  ## rad/s at full stick.
+@export var roll_rate := 2.8
+@export var yaw_rate := 1.6
+@export var angular_accel := 7.0  ## How fast the rates follow the stick: the inertia you feel.
 ## Drag per body axis (x across, y up, z along the nose), times speed squared. Lower
 ## along the nose, so the choppa flies best the way it points and drifts in a slide.
-@export var drag := Vector3(0.02, 0.02, 0.0065)
+@export var drag := Vector3(0.016, 0.016, 0.0065)
 @export var afterburner_thrust := 22.0  ## Extra acceleration along the nose while burning.
 @export var turbo_thrust := 34.0  ## The TURBO item.
 @export var boost_drain := 0.5  ## Afterburner charge used per second...
@@ -72,12 +75,27 @@ var aim_assist := true  ## Guns snap onto a target in the cone; the player can t
 @export var max_speed := 36.0  ## About the level top speed at a 35 degree nose-down (bots, docs).
 @export var boost_speed := 60.0  ## About the top speed with the afterburner (camera, visuals).
 @export var max_altitude := 140.0
+## Rotor thrust follows the collective with this time constant (seconds): the weight you
+## feel when you pull power.
+@export var thrust_lag := 0.35
+
+@export_group("Easy model")
+@export var easy_accel := 28.0  ## m/s^2 toward the wished velocity.
+@export var climb_speed := 16.0
+@export var climb_accel := 45.0
+@export var turn_speed := 2.4  ## rad/s
+@export var turn_accel := 14.0
+@export var aim_rate := 2.0  ## rad/s the nose pitches at full stick (held where you leave it).
 
 var input := PilotInput.new()
 var heading := 0.0  ## Yaw in radians; 0 faces -Z. Derived from the body each tick.
 var turn_rate := 0.0  ## Yaw rate, rad/s (positive turns left).
 var rates := Vector3.ZERO  ## Body rotation rates: x pitch (nose up), y yaw (left), z roll (left).
 var flight_assist := false  ## Level out and hold height when the stick is centred (a setting).
+var easy := false  ## The easy flight model (a setting): no gravity, auto-hover, fly where you look.
+var _thrust := GRAVITY  ## Current rotor thrust; follows the collective with `thrust_lag`.
+var _aim := 0.0  ## Easy model: nose-down angle set by the stick, held.
+var _crash_cooldown := 0.0  ## Grinding along terrain hurts once per window, not every tick.
 var boost_meter := 1.0  ## Afterburner charge, 0..1.
 var turbo_time := 0.0
 var item := ""
@@ -174,6 +192,10 @@ func step(delta: float) -> void:
 		use_item()
 	_prev_item = i.use_item
 	_update_gun(i, delta)
+	_crash_cooldown = maxf(0.0, _crash_cooldown - delta)
+	if easy:
+		_step_easy(i, delta)
+		return
 
 	# Attitude: the stick asks for rotation rates and the body follows with some inertia.
 	# Nothing pulls the nose back by itself unless flight assist is on.
@@ -199,11 +221,13 @@ func step(delta: float) -> void:
 
 	# Forces: gravity, rotor thrust along the body's up axis, the afterburner along the
 	# nose, and drag that is lower along the body than across it.
-	var thrust := hover_thrust * (1.0 + i.collective * collective_range)
+	var wanted_thrust := hover_thrust * (1.0 + i.collective * collective_range)
 	if flight_assist:
-		thrust /= clampf(b.y.y, 0.5, 1.0)  # Hold height when tilted.
-	thrust *= 1.0 + GROUND_EFFECT * clampf(1.0 - altitude / GROUND_EFFECT_HEIGHT, 0.0, 1.0)
-	thrust *= (1.0 - 0.15 * rotor) * (1.0 - 0.35 * engine)  # Damaged lift and power.
+		wanted_thrust /= clampf(b.y.y, 0.5, 1.0)  # Hold height when tilted.
+	wanted_thrust *= 1.0 + GROUND_EFFECT * clampf(1.0 - altitude / GROUND_EFFECT_HEIGHT, 0.0, 1.0)
+	wanted_thrust *= (1.0 - 0.15 * rotor) * (1.0 - 0.35 * engine)  # Damaged lift and power.
+	_thrust = lerpf(_thrust, wanted_thrust, 1.0 - exp(-delta / thrust_lag))
+	var thrust := _thrust
 	var accel := b.y * thrust + Vector3.DOWN * GRAVITY
 	if turbo_time > 0.0:
 		turbo_time -= delta
@@ -228,6 +252,65 @@ func step(delta: float) -> void:
 	model.update_pose(self, delta)
 
 
+## The easy model: a drone with no gravity that hovers when you let go. The mouse (or
+## the right stick) aims the nose, and the move stick flies along it, so pointing the
+## nose down and pushing forward descends. Momentum comes from easing toward the wish.
+func _step_easy(i: PilotInput, delta: float) -> void:
+	var tail := wear(Part.TAIL)
+	var rotor := wear(Part.ROTOR)
+	var engine := wear(Part.ENGINE)
+	var yaw_wish := -i.yaw * turn_speed * (1.0 - 0.75 * tail) - TAIL_TORQUE * tail * tail
+	turn_rate = move_toward(turn_rate, yaw_wish, turn_accel * delta)
+	heading = wrapf(heading + turn_rate * delta, -PI, PI)
+	_aim = clampf(_aim + i.cyclic.y * aim_rate * delta, -1.2, 1.2)
+	rates = Vector3(0.0, turn_rate, 0.0)
+
+	var boosting := is_boosting() and engine < 1.0
+	var top := max_speed * (1.0 - 0.15 * rotor) * (1.0 - 0.35 * engine)
+	if turbo_time > 0.0:
+		turbo_time -= delta
+		top = turbo_speed()
+	elif boosting:
+		boost_meter = maxf(0.0, boost_meter - boost_drain * delta)
+		top = boost_speed
+	elif not i.boost:
+		boost_meter = minf(1.0, boost_meter + boost_recharge * delta)
+	var nose := Basis(Vector3.UP, heading) * Basis(Vector3.RIGHT, -_aim)
+	var wish := nose * Vector3(0.0, 0.0, -i.move.y) + facing() * Vector3(i.move.x, 0.0, 0.0)
+	if boosting or turbo_time > 0.0:
+		wish += nose * Vector3.FORWARD  # The afterburner always drives you along the nose.
+	wish = wish.limit_length(1.0)
+	var rate := easy_accel * (2.0 if boosting else 1.0)
+	if wish.length_squared() < 0.01 or velocity.length() > top:
+		rate = easy_accel * 0.6
+	var climb := i.collective * climb_speed * (1.0 - 0.35 * engine) - 6.0 * engine * engine
+	var wanted := wish * top + Vector3.UP * climb
+	# Horizontal and vertical ease separately, so a climb does not wait for the run-on to bleed off.
+	var level := Vector3(velocity.x, 0.0, velocity.z).move_toward(Vector3(wanted.x, 0.0, wanted.z), rate * delta)
+	velocity = level + Vector3.UP * move_toward(velocity.y, wanted.y, climb_accel * delta)
+	if global_position.y > max_altitude:
+		velocity.y = minf(velocity.y, 0.0)
+
+	# The body leans into the motion, like a real one would have to.
+	var local_v := facing().inverse() * velocity
+	var lean_pitch := clampf(local_v.z / boost_speed, -1.0, 1.0) * 0.35
+	var bank := clampf(-local_v.x / boost_speed, -1.0, 1.0) * 0.5 + turn_rate * 0.12
+	if rotor > 0.0:
+		lean_pitch += sin(clock * 31.0) * 0.05 * rotor
+		bank += sin(clock * 23.0 + 1.0) * 0.05 * rotor
+	global_transform.basis = Basis.from_euler(Vector3(lean_pitch - _aim, heading, bank))
+	var before := velocity
+	move_and_slide()
+	_handle_collisions(before)
+	_update_altitude()
+	model.update_pose(self, delta)
+
+
+## The TURBO item's top speed in the easy model.
+func turbo_speed() -> float:
+	return boost_speed * 1.2
+
+
 ## Pitch of the nose below the horizon, radians (negative: nose up).
 func nose_down() -> float:
 	return -asin(clampf(-global_transform.basis.z.y, -1.0, 1.0))
@@ -240,7 +323,7 @@ func bank_right() -> float:
 
 ## Rolling fast enough to throw off bullets and missiles.
 func is_rolling_hard() -> bool:
-	return absf(rates.z) > DODGE_ROLL_RATE
+	return not easy and absf(rates.z) > DODGE_ROLL_RATE
 
 
 ## The choppa that aim assist would shoot at right now, or null.
@@ -467,6 +550,8 @@ func respawn(at: Transform3D) -> void:
 	velocity = Vector3.ZERO
 	turn_rate = 0.0
 	rates = Vector3.ZERO
+	_thrust = GRAVITY
+	_aim = 0.0
 	stun = 0.0
 	turbo_time = 0.0
 	heat = 0.0
@@ -541,12 +626,19 @@ func _handle_collisions(before: Vector3) -> void:
 	if impact <= 0.0:
 		return
 	var is_ground := normal.y > 0.7
+	if is_ground:
+		# Skids on the ground: only the sink rate counts, and the skids drag you to a stop.
+		impact = maxf(0.0, -before.y)
+		var braking := exp(-SKID_FRICTION * get_physics_process_delta_time())
+		velocity.x *= braking
+		velocity.z *= braking
 	if impact > BOUNCE_IMPACT and not is_ground:
 		velocity = before.bounce(normal) * 0.45
 		stun = clampf(impact / 60.0, 0.15, 0.5)
 		rates *= 0.3  # The knock takes most of the spin out.
 		bumped.emit(impact)
-	if impact > CRASH_DAMAGE_FROM:
+	if impact > CRASH_DAMAGE_FROM and _crash_cooldown <= 0.0:
+		_crash_cooldown = CRASH_WINDOW
 		var credit := _last_attacker if clock - _last_attacker_time < CRASH_CREDIT_TIME else null
 		var excess := impact - CRASH_DAMAGE_FROM
 		# Whatever struck first takes the brunt: tail strikes wreck the tail rotor, and a

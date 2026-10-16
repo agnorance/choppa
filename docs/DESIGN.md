@@ -112,25 +112,39 @@ cockpit's), dark translucent panels with 1 px lines, thin bars, no gradients or 
 
 ## Flight model (decided)
 
-Real forces, arcade numbers, no hand-holding: the owner wants flying to depend on the
-pilot alone, like the helicopters in Wardogs. Built in `Choppa.step`, deterministic and
-cheap for netcode.
+Two models, chosen on the title screen ("Flight") or in the settings:
+
+- **Realistic** (default): real forces, arcade numbers, no hand-holding, the owner's
+  request after flying the first build (like the helicopters in Wardogs, with some
+  weight to it). Built in `Choppa.step`, deterministic and cheap for netcode.
+- **Easy** (`Choppa._step_easy`): the first build's drone, kept for newcomers. No
+  gravity, hovers by itself, WASD moves and strafes, Q/E or the mouse turn, mouse Y
+  aims the nose and the choppa flies where it points (so nose down plus forward
+  descends), Space/C climb and dive. The body leans into the motion. Rolling hard is
+  not a thing here, so missiles cannot be shaken off.
+
+The realistic model:
 
 - **Forces:** gravity; rotor thrust along the body's up axis (collective 0 holds a
   level hover, +-1 adds or takes 60 %); the afterburner along the nose; drag per body
   axis, lowest along the nose, so the choppa flies best the way it points and slides
   in a turn. Tilting the nose down is what accelerates you; bank to slide sideways;
   a hard pull makes a loop, a hard roll a barrel roll. No scripted moves.
-- **Attitude:** the stick asks for rotation rates (pitch 2.4, roll 3.6, yaw 2.0 rad/s
-  at full deflection) and the body follows with inertia. Nothing levels the nose by
-  itself. *Flight assist* (setting, off by default) adds auto-level and height hold.
+- **Attitude:** the stick asks for rotation rates (pitch 2.0, roll 2.8, yaw 1.6 rad/s
+  at full deflection) and the body follows with inertia (7 rad/s^2). Thrust follows
+  the collective with a 0.35 s lag. That inertia and lag, plus low drag across the
+  body so it keeps sliding, are the "weight" the owner asked for. Nothing levels the
+  nose by itself. *Flight assist* (setting, off by default) adds auto-level and
+  height hold.
 - **Afterburner:** Shift / RB. About two seconds of charge, back in five when off;
   the HUD bar shows it. The TURBO item is a stronger burst.
 - **Ground effect:** a little extra thrust in the last six metres.
 - **Ceiling:** no climbing above the map's ceiling.
 - Collisions bounce you off walls, stun you briefly and kill most of the spin. Any
-  impact over 8 m/s costs health (2 per m/s above that); a crash soon after being shot
-  credits the shooter.
+  impact over 8 m/s costs health (2 per m/s above that), at most once every 0.4 s so
+  scraping along terrain is not instant death. On the ground only the sink rate counts
+  and the skids drag you to a stop, so landings are safe below 8 m/s. A crash soon
+  after being shot credits the shooter.
 - Rolling hard (over 2.8 rad/s) throws off bullets and shakes a missile's lock, which
   then veers wide. Pilot skill, not a button.
 

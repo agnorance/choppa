@@ -6,13 +6,22 @@ extends RefCounted
 ## the vertical part picks the collective with the tilt compensated.
 
 const MAX_TILT := 0.65  ## rad, about 37 degrees of nose-down or bank.
-const ACCEL_GAIN := 1.4  ## Wanted acceleration per m/s of velocity error.
+const ACCEL_GAIN := 1.8  ## Wanted acceleration per m/s of velocity error.
 const MAX_ACCEL := 9.0
 const TILT_GAIN := 2.8  ## Stick per radian of tilt error. Softer gains let the race bots drift into tunnel walls.
 const RATE_DAMPING := 0.25  ## Stick against the current rotation rate.
 
 
 static func fly(c: Choppa, i: PilotInput, want_velocity: Vector3, look_at: Vector3) -> void:
+	var yaw_local := c.facing().inverse() * (look_at - c.global_position)
+	if c.easy:
+		# Drone controls: a move stick in the yaw frame, collective as climb rate.
+		var local_want := c.facing().inverse() * want_velocity
+		i.move = (Vector2(local_want.x, -local_want.z) / c.max_speed).limit_length(1.0)
+		i.collective = clampf(want_velocity.y / c.climb_speed, -1.0, 1.0)
+		i.yaw = clampf(atan2(yaw_local.x, -yaw_local.z) * 2.5, -1.0, 1.0)
+		i.cyclic.y = clampf(-c._aim * 3.0, -1.0, 1.0)  # Keep the nose level.
+		return
 	var want_accel := ((want_velocity - c.velocity) * ACCEL_GAIN).limit_length(MAX_ACCEL)
 	var yaw_frame := c.facing()
 	var local := yaw_frame.inverse() * want_accel

@@ -22,9 +22,9 @@ Little Bird style choppa with cockpit view, effects, pines, grass, water, explos
 synthesized sound effects. All of that is on `main` (PR #1). New work continues on
 `godot-foundation`; open a PR to `main` when a chunk is done. Merging is the owner's
 call: they merge on GitHub (with "Create a merge commit").
-Load times are done (grass on threads, baked textures). Noted for later (ask before starting): flight physics feel pass (DESIGN.md, "Physics
-ideas"), UI overhaul (DESIGN.md, Milestones), choppa colours/customization, LAN
-multiplayer. Each session: check `git log` and the roadmap, then confirm the next step.
+Load times are done (grass on threads, baked textures). Noted for later (ask before
+starting): flight physics feel pass (DESIGN.md, "Physics ideas"), UI overhaul
+(DESIGN.md, Milestones), choppa colours/customization, LAN multiplayer. Each session: check `git log` and the roadmap, then confirm the next step.
 
 ## Commands
 

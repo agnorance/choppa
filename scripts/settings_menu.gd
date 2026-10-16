@@ -332,7 +332,7 @@ func _bindings() -> Control:
 	box.add_child(_spacer(16))
 	box.add_child(UiKit.rule())
 	box.add_child(_spacer(8))
-	box.add_child(UiKit.label("Gamepad: left stick flies, right stick turns and climbs,\nRB boost, RT fire, A trick, X item, Y camera, Start pause.\nIn menus: LB / RB (or Q / E) switch tabs.", 14, UiKit.FAINT))
+	box.add_child(UiKit.label("Gamepad: left stick pitch and roll, right stick yaw and\ncollective. RT gun, LT rockets, RB missile, B flares,\nX mine, LB afterburner, Y camera, Start pause.\nIn menus: LB / RB (or Q / E) switch tabs.", 14, UiKit.FAINT))
 	return panel
 
 

@@ -336,6 +336,45 @@ static func item_row(parent: Node3D, center: Vector3, yaw: float, count: int, sp
 		parent.add_child(box)
 
 
+## A sculpted rock model from assets/models/rocks (see tools/blender/make_rocks.py),
+## textured with triplanar stone and given an exact collision mesh.
+static func rock(
+	parent: Node3D, model: String, at: Vector3, yaw := 0.0, size := 1.0, color := SANDSTONE
+) -> Node3D:
+	var key := "rock_" + model
+	if not _meshes.has(key):
+		var scene: PackedScene = load("res://assets/models/rocks/%s.glb" % model)
+		var probe := scene.instantiate()
+		var mesh: Mesh = probe.find_children("*", "MeshInstance3D")[0].mesh
+		probe.free()
+		_meshes[key] = [mesh, mesh.create_trimesh_shape()]
+	var body := StaticBody3D.new()
+	body.position = at
+	body.rotation.y = yaw
+	body.scale = Vector3.ONE * size
+	_mesh_child(body, _meshes[key][0], surface(color), Vector3.ZERO)
+	var shape := CollisionShape3D.new()
+	shape.shape = _meshes[key][1]
+	body.add_child(shape)
+	parent.add_child(body)
+	return body
+
+
+## Warm lights along two crossing tunnels (along local X and Z), as in the mesa model.
+static func tunnel_lights(parent: Node3D, center: Vector3, half_length: float, height: float) -> void:
+	for at: Vector3 in [
+		Vector3.ZERO, Vector3(half_length * 0.5, 0, 0), Vector3(-half_length * 0.5, 0, 0),
+		Vector3(0, 0, half_length * 0.5), Vector3(0, 0, -half_length * 0.5),
+	]:
+		var light := OmniLight3D.new()
+		light.light_color = Color(1.0, 0.72, 0.42)
+		light.light_energy = 2.5
+		light.omni_range = 24.0
+		light.shadow_enabled = Graphics.at_least(Graphics.Quality.HIGH)
+		light.position = center + at + Vector3.UP * height
+		parent.add_child(light)
+
+
 ## A mesa with two tunnels crossing at its center, along local X and Z.
 static func cross_mesa(
 	parent: Node3D, center: Vector3, size: float, height: float, tunnel_width: float,

@@ -39,15 +39,16 @@ func _ready() -> void:
 	add_child(terrain)
 	MapKit.backdrop(self, 420.0, 7)
 
-	MapKit.cross_mesa(self, Vector3(0.0, -2.0, 0.0), 110.0, 42.0, 22.0, 17.0, Color(0.76, 0.47, 0.31))
-	MapKit.item_row(self, Vector3(0.0, 45.0, 0.0), 0.0, 2, 10.0)
+	MapKit.rock(self, "mesa", Vector3(0.0, -2.0, 0.0), 0.0, 1.0, Color(0.76, 0.47, 0.31))
+	MapKit.tunnel_lights(self, Vector3.ZERO, 110.0, 12.0)
+	MapKit.item_row(self, Vector3(0.0, 50.0, 0.0), 0.0, 2, 10.0)
 
 	# Ring of ruined arches around the mesa.
 	for k in 6:
 		var angle := TAU * k / 6.0 + 0.3
 		var at := Vector3(cos(angle), 0.0, sin(angle)) * 150.0
-		at.y = _ground(at.x, at.z) - 3.0
-		MapKit.arch(self, at, -(angle + PI * 0.5), 24.0, 22.0, MapKit.SANDSTONE)
+		at.y = _ground(at.x, at.z) - 1.0
+		MapKit.rock(self, "arch_%d" % (k % 2 + 1), at, -(angle + PI * 0.5), _rng.randf_range(0.9, 1.1))
 	for k in 10:
 		var angle := _rng.randf() * TAU
 		var at := Vector3(cos(angle), 0.0, sin(angle)) * _rng.randf_range(115.0, 190.0)
@@ -63,7 +64,8 @@ func _ready() -> void:
 			continue
 		placed += 1
 		at.y = _ground(at.x, at.z) - 2.0
-		MapKit.hoodoo(self, at, _rng.randf_range(3.0, 5.5), _rng.randf_range(22.0, 48.0))
+		MapKit.rock(self, "hoodoo_%d" % _rng.randi_range(1, 3), at, _rng.randf() * TAU,
+			_rng.randf_range(0.8, 1.2), MapKit.SANDSTONE.lerp(MapKit.ROCK, _rng.randf() * 0.5))
 
 	# Bridge over the trench.
 	var trench_x := _trench_center(0.0)
@@ -85,7 +87,8 @@ func _ready() -> void:
 	for k in 45:
 		var at := Vector3(_rng.randf_range(-260.0, 260.0), 0.0, _rng.randf_range(-260.0, 260.0))
 		if _clear_of_structures(at):
-			MapKit.boulder(self, Vector3(at.x, _ground(at.x, at.z), at.z), _rng.randf_range(2.0, 6.0))
+			MapKit.rock(self, "boulder_%d" % _rng.randi_range(1, 4), Vector3(at.x, _ground(at.x, at.z), at.z),
+				_rng.randf() * TAU, _rng.randf_range(1.0, 3.2), MapKit.ROCK)
 
 
 	# Pickups.

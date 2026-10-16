@@ -51,6 +51,11 @@ twist, heavy atmosphere, strong lighting and post-processing.
   shock wave of bent air, a light, a scorch mark on the ground, and camera shake.
   Bullet hits spark off metal, kick up dust and chips from the ground, splash on water.
   Tracers glow.
+- Sound (`tools/audio/make_sounds.py`, all synthesized): rotor blade slap and a lumpy
+  radial engine (pitch follows rotor speed and lift), boost roar, machine gun rounds,
+  impacts on metal, dirt and water, explosions (deeper for bigger blasts), missile
+  launch and motor, missile lock warning in the cockpit, item pickup chime. 3D
+  positioned, far sounds lose their highs. To tune on real speakers.
 
 ## Game feel (decided)
 
@@ -212,8 +217,8 @@ Low-poly, flat-shaded look with strong colours.
    rotor dust, boost flame, muzzle flash, damage smoke).
 3. **Items** *(done)*: missile, mine, fake box, smoke, scrambler, shield, GET TO THE
    CHOPPA, with scoreboard-weighted odds; bots use them.
-4. **Feel pass:** tune on real hardware (Windows + Android), audio, camera shake, hit
-   markers.
+4. **Feel pass:** tune on real hardware (Windows + Android): physics (see Physics
+   ideas), sound mix, camera shake, hit markers. Music is still missing.
    **UI overhaul (owner's request, to do):** menus, HUD, scoreboard and touch controls
    are still placeholder Godot controls; restyle them to match the PVKK-like look
    (stencil type, worn metal panels, amber/cream instruments).

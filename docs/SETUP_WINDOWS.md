@@ -100,6 +100,8 @@ scripts in `tools/blender/` and committed, so you only need this to change them.
    - `python tools/blender/make_cockpit.py`: the cockpit interior
    - `python tools/blender/make_trees.py`: the pines and their needle texture
      (`--preview out_dir` too)
+4. Sounds don't need Blender: `pip install numpy`, then
+   `python tools/audio/make_sounds.py` (or with names, e.g. `gun explosion`).
 
 You can also open the results in the regular Blender 5.2 app.
 

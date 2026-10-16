@@ -271,6 +271,8 @@ class Impact extends Node3D:
 
 	func _start() -> void:
 		var out := normal.normalized()
+		var sound: String = ["impact_metal", "impact_dirt", "splash"][kind]
+		Sounds.play_at(get_parent(), sound, global_position, -8.0, randf_range(0.9, 1.15), 0.6)
 		match kind:
 			Kind.METAL:
 				var s := Effects.sparks(14, 0.35, Vector2(8.0, 20.0), Color(4.0, 2.2, 0.7), 0.25)
@@ -441,6 +443,9 @@ class Explosion extends Node3D:
 		add_child(_light)
 
 		_scorch_ground()
+		# Bigger blasts are louder and deeper.
+		Sounds.play_at(get_parent(), "explosion", global_position, 4.0 + linear_to_db(size),
+			randf_range(0.9, 1.05) / pow(size, 0.25), 2.0)
 		get_tree().call_group("shake_cameras", "shake_from", global_position, size)
 
 	func _scorch_ground() -> void:

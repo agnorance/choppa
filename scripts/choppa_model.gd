@@ -31,6 +31,10 @@ var _downwash_material: ShaderMaterial
 var _dust_colors: Gradient
 var _spray_colors: Gradient
 var _cracks: Array[MeshInstance3D] = []
+var _rotor_sound: AudioStreamPlayer3D
+var _engine_sound: AudioStreamPlayer3D
+var _boost_sound: AudioStreamPlayer3D
+var _last_shot := -10.0
 var _bubble: MeshInstance3D
 var _bubble_material: StandardMaterial3D
 var _sparks: CPUParticles3D
@@ -84,6 +88,19 @@ func _ready() -> void:
 	for exhaust in ["exhaust_l", "exhaust_r"]:
 		_haze.append(_build_haze(_marker(model, exhaust)))
 	_build_downwash()
+
+	# Rotor slap carries furthest; the engine and boost roar are closer up.
+	_rotor_sound = Sounds.loop_on(self, "rotor_loop", -4.0, 1.4)
+	_rotor_sound.position = _rotor.position
+	_engine_sound = Sounds.loop_on(self, "engine_loop", -8.0)
+	_engine_sound.position = _rotor.position * Vector3(1.0, 0.6, 1.0)
+	_boost_sound = Sounds.loop_on(self, "boost_loop", -6.0)
+	_boost_sound.position = _engine_sound.position + Vector3(0.0, 0.0, 1.0)
+	_boost_sound.stream_paused = true
+	if own and pilot:
+		pilot.item_changed.connect(func(item: String) -> void:
+			if item != "":
+				Sounds.play_ui(self, "pickup", -6.0))
 
 	# Rotor downwash kicking up dust (or spray over water) when flying low.
 	_dust_colors = Effects.gradient([
@@ -207,6 +224,15 @@ func update_pose(c: Choppa, delta: float) -> void:
 	_rotor.rotate_y(_rotor_speed * delta)
 	_tail_rotor.rotate_x(_rotor_speed * 1.6 * delta)
 	_blur_material.albedo_color.a = clampf((_rotor_speed - 8.0) / 80.0, 0.0, 0.1)
+	_rotor_sound.pitch_scale = clampf(_rotor_speed / 22.0, 0.5, 1.6)
+	_engine_sound.pitch_scale = clampf(0.85 + _rotor_speed / 80.0 + c.input.lift * 0.08, 0.6, 1.5)
+	_rotor_sound.stream_paused = not c.alive
+	_engine_sound.stream_paused = not c.alive
+	_boost_sound.stream_paused = not c.is_boosting() or not c.alive
+	if c.last_shot_time != _last_shot and c.last_shot_time > _last_shot:
+		_last_shot = c.last_shot_time
+		var muzzle := global_transform * (_flashes[1 if c.last_shot_side > 0.0 else 0].position)
+		Sounds.play_at(get_tree().current_scene, "gun", muzzle, -6.0, randf_range(0.92, 1.08))
 
 	_parts.visible = c.invulnerable <= 0.0 or fmod(c.invulnerable, 0.2) > 0.08
 	if cockpit_view:  # Blinks with the hull in chase view; always there from the seat.

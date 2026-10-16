@@ -57,6 +57,8 @@ class Missile extends Node3D:
 		_trail.scale_amount_max = 1.6
 		add_child(_trail)
 		_trail.emitting = true
+		Sounds.play_on(self, "missile_launch", -2.0)
+		Sounds.loop_on(self, "missile_loop", -6.0, 0.8)
 		_face()
 
 	## True while it still homes in on `who`.

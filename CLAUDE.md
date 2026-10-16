@@ -14,7 +14,9 @@ changing gameplay or looks; it records what the owner decided).
 ## Where things stand
 
 Done: flight model, tricks, boost, battle/free/race modes, items, bots, Mesa Basin, the
-Little Bird style choppa with cockpit view, effects, pines, grass, water, explosions.
+Little Bird style choppa with cockpit view, effects, pines, grass, water, explosions,
+synthesized sound effects. PR #1 (`godot-foundation` -> `main`) waits for the owner to
+merge it on GitHub (merging is the owner's call).
 Noted for later (ask before starting): flight physics feel pass (DESIGN.md, "Physics
 ideas"), UI overhaul (DESIGN.md, Milestones), choppa colours/customization, LAN
 multiplayer. Each session: check `git log` and the roadmap, then confirm the next step.
@@ -49,6 +51,7 @@ Godot must be 4.7.2. Two environments:
 - `blender-assets`: regenerate or change textures and models made in Blender.
 - `add-item`: add a new item (box pickup) end to end.
 - `add-map`: add a new arena.
+- `sound`: synthesize, tune and wire up sound effects.
 - `ship`: test, document, commit and push a change, then watch CI.
 
 ## Code rules
@@ -66,8 +69,14 @@ Godot must be 4.7.2. Two environments:
   near 1 and saturated.
 - `Graphics.quality` (LOW / MEDIUM / HIGH) decides how much detail to spend. Headless
   runs are LOW (no grass), the Compatibility renderer is LOW, phones MEDIUM, desktop HIGH.
+- Sounds come from `tools/audio/make_sounds.py` (numpy only): synthesized, committed as
+  `assets/sounds/*.wav`. Loops (`*_loop`) need `edit/loop_mode=2` in their `.import`.
+  Play them through `Sounds` (`scripts/sounds.gd`). Nobody can listen in the cloud:
+  ask the owner how new sounds feel and tune the generator.
 - Textures/models come from Blender scripts in `tools/blender/` (`pip install bpy==5.2.2`).
   Generated files are committed. Texture `.import` files must keep VRAM compression and
   mipmaps (and `normal_map=1` for normal maps). Details: the `blender-assets` skill.
+- Known harmless noise: the test run ends with "3 resources still in use at exit"
+  (an audio playback still registered when the headless run quits).
 - Match the surrounding code: GDScript with static types, `##` doc comments on classes
   and public members, comments explain why rather than what.

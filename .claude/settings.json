@@ -25,7 +25,9 @@
       "Bash(python tools/blender/make_cockpit.py:*)",
       "Bash(python3 tools/blender/make_cockpit.py:*)",
       "Bash(python tools/blender/make_trees.py:*)",
-      "Bash(python3 tools/blender/make_trees.py:*)"
+      "Bash(python3 tools/blender/make_trees.py:*)",
+      "Bash(python tools/audio/make_sounds.py:*)",
+      "Bash(python3 tools/audio/make_sounds.py:*)"
     ]
   }
 }

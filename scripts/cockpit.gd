@@ -28,6 +28,7 @@ var _beacon_light: SpotLight3D
 var _beacon_dome: StandardMaterial3D
 var _radar: RadarScreen
 var _clock := 0.0
+var _warning: AudioStreamPlayer
 
 
 ## The bare interior (no live instruments), for other choppas seen through their canopy.
@@ -61,6 +62,12 @@ func _ready() -> void:
 			["shield", Color(0.2, 0.8, 1.0), "SHLD"], ["scrambled", Color(0.75, 0.3, 1.0), "SCRM"]]:
 		_lamps[lamp[0]] = _build_lamp(_mount(shell, "lamp_" + lamp[0]), lamp[1], lamp[2])
 	_build_beacon(_mount(shell, "beacon"))
+	_warning = AudioStreamPlayer.new()
+	_warning.stream = Sounds.stream("warning_loop")
+	_warning.volume_db = -12.0
+	add_child(_warning)
+	_warning.play()
+	_warning.stream_paused = true
 	reticle = _mount(shell, "sight")
 	_build_reticle(reticle)
 
@@ -111,6 +118,7 @@ func _process(delta: float) -> void:
 	_set_lamp("shield", choppa.shield > 0.0 or choppa.rampage > 0.0)
 	_set_lamp("scrambled", choppa.scrambled > 0.0)
 	_beacon_light.visible = hunted
+	_warning.stream_paused = not hunted
 	_beacon_dome.emission_energy_multiplier = 4.0 if hunted else 0.2
 	if hunted:
 		_beacon.rotate_object_local(Vector3.UP, delta * 9.0)

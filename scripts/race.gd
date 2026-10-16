@@ -89,9 +89,6 @@ func tick(delta: float) -> void:
 				choppa.locked = false
 		return
 	time += delta
-	var order := standings()
-	for n in order.size():
-		order[n].standing = float(n) / maxi(1, order.size() - 1)
 	if _grace >= 0.0:
 		_grace -= delta
 		if _grace <= 0.0:

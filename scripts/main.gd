@@ -9,7 +9,7 @@ extends Node
 ##   --pause=<tick>           open the pause menu at that tick (the --shot is taken then)
 ##   --laps=<n>               race laps (default 3)
 ##   --kills=<n>              battle kill limit (default 8)
-##   --autopilot=<plan>       fly a ScriptedPilot plan instead of reading controls;
+##   --autopilot=<plan>       fly a ScriptedPilot plan (hover, forward, weapon:missile...);
 ##                            "bot" lets the mode's AI fly you
 ##   --spawn=x,y,z[,yaw]      start position, yaw in degrees (free flight)
 ##   --cam=fp|showcase        start in first-person view / a fixed front view of the choppa
@@ -20,6 +20,7 @@ extends Node
 ##   --health=<n>             start with this much health (to see damage effects)
 ##   --wear=tail,rotor,engine start with these parts wrecked (spin, shaking, weak engine)
 ##   --easy                   fly the easy model whatever the setting says
+##   --airframe=scout|gunship|heavy  fly that class whatever the setting says
 ##   --explode=<tick>         set off an explosion 26 m ahead of you at that tick
 ##   --timing                 print how long the map build and the first frame took
 
@@ -103,7 +104,8 @@ func _show_menu() -> void:
 
 func _start() -> void:
 	var slot := RACE_GRID_SLOT if mode == "race" else 0
-	choppa = _new_choppa("You", Color(0.95, 0.5, 0.1), map.spawn_points[slot], true)
+	var mine: String = _args.get("airframe", Airframe.ORDER[Settings.choice("airframe")])
+	choppa = _new_choppa("You", Color(0.95, 0.5, 0.1), map.spawn_points[slot], true, mine)
 	choppa.aim_assist = Settings.flag("aim_assist")
 	choppa.flight_assist = Settings.flag("flight_assist")
 	choppa.easy = Settings.choice("flight_model") == 0 or _args.has("easy")
@@ -159,9 +161,11 @@ func _start() -> void:
 	_update_mouse()
 
 
-func _new_choppa(pilot_name: String, color: Color, at: Transform3D, local := false) -> Choppa:
+## A choppa in the world. Rivals fly a class picked from their name, so a match mixes them.
+func _new_choppa(pilot_name: String, color: Color, at: Transform3D, local := false, airframe := "") -> Choppa:
 	var c := Choppa.new()
 	c.local_player = local  # Must be set before _ready: it decides the cockpit and layers.
+	c.airframe = airframe if airframe != "" else Airframe.ORDER[hash(pilot_name) % Airframe.ORDER.size()]
 	c.pilot_name = pilot_name
 	c.team_color = color
 	c.max_altitude = map.ceiling

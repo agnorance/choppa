@@ -22,9 +22,6 @@ func _run() -> void:
 		"test_cannot_dive_through_ground",
 		"test_boost_is_faster_and_drains_meter",
 		"test_wall_hit_bounces_and_stuns",
-		"test_turbo_item",
-		"test_item_box_gives_item_and_respawns",
-		"test_item_roll_only_returns_known_items",
 		"test_gun_fires_and_overheats",
 		"test_gun_cools_down_after_overheat",
 		"test_bullets_knock_target_back",
@@ -40,17 +37,12 @@ func _run() -> void:
 		"test_crash_after_hit_credits_attacker",
 		"test_battle_kills_respawn_and_limit",
 		"test_battle_time_limit",
-		"test_health_crate_heals",
 		"test_terrain_collision_matches_mesh",
 		"test_bots_battle_in_arena",
 		"test_missile_homes_and_hits",
 		"test_rolling_hard_shakes_off_missile",
 		"test_mine_arms_then_explodes",
-		"test_fake_item_box_explodes",
 		"test_smoke_blocks_lock_on",
-		"test_scrambler_hits_the_leader",
-		"test_shield_absorbs_damage",
-		"test_get_to_the_choppa",
 		"test_effects_start_where_placed",
 		"test_grass_only_on_flat_dry_ground",
 		"test_canopy_cracks_follow_damage",
@@ -63,6 +55,13 @@ func _run() -> void:
 		"test_blast_wrecks_the_nearest_part",
 		"test_landing_is_gentle_slamming_is_not",
 		"test_easy_model_hovers_and_flies_where_it_looks",
+		"test_loadout_runs_out_and_waits_between_shots",
+		"test_rocket_hits_the_part_it_strikes",
+		"test_flares_break_a_missile_lock",
+		"test_station_repairs_and_rearms_then_powers_down",
+		"test_station_needs_a_landing",
+		"test_airframes_differ",
+		"test_hurt_bot_lands_at_a_station",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -163,46 +162,6 @@ func test_wall_hit_bounces_and_stuns() -> void:
 	await _fly(choppa, 40)
 	_check(bumps.size() >= 1, "bumped the wall")
 	_check(choppa.global_position.z > -20.0, "did not pass through, z=%f" % choppa.global_position.z)
-
-
-func test_turbo_item() -> void:
-	var choppa := _choppa(Vector3(0.0, 10.0, 0.0))
-	choppa.boost_meter = 0.0
-	_check(choppa.give_item("TURBO"), "slot was empty")
-	_check(not choppa.give_item("TURBO"), "slot holds one item")
-	await _fly(choppa, 80, func(i: PilotInput, t: int) -> void: i.use_item = t < 3)
-	_check(choppa.item == "", "item consumed")
-	_check(choppa.velocity.length() > choppa.boost_speed, "turbo speed, v=%f" % choppa.velocity.length())
-
-
-func test_item_box_gives_item_and_respawns() -> void:
-	var box := ItemBox.new()
-	box.position = Vector3(0.0, 10.0, -15.0)
-	_world.add_child(box)
-	var choppa := _choppa(Vector3(0.0, 10.0, 0.0))
-	choppa.velocity = Vector3(0.0, 0.0, -20.0)  # Coasting into it.
-	await _fly(choppa, 60)
-	_check(Items.TABLE.has(choppa.item), "got an item, item=%s" % choppa.item)
-	_check(not box.is_available(), "box broke")
-	box._process(ItemBox.RESPAWN_TIME + 0.1)
-	_check(box.is_available(), "box respawned")
-
-
-func test_item_roll_only_returns_known_items() -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 1
-	var leader := {}
-	var last := {}
-	for n in 2000:
-		var a := Items.roll(rng, 0.0)
-		var b := Items.roll(rng, 1.0)
-		leader[a] = leader.get(a, 0) + 1
-		last[b] = last.get(b, 0) + 1
-	_check(leader.keys().all(func(k: String) -> bool: return Items.TABLE.has(k)), "known items")
-	_check(not leader.has("SCRAMBLER"), "the leader never gets the scrambler")
-	_check(not leader.has("GET TO THE CHOPPA"), "the leader never gets the comeback item")
-	_check(last.get("GET TO THE CHOPPA", 0) > 300, "last place gets the comeback item")
-	_check(last.get("MISSILE", 0) > leader.get("MISSILE", 0) * 2, "missiles favour those behind")
 
 
 func _bullets() -> Array:
@@ -494,18 +453,6 @@ func test_battle_time_limit() -> void:
 	_check(battle.over and battle.time_left == 0.0, "time runs out")
 
 
-func test_health_crate_heals() -> void:
-	var crate := HealthCrate.new()
-	crate.position = Vector3(0.0, 10.0, -15.0)
-	_world.add_child(crate)
-	var choppa := _choppa(Vector3(0.0, 10.0, 0.0))
-	choppa.damage(70.0, null)
-	choppa.velocity = Vector3(0.0, 0.0, -20.0)  # Coasting into it.
-	await _fly(choppa, 60)
-	_check(is_equal_approx(choppa.health, 30.0 + HealthCrate.HEAL), "healed, hp=%f" % choppa.health)
-	_check(not crate.is_available(), "crate used up")
-
-
 func test_terrain_collision_matches_mesh() -> void:
 	var terrain := Terrain.new()
 	terrain.size = 200.0
@@ -538,6 +485,7 @@ func test_bots_battle_in_arena() -> void:
 	var bumps := {}
 	var travelled := {}
 	var used := []
+	var serviced := []
 	var dealt := [0.0]
 	for c in field:
 		c.damaged.connect(func(amount: float, attacker: Choppa) -> void:
@@ -546,12 +494,14 @@ func test_bots_battle_in_arena() -> void:
 		bumps[c] = 0
 		travelled[c] = 0.0
 		c.bumped.connect(func(_i: float) -> void: bumps[c] += 1)
-		c.item_used.connect(func(item_name: String) -> void: used.append(item_name))
+		c.fired.connect(func(weapon: String) -> void: used.append(weapon))
 		var bot := FighterBot.new()
 		bot.choppa = c
 		bot.ceiling = map.ceiling
 		bot.rng.seed = hash(c.pilot_name)
 		_world.add_child(bot)
+	for node in _world.get_tree().get_nodes_in_group("stations"):
+		(node as ServiceStation).served.connect(func(c: Choppa) -> void: serviced.append(c.pilot_name))
 	var last := {}
 	for c in field:
 		last[c] = c.global_position
@@ -563,7 +513,10 @@ func test_bots_battle_in_arena() -> void:
 			last[c] = c.global_position
 	var summary := field.map(func(c: Choppa) -> String:
 		return "%s k%d d%d bumps%d %.0fm" % [c.pilot_name, battle.kills_of(c), battle.deaths_of(c), bumps[c], travelled[c]])
-	print("    ", summary, " damage dealt: %d, items used: %s" % [dealt[0], used])
+	var counts := {}
+	for weapon in used:
+		counts[weapon] = counts.get(weapon, 0) + 1
+	print("    ", summary, " damage dealt: %d, weapons fired: %s, serviced: %s" % [dealt[0], counts, serviced])
 	var kills := 0
 	for c in field:
 		kills += battle.kills_of(c)
@@ -571,10 +524,11 @@ func test_bots_battle_in_arena() -> void:
 	# Exact kill counts vary between machines; what matters is that they fight.
 	_check(dealt[0] >= 300.0, "bots deal real damage, got %d" % dealt[0])
 	_check(kills >= 2, "bots score kills, got %d" % kills)
-	_check(used.size() >= 4, "bots use items, got %s" % [used])
+	_check(counts.get("rockets", 0) >= 4, "bots fire rockets, got %s" % [counts])
+	_check(serviced.size() >= 1, "bots land at service stations, got %s" % [serviced])
 
 
-## Steps choppas by hand for `ticks` ticks while the item objects run on their own.
+## Steps choppas by hand for `ticks` ticks while the weapon objects run on their own.
 func _step_all(field: Array, ticks: int) -> void:
 	for t in ticks:
 		await physics_frame
@@ -586,9 +540,8 @@ func test_missile_homes_and_hits() -> void:
 	var shooter := _choppa(Vector3(0.0, 20.0, 0.0))
 	# Off to the side and higher: only a homing missile can hit this.
 	var target := _choppa(Vector3(40.0, 35.0, -90.0))
-	shooter.give_item("MISSILE")
 	_check(shooter.missile_target() == target, "locks on")
-	shooter.use_item()
+	_check(shooter.fire_missile(), "fired")
 	await _step_all([shooter, target], 150)
 	_check(target.health < Choppa.MAX_HEALTH - 20.0, "missile hit, hp=%f" % target.health)
 	_check(shooter.health == Choppa.MAX_HEALTH, "shooter unhurt")
@@ -597,8 +550,7 @@ func test_missile_homes_and_hits() -> void:
 func test_rolling_hard_shakes_off_missile() -> void:
 	var shooter := _choppa(Vector3(0.0, 20.0, 0.0))
 	var target := _choppa(Vector3(0.0, 20.0, -120.0))
-	shooter.give_item("MISSILE")
-	shooter.use_item()
+	shooter.fire_missile()
 	var missile: Weapons.Missile = _world.get_children().filter(func(n: Node) -> bool: return n is Weapons.Missile)[0]
 	for t in 150:
 		await physics_frame
@@ -612,8 +564,7 @@ func test_rolling_hard_shakes_off_missile() -> void:
 func test_mine_arms_then_explodes() -> void:
 	var layer := _choppa(Vector3(0.0, 20.0, 0.0))
 	var victim := _choppa(Vector3(0.0, 20.0, 60.0))
-	layer.give_item("MINE")
-	layer.use_item()
+	_check(layer.drop_mine(), "dropped")
 	await _step_all([layer, victim], 10)
 	_check(layer.health == Choppa.MAX_HEALTH, "doesn't go off under its owner before arming")
 	await _step_all([layer], 60)
@@ -623,20 +574,6 @@ func test_mine_arms_then_explodes() -> void:
 		await physics_frame
 		victim.step(TICK)
 	_check(victim.health <= Choppa.MAX_HEALTH - 25.0, "mine went off, hp=%f" % victim.health)
-
-
-func test_fake_item_box_explodes() -> void:
-	var layer := _choppa(Vector3(0.0, 20.0, 0.0))
-	layer.give_item("FAKE BOX")
-	layer.use_item()
-	await _step_all([layer], 70)
-	var victim := _choppa(Vector3(0.0, 20.0, 40.0))
-	for t in 120:
-		victim.velocity = Vector3(0.0, 0.0, -25.0)  # Held at speed; drag would slow it.
-		await physics_frame
-		victim.step(TICK)
-	_check(victim.health < Choppa.MAX_HEALTH, "fake box hurt, hp=%f" % victim.health)
-	_check(victim.item == "", "and gave no item")
 
 
 func test_smoke_blocks_lock_on() -> void:
@@ -649,50 +586,6 @@ func test_smoke_blocks_lock_on() -> void:
 	_check(b.in_smoke(), "b is in the cloud")
 	_check(a.aim_target() == null, "can't lock onto a choppa in smoke")
 	_check(b.aim_target() == null, "can't lock from inside smoke")
-
-
-func test_scrambler_hits_the_leader() -> void:
-	var user := _choppa(Vector3(0.0, 20.0, 0.0))
-	var leader := _choppa(Vector3(50.0, 20.0, 0.0))
-	var other := _choppa(Vector3(-20.0, 20.0, 0.0))
-	user.standing = 1.0
-	leader.standing = 0.0
-	other.standing = 0.5
-	user.give_item("SCRAMBLER")
-	user.use_item()
-	_check(leader.scrambled > 0.0 and other.scrambled == 0.0, "the leader got scrambled")
-	await _fly(leader, 30, func(i: PilotInput, _t: int) -> void: i.yaw = 1.0)
-	_check((leader.facing() * Vector3.FORWARD).x < -0.3, "steering right turned it left")
-
-
-func test_shield_absorbs_damage() -> void:
-	var a := _choppa(Vector3(0.0, 20.0, 0.0))
-	a.give_item("SHIELD")
-	a.use_item()
-	a.damage(30.0, null)
-	_check(a.health == Choppa.MAX_HEALTH, "first 40 damage absorbed")
-	a.damage(30.0, null)
-	_check(a.health == Choppa.MAX_HEALTH - 20.0, "the rest gets through, hp=%f" % a.health)
-
-
-func test_get_to_the_choppa() -> void:
-	var a := _choppa(Vector3(0.0, 20.0, 0.0))
-	var b := _choppa(Vector3(0.0, 20.0, -30.0))
-	a.give_item("GET TO THE CHOPPA")
-	a.use_item()
-	a.damage(90.0, b)
-	_check(a.health == Choppa.MAX_HEALTH, "invulnerable during the rampage")
-	_check(a.velocity.length() >= a.boost_speed, "turbo kick")
-	var hits := []
-	b.damaged.connect(func(amount: float, _by: Choppa) -> void: hits.append(amount))
-	a.velocity = Vector3.ZERO
-	for t in 20:
-		a.input.fire = true
-		await physics_frame
-		a.step(TICK)
-	# Shot from behind, the rounds land on the tail boom: a part hit costs 60 % hull.
-	_check(not hits.is_empty() and (is_equal_approx(hits[0], Bullet.DAMAGE * 2.0) or is_equal_approx(hits[0], Bullet.DAMAGE * 1.2)),
-		"double damage, got %s" % [hits])
 
 
 func test_effects_start_where_placed() -> void:
@@ -906,3 +799,149 @@ func test_easy_model_hovers_and_flies_where_it_looks() -> void:
 	choppa.input.clear()  # Let go of the move stick before pulling collective.
 	await _fly(choppa, 60, func(i: PilotInput, _t: int) -> void: i.collective = 1.0)
 	_check(choppa.velocity.y > 8.0, "collective climbs, vy=%f" % choppa.velocity.y)
+
+
+func test_loadout_runs_out_and_waits_between_shots() -> void:
+	var choppa := _choppa(Vector3(0.0, 30.0, 0.0))
+	var rockets: int = choppa.ammo.rockets
+	_check(rockets == Airframe.spec(Airframe.SCOUT).rockets, "full loadout at spawn, %d rockets" % rockets)
+	_check(choppa.fire_rocket(), "first rocket")
+	_check(not choppa.fire_rocket(), "the pods need a moment between rockets")
+	var fired := 1
+	for t in 200:
+		choppa.input.rockets = true
+		await physics_frame
+		choppa.step(TICK)
+	fired = rockets - choppa.ammo.rockets
+	_check(choppa.ammo.rockets == 0 and fired == rockets, "fired them all, then nothing: %d left" % choppa.ammo.rockets)
+	_check(not choppa.fire_rocket(), "empty pods do not fire")
+	choppa.restock()
+	_check(choppa.ammo.rockets == rockets and choppa.ammo.mines == 1, "restock fills everything")
+
+
+func test_rocket_hits_the_part_it_strikes() -> void:
+	var shooter := _choppa(Vector3(0.0, 20.0, 0.0))
+	# Straight ahead, facing away, in line with the shooter's left pod: the rocket meets
+	# the end of its tail boom first.
+	var target := _choppa(Vector3(-1.45, 20.0 - 0.9, -40.0))
+	shooter._rocket_side = -1.0
+	shooter.fire_rocket()
+	await _step_all([shooter, target], 30)
+	_check(target.health < Choppa.MAX_HEALTH, "the rocket hit, hp=%f" % target.health)
+	_check(target.wear(Choppa.Part.TAIL) > 0.2, "and wrecked the tail rotor it struck, wear %f" % target.wear(Choppa.Part.TAIL))
+
+
+func test_flares_break_a_missile_lock() -> void:
+	var shooter := _choppa(Vector3(0.0, 20.0, 0.0))
+	var target := _choppa(Vector3(0.0, 20.0, -120.0))
+	shooter.fire_missile()
+	await _step_all([shooter, target], 30)
+	var missile: Weapons.Missile = _world.get_children().filter(func(n: Node) -> bool: return n is Weapons.Missile)[0]
+	_check(missile.is_hunting(target), "the missile is chasing the target")
+	_check(target.fire_flares(), "flares out")
+	_check(not missile.is_hunting(target), "the lock is broken")
+	await _step_all([shooter, target], 150)
+	_check(target.health == Choppa.MAX_HEALTH, "the missile missed, hp=%f" % target.health)
+	var second := _choppa(Vector3(0.0, 20.0, 40.0))
+	second.global_transform.basis = Basis(Vector3.UP, PI)
+	second.fire_missile()
+	var m2: Weapons.Missile = _world.get_children().filter(func(n: Node) -> bool: return n is Weapons.Missile and n != missile)[0]
+	await _step_all([second, shooter], 2)
+	_check(m2.target == null or not m2.is_hunting(shooter) or shooter.decoy_time == 0.0, "sanity: second missile")
+
+
+## A flat ground and a station on it at the origin.
+func _station_on_ground() -> ServiceStation:
+	_ground()
+	var station := ServiceStation.new()
+	_world.add_child(station)
+	return station
+
+
+func test_station_repairs_and_rearms_then_powers_down() -> void:
+	var station := _station_on_ground()
+	var choppa := _choppa(Vector3(0.0, station.pad_top() + Choppa.GROUND_CLEARANCE + 0.5, 0.0))
+	choppa.damage(60.0, null)
+	choppa.parts[Choppa.Part.TAIL] = 0.0
+	choppa.ammo.rockets = 0
+	var served := []
+	station.served.connect(func(c: Choppa) -> void: served.append(c))
+	# Settle onto the pad with a little less than hover power, then sit.
+	for t in 60 * 6:
+		choppa.input.collective = -0.2
+		await physics_frame
+		choppa.step(TICK)
+		station.tick(TICK)
+	_check(served == [choppa], "serviced once, got %s" % [served])
+	_check(choppa.health == choppa.max_health, "hull repaired, hp=%f" % choppa.health)
+	_check(choppa.wear(Choppa.Part.TAIL) == 0.0, "tail rotor repaired")
+	_check(choppa.ammo.rockets == choppa.full_ammo("rockets"), "rearmed, %d rockets" % choppa.ammo.rockets)
+	_check(not station.is_ready(), "the station powered down")
+	choppa.damage(30.0, null)
+	for t in 60 * 5:
+		await physics_frame
+		choppa.step(TICK)
+		station.tick(TICK)
+	_check(served.size() == 1 and choppa.health < choppa.max_health, "nothing while it is down")
+	station.tick(ServiceStation.COOLDOWN)
+	_check(station.is_ready(), "and back after the cooldown")
+
+
+func test_station_needs_a_landing() -> void:
+	var station := _station_on_ground()
+	var hovering := _choppa(Vector3(0.0, station.pad_top() + 6.0, 0.0))
+	hovering.damage(50.0, null)
+	for t in 60 * 5:
+		await physics_frame
+		hovering.step(TICK)
+		station.tick(TICK)
+	_check(station.occupant == null and hovering.health == Choppa.MAX_HEALTH - 50.0, "hovering 6 m up does not count")
+	var passing := _choppa(Vector3(-20.0, station.pad_top() + Choppa.GROUND_CLEARANCE + 0.2, 0.0))
+	passing.velocity = Vector3(12.0, 0.0, 0.0)
+	for t in 60:
+		passing.velocity.x = 12.0
+		await physics_frame
+		passing.step(TICK)
+		station.tick(TICK)
+	_check(station.occupant != passing, "skimming across at speed does not count")
+
+
+func test_airframes_differ() -> void:
+	var scout := _choppa(Vector3(0.0, 40.0, 0.0))
+	var heavy := _choppa(Vector3(50.0, 40.0, 0.0))
+	heavy.set_airframe(Airframe.HEAVY)
+	_check(heavy.max_health > scout.max_health and heavy.health == heavy.max_health, "the heavy has more hull")
+	_check(heavy.part_max(Choppa.Part.TAIL) > scout.part_max(Choppa.Part.TAIL), "and tougher parts")
+	_check(heavy.ammo.rockets > scout.ammo.rockets, "and more rockets")
+	var roll := func(i: PilotInput, _t: int) -> void: i.cyclic.x = 1.0
+	await _fly(scout, 20, roll)
+	await _fly(heavy, 20, roll)
+	_check(absf(scout.rates.z) > absf(heavy.rates.z) * 1.3, "the scout rolls faster: %f vs %f" % [scout.rates.z, heavy.rates.z])
+	var bullet_damage := []
+	heavy.damaged.connect(func(amount: float, _by: Choppa) -> void: bullet_damage.append(amount))
+	var gunship := _choppa(Vector3(50.0, 40.0, 30.0))
+	gunship.set_airframe(Airframe.GUNSHIP)
+	_check(gunship.gun_factor > scout.gun_factor, "the gunship's guns hit harder")
+	_check(gunship.model.airframe == Airframe.GUNSHIP, "and it wears its own model")
+
+
+func test_hurt_bot_lands_at_a_station() -> void:
+	var station := _station_on_ground()
+	station.position = Vector3(0.0, 0.0, -60.0)
+	var c := Choppa.new()
+	_world.add_child(c)
+	c.respawn(Transform3D(Basis(), Vector3(0.0, 15.0, 0.0)))
+	c.invulnerable = 0.0
+	c.damage(70.0, null)
+	var bot := FighterBot.new()
+	bot.choppa = c
+	bot.ceiling = 90.0
+	_world.add_child(bot)
+	var served := []
+	station.served.connect(func(who: Choppa) -> void: served.append(who))
+	for t in 60 * 40:
+		await physics_frame
+		if not served.is_empty():
+			break
+	_check(served == [c], "the bot landed and got serviced, hp=%f, %.1f m from the pad" % [c.health,
+		Vector2(c.global_position.x, c.global_position.z + 60.0).length()])

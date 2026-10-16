@@ -23,7 +23,7 @@ static func blast(world: Node, at: Vector3, radius: float, amount: float, owner:
 		c.blast_damage(amount * falloff, owner, at)
 
 
-## Seeks the target it locked at launch. Barrel-roll as it closes in to shake it off.
+## Seeks the target it locked at launch. Flares, or rolling hard as it closes in, shake it off.
 class Missile extends Node3D:
 	const SPEED := 75.0
 	const TURN := 2.6  ## rad/s
@@ -61,6 +61,17 @@ class Missile extends Node3D:
 		Sounds.loop_on(self, "missile_loop", -6.0, 0.8)
 		_face()
 
+	## The seeker loses the lock and the missile veers wide of where it was going.
+	func shake_off() -> void:
+		if target == null:
+			return
+		var to := target.global_position - global_position
+		var side := direction.cross(Vector3.UP).normalized()
+		if side.dot(to) > 0.0:
+			side = -side
+		direction = (direction + side * 0.8).normalized()
+		target = null
+
 	## True while it still homes in on `who`.
 	func is_hunting(who: Choppa) -> bool:
 		return target == who and is_instance_valid(target)
@@ -74,13 +85,8 @@ class Missile extends Node3D:
 			target = null
 		if target:
 			var to := target.global_position - global_position
-			if to.length() < 25.0 and target.is_rolling_hard():
-				# Shaken off: the seeker loses the lock and the missile veers wide.
-				var side := direction.cross(Vector3.UP).normalized()
-				if side.dot(to) > 0.0:
-					side = -side
-				direction = (direction + side * 0.8).normalized()
-				target = null
+			if (to.length() < 25.0 and target.is_rolling_hard()) or target.decoy_time > 0.0:
+				shake_off()
 			elif to.length() < 2.5:
 				_explode(global_position)
 				return
@@ -184,28 +190,103 @@ class Mine extends Area3D:
 		queue_free()
 
 
-## Looks just like an item box, except the question mark is upside down.
-class FakeItemBox extends ItemBox:
-	const DAMAGE := 30.0
+## Unguided, fast, straight: 12 damage on the part it strikes plus a small blast.
+class Rocket extends Node3D:
+	const SPEED := 150.0
+	const LIFETIME := 2.5
+	const DAMAGE := 12.0
+	const SPLASH := 6.0
+	const SPLASH_RADIUS := 4.0
 
-	var owner_choppa: Choppa
-	var _armed := 0.0
+	var shooter: Choppa
+	var direction := Vector3.FORWARD
+	var speed := SPEED
+	var _age := 0.0
 
 	func _ready() -> void:
-		super._ready()
-		for child in _visual.get_children():
-			if child is Label3D:
-				(child as Label3D).text = "¿"
+		add_to_group("rockets")
+		var body := CylinderMesh.new()
+		body.top_radius = 0.07
+		body.bottom_radius = 0.09
+		body.height = 1.0
+		body.radial_segments = 6
+		var mesh := MeshInstance3D.new()
+		mesh.mesh = body
+		mesh.material_override = MapKit.material(Color(0.4, 0.42, 0.35))
+		mesh.rotation_degrees.x = 90.0
+		add_child(mesh)
+		var trail := Effects.puffs(Effects.gradient([
+			Color(1.0, 0.75, 0.35, 0.9), Color(0.65, 0.65, 0.65, 0.4), Color(0.7, 0.7, 0.7, 0.0),
+		]), 24, 0.5)
+		trail.position.z = 0.6
+		trail.scale_amount_min = 0.4
+		trail.scale_amount_max = 0.9
+		add_child(trail)
+		trail.emitting = true
+		Sounds.play_on(self, "missile_launch", -8.0, 1.5)
+		_face()
+
+	func _physics_process(delta: float) -> void:
+		_age += delta
+		if _age > LIFETIME:
+			queue_free()
+			return
+		var from := global_position
+		var to := from + direction * speed * delta
+		var query := PhysicsRayQueryParameters3D.create(from, to)
+		if is_instance_valid(shooter):
+			query.exclude = [shooter.get_rid()]
+		var hit := get_world_3d().direct_space_state.intersect_ray(query)
+		if hit:
+			var owner_choppa := shooter if is_instance_valid(shooter) else null
+			var target := hit.collider as Choppa
+			if target and target.take_hit(direction * 3.0, owner_choppa, DAMAGE, hit.position) and owner_choppa:
+				owner_choppa.scored_hit.emit(target)
+			Weapons.blast(get_parent(), hit.position, SPLASH_RADIUS, SPLASH, owner_choppa, 0.5)
+			queue_free()
+			return
+		global_position = to
+		_face()
+
+	func _face() -> void:
+		if absf(direction.dot(Vector3.UP)) < 0.99:
+			basis = Basis.looking_at(direction)
+
+
+## A burst of burning flares falling away behind a choppa; the choppa does the decoying.
+class Flares extends Node3D:
+	var _light: OmniLight3D
+	var _age := 0.0
+
+	func _ready() -> void:
+		_light = OmniLight3D.new()
+		_light.light_color = Color(1.0, 0.7, 0.35)
+		_light.light_energy = 3.0
+		_light.omni_range = 18.0
+		add_child(_light)
+		_start.call_deferred()  # World-space particles: only after the caller placed us.
+
+	func _start() -> void:
+		var burst := Effects.puffs(Effects.gradient([
+			Color(1.0, 0.95, 0.8, 1.0), Color(1.0, 0.6, 0.2, 0.9), Color(0.6, 0.6, 0.6, 0.0),
+		]), 14, 1.6)
+		burst.one_shot = true
+		burst.explosiveness = 0.85
+		burst.direction = Vector3.DOWN
+		burst.spread = 70.0
+		burst.initial_velocity_min = 5.0
+		burst.initial_velocity_max = 10.0
+		burst.gravity = Vector3(0.0, -6.0, 0.0)
+		burst.scale_amount_min = 0.6
+		burst.scale_amount_max = 1.1
+		add_child(burst)
+		burst.emitting = true
 
 	func _process(delta: float) -> void:
-		_armed += delta
-		super._process(delta)
-
-	func _on_body_entered(body: Node3D) -> void:
-		if not body is Choppa or (body == owner_choppa and _armed < 1.0) or is_queued_for_deletion():
-			return
-		Weapons.blast(get_parent(), global_position, 6.0, DAMAGE, owner_choppa if is_instance_valid(owner_choppa) else null, 0.7)
-		queue_free()
+		_age += delta
+		_light.light_energy = maxf(0.0, 3.0 * (1.0 - _age / 1.6))
+		if _age > 2.0:
+			queue_free()
 
 
 ## A thick cloud. Pilots inside can't see out (no lock-on, dark screen) and can't be

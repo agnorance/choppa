@@ -36,7 +36,11 @@ func _physics_process(_delta: float) -> void:
 	var i := choppa.input
 	i.boost = Input.is_action_pressed("boost")
 	i.fire = Input.is_action_pressed("fire")
-	i.use_item = Input.is_action_pressed("use_item")
+	i.rockets = Input.is_action_pressed("rockets")
+	i.missile = Input.is_action_pressed("missile")
+	i.flares = Input.is_action_pressed("flares")
+	i.mine = Input.is_action_pressed("mine")
+	i.smoke = Input.is_action_pressed("smoke")
 	var gain := Settings.choice("mouse_sensitivity") * MOUSE_GAIN
 	var mouse := _mouse if Settings.flag("mouse_steer") else Vector2.ZERO
 	_mouse = Vector2.ZERO
@@ -77,4 +81,6 @@ func _physics_process(_delta: float) -> void:
 		i.boost = i.boost or touch.is_pressed("boost")
 		# Your right thumb is busy steering, so touch fires by itself once locked on.
 		i.fire = i.fire or touch.is_pressed("fire") or choppa.aim_target() != null
-		i.use_item = i.use_item or touch.is_pressed("use_item")
+		i.rockets = i.rockets or touch.is_pressed("rockets")
+		i.missile = i.missile or touch.is_pressed("missile")
+		i.flares = i.flares or touch.is_pressed("flares")

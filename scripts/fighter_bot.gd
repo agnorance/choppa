@@ -1,8 +1,9 @@
 class_name FighterBot
 extends Node
 ## AI pilot for battles: hunts an opponent, circles it at gun range and shoots when lined
-## up, rolls hard when under fire, fetches repair kits when hurt, and feels its way
-## around obstacles with ray probes.
+## up, fires rockets and missiles, rolls hard or drops flares against missiles, lands at
+## a service station when hurt or out of ammunition, and feels its way around obstacles
+## with ray probes.
 
 const PREFERRED_RANGE := 45.0
 const PROBE_LENGTH := 14.0
@@ -28,9 +29,9 @@ var _under_fire := 0.0
 var _cooling_gun := false
 var _wander := Vector3.ZERO
 var _wander_time := 0.0
-var _chasing_box: ItemBox
-var _box_time := 0.0
-var _ignored_boxes := {}  ## ItemBox -> seconds left to ignore it.
+var _station: ServiceStation  ## Where we are heading to land, or null.
+var _station_time := 0.0  ## Seconds spent trying to reach it.
+var _ignored_stations := {}  ## ServiceStation -> seconds left to ignore it.
 
 
 func _ready() -> void:
@@ -64,32 +65,14 @@ func steer(delta: float) -> void:
 	var goal: Vector3
 	var look: Vector3
 	var distance := 0.0
-	var crate := _crate_if_hurt()
-	var box := _item_box_worth_it()
-	if box != _chasing_box:
-		_chasing_box = box
-		_box_time = 0.0
-	elif box:
-		_box_time += delta
-		if _box_time > 10.0:
-			_ignored_boxes[box] = 20.0  # Can't reach it; try another.
-	for ignored in _ignored_boxes.keys():
-		if not is_instance_valid(ignored):  # A fake box blew up.
-			_ignored_boxes.erase(ignored)
-			continue
-		_ignored_boxes[ignored] -= delta
-		if _ignored_boxes[ignored] <= 0.0:
-			_ignored_boxes.erase(ignored)
-	var pickup := crate != null or box != null
+	var station := _station_if_needed(delta)
+	var landing := station != null
 	if _unstick > 0.0:
 		goal = pos + _unstick_dir * 30.0
 		look = goal
-	elif crate:
-		goal = crate.global_position
-		look = goal
-	elif box:
-		goal = box.global_position
-		look = goal
+	elif station:
+		goal = Vector3(station.global_position.x, station.pad_top() + choppa.clearance, station.global_position.z)
+		look = goal + choppa.facing() * Vector3.FORWARD * 30.0  # Keep the heading; just set down.
 	elif target:
 		var to := target.global_position - pos
 		var flat := Vector3(to.x, 0.0, to.z)
@@ -107,13 +90,22 @@ func steer(delta: float) -> void:
 			_wander_time = 6.0
 		goal = _wander
 		look = goal
-	# Keep off the ground and under the ceiling, unless grabbing a pickup.
-	goal.y = clampf(goal.y, 2.0 if pickup and _unstick <= 0.0 else 8.0, ceiling - 8.0)
+	# Keep off the ground and under the ceiling, unless landing at a station.
+	if not landing:
+		goal.y = clampf(goal.y, 8.0, ceiling - 8.0)
 
 	var local_look := choppa.facing().inverse() * (look - pos)
 	var angle := atan2(local_look.x, -local_look.z)  # Positive: look point is to the right.
 	var want := ((goal - pos) * 0.6).limit_length(lerpf(0.75, 1.0, skill) * choppa.max_speed)
-	want += _avoidance() * 20.0
+	var flat_to_goal := Vector2(goal.x - pos.x, goal.z - pos.z).length()
+	if landing and flat_to_goal < 40.0:
+		# Final approach: slow down over the pad, then sink onto it gently.
+		want = (goal - pos) * 0.5
+		want.y = clampf(want.y, -2.5 if flat_to_goal < 4.0 else 0.0, 3.0)
+		if station.occupant == choppa:
+			want = Vector3(0.0, -1.0, 0.0)
+	else:
+		want += _avoidance() * 20.0
 	Autopilot.fly(choppa, i, want, look)
 
 	# Trigger discipline: let the gun cool before it overheats.
@@ -124,7 +116,8 @@ func steer(delta: float) -> void:
 	var in_sights := choppa.aim_target()
 	i.fire = in_sights != null and not _cooling_gun and _can_see(in_sights)
 	i.boost = target != null and distance > 110.0 and absf(angle) < 0.3 and choppa.boost_meter > 0.3
-	i.use_item = _should_use_item(distance)
+	if not landing:
+		_use_weapons(angle, distance)
 
 	var dodge_chance := 0.05 * skill if _under_fire > 0.0 else 0.0
 	if _missile_incoming():
@@ -137,7 +130,7 @@ func steer(delta: float) -> void:
 		_dodge_time -= delta
 		i.cyclic.x = _dodge_dir  # A full roll throws off bullets and missiles.
 
-	if choppa.velocity.length() < 3.0 and want.length() > 5.0:
+	if not landing and choppa.velocity.length() < 3.0 and want.length() > 5.0:
 		_stuck += delta
 	else:
 		_stuck = maxf(0.0, _stuck - delta)
@@ -164,40 +157,50 @@ func _pick_target() -> Choppa:
 	return best
 
 
-## A nearby item box to grab when empty-handed and nobody is close.
-func _item_box_worth_it() -> ItemBox:
-	if choppa.item != "":
+## Rockets when lined up and close, a missile with a lock, flares against an incoming
+## missile, a mine for whoever is on our tail, smoke when hurt and under fire.
+func _use_weapons(angle: float, distance: float) -> void:
+	var i := choppa.input
+	var a := choppa.ammo
+	var lined_up := target != null and absf(angle) < lerpf(0.06, 0.12, skill) and distance < 130.0
+	i.rockets = a.rockets > 0 and lined_up and _can_see(target)
+	i.missile = a.missiles > 0 and target != null and choppa.missile_target() == target and distance < 220.0
+	i.flares = a.flares > 0 and _missile_incoming(60.0)
+	i.mine = a.mines > 0 and _enemy_behind(70.0)
+	i.smoke = a.smoke > 0 and _under_fire > 0.0 and choppa.health < choppa.max_health * 0.5
+
+
+## The nearest ready station when hurt or out of rockets and missiles, else null. Gives
+## up on one it cannot reach in 20 s.
+func _station_if_needed(delta: float) -> ServiceStation:
+	for ignored in _ignored_stations.keys():
+		_ignored_stations[ignored] -= delta
+		if _ignored_stations[ignored] <= 0.0:
+			_ignored_stations.erase(ignored)
+	if _station and _station.occupant == choppa:
+		return _station  # Already on the pad: stay until it is done.
+	var worn := choppa.wear(Choppa.Part.TAIL) > 0.5 or choppa.wear(Choppa.Part.ENGINE) > 0.5 or choppa.wear(Choppa.Part.ROTOR) > 0.6
+	var dry: bool = choppa.ammo.rockets + choppa.ammo.missiles == 0
+	var hurt := choppa.health < choppa.max_health * 0.45
+	if not (worn or dry or hurt):
+		_station = null
 		return null
-	if target and choppa.global_position.distance_to(target.global_position) < 90.0:
-		return null
-	var best: ItemBox = null
-	var best_distance := 160.0
-	for node in choppa.get_tree().get_nodes_in_group("item_boxes"):
-		var box := node as ItemBox
-		var d := choppa.global_position.distance_to(box.global_position)
-		if box.is_available() and d < best_distance and not _ignored_boxes.has(box):
-			best = box
+	if _station and _station.is_ready() and (_station.occupant == null or _station.occupant == choppa):
+		_station_time += delta
+		if _station_time > 20.0 and _station.occupant != choppa:
+			_ignored_stations[_station] = 30.0
+			_station = null
+		return _station
+	_station = null
+	_station_time = 0.0
+	var best_distance := 400.0
+	for node in choppa.get_tree().get_nodes_in_group("stations"):
+		var st := node as ServiceStation
+		var d := choppa.global_position.distance_to(st.global_position)
+		if st.is_ready() and st.occupant == null and d < best_distance and not _ignored_stations.has(st):
+			_station = st
 			best_distance = d
-	return best
-
-
-func _should_use_item(target_distance: float) -> bool:
-	match choppa.item:
-		"":
-			return false
-		"MISSILE":
-			return choppa.missile_target() != null
-		"MINE", "FAKE BOX":
-			return _enemy_behind(70.0)
-		"SMOKE":
-			return _under_fire > 0.0 or _enemy_behind(50.0)
-		"SHIELD":
-			return _under_fire > 0.0 or choppa.health < 60.0
-		"TURBO":
-			return target_distance > 100.0
-		"GET TO THE CHOPPA":
-			return target != null and target_distance < 120.0
-	return true  # SCRAMBLER and anything new: use it right away.
+	return _station
 
 
 func _enemy_behind(reach: float) -> bool:
@@ -212,26 +215,12 @@ func _enemy_behind(reach: float) -> bool:
 	return false
 
 
-func _missile_incoming() -> bool:
+func _missile_incoming(reach := 30.0) -> bool:
 	for node in choppa.get_tree().get_nodes_in_group("missiles"):
 		var missile := node as Weapons.Missile
-		if missile.is_hunting(choppa) and missile.global_position.distance_to(choppa.global_position) < 30.0:
+		if missile.is_hunting(choppa) and missile.global_position.distance_to(choppa.global_position) < reach:
 			return true
 	return false
-
-
-func _crate_if_hurt() -> HealthCrate:
-	if choppa.health > 40.0:
-		return null
-	var best: HealthCrate = null
-	var best_distance := 250.0
-	for node in choppa.get_tree().get_nodes_in_group("health_crates"):
-		var crate := node as HealthCrate
-		var d := choppa.global_position.distance_to(crate.global_position)
-		if crate.is_available() and d < best_distance:
-			best = crate
-			best_distance = d
-	return best
 
 
 func _can_see(other: Choppa) -> bool:

@@ -16,7 +16,10 @@ $scenes = [ordered]@{
 	"engine"   = @("--mode=free", "--map=basin", "--wear=engine")
 	"touch"    = @("--mode=free", "--map=basin", "--touch")
 	"bots"     = @("--mode=battle", "--map=basin", "--autopilot=bot")
-	"missile"  = @("--mode=free", "--map=basin", "--autopilot=item:MISSILE")
+	"missile"  = @("--mode=free", "--map=basin", "--autopilot=weapon:missile")
+	"gunship"  = @("--mode=free", "--map=basin", "--airframe=gunship")
+	"heavy"    = @("--mode=free", "--map=basin", "--airframe=heavy")
+	"rockets"  = @("--mode=free", "--map=basin", "--autopilot=weapon:rockets")
 	"explode"  = @("--mode=free", "--map=basin", "--explode=120")
 }
 if (-not $scenes.Contains($Scene)) {

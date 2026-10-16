@@ -8,8 +8,12 @@ var move := Vector2.ZERO  ## Easy model only: x strafe right, y forward. Length 
 var yaw := 0.0  ## +1 turns right.
 var collective := 0.0  ## +1 full power, -1 idle; 0 holds a level hover.
 var boost := false  ## Afterburner.
-var fire := false
-var use_item := false  ## Held state; the choppa reacts to the press edge.
+var fire := false  ## Machine gun, held.
+var rockets := false  ## Held: a salvo, one rocket per interval.
+var missile := false  ## Weapons below fire while held, at most once per their interval.
+var flares := false
+var mine := false
+var smoke := false
 
 
 func copy_from(other: PilotInput) -> void:
@@ -19,7 +23,11 @@ func copy_from(other: PilotInput) -> void:
 	collective = other.collective
 	boost = other.boost
 	fire = other.fire
-	use_item = other.use_item
+	rockets = other.rockets
+	missile = other.missile
+	flares = other.flares
+	mine = other.mine
+	smoke = other.smoke
 
 
 func clear() -> void:

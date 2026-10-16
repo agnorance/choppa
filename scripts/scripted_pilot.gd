@@ -1,8 +1,8 @@
 class_name ScriptedPilot
 extends Node
 ## Canned flight plans for screenshots and smoke tests (`--autopilot=<plan>`).
-## Plans: hover, shoot, forward, boost, roll, flip, pirouette, and item:<NAME>
-## (hover, then get and use that item, e.g. item:MISSILE).
+## Plans: hover, shoot, forward, boost, roll, flip, pirouette, and weapon:<NAME>
+## (hover, then fire rockets, missile, flares, mine or smoke, e.g. weapon:missile).
 
 const CRUISE_ALTITUDE := 7.0
 
@@ -23,10 +23,16 @@ func _physics_process(_delta: float) -> void:
 	var pos := choppa.global_position
 	var forward := choppa.facing() * Vector3.FORWARD
 	var want := Vector3(0.0, (CRUISE_ALTITUDE - choppa.altitude) * 0.5, 0.0)
-	if plan.begins_with("item:"):
-		if _tick == 20:
-			choppa.give_item(plan.substr(5))
-		i.use_item = _tick == 30
+	if plan.begins_with("weapon:"):
+		# Hover, then fire that weapon once at tick 30 (rockets: a salvo for half a second).
+		var weapon := plan.substr(7)
+		var on := _tick >= 30 and _tick < (60 if weapon == "rockets" else 31)
+		match weapon:
+			"rockets": i.rockets = on
+			"missile": i.missile = on
+			"flares": i.flares = on
+			"mine": i.mine = on
+			"smoke": i.smoke = on
 	elif plan == "shoot":
 		i.fire = true
 	elif plan != "hover":

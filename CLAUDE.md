@@ -57,7 +57,7 @@ Godot must be 4.7.2. Two environments:
 
 - `screenshot`: take and judge screenshots of the game (views, arguments, pitfalls).
 - `blender-assets`: regenerate or change textures and models made in Blender.
-- `add-item`: add a new item (box pickup) end to end.
+- `add-weapon`: add a weapon to the loadout end to end (refilled at service stations).
 - `add-map`: add a new arena.
 - `sound`: synthesize, tune and wire up sound effects.
 - `ship`: test, document, commit and push a change, then watch CI.

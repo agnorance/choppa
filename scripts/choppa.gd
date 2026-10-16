@@ -6,7 +6,7 @@ extends CharacterBody3D
 ## so the same code runs for local players, bots and (later) network peers.
 
 signal bumped(impact: float)
-signal item_changed(item_name: String)
+signal fired(weapon: String)  ## rockets, missiles, flares, mines, smoke
 signal hit_taken(impulse: Vector3, shooter: Choppa)
 signal scored_hit(target: Choppa)
 signal gun_overheated
@@ -14,8 +14,7 @@ signal damaged(amount: float, attacker: Choppa)
 signal part_damaged(part: Part, left: float)  ## A rotor, the tail rotor or the engine took a hit.
 signal died(killer: Choppa)
 signal healed(amount: float)
-signal item_used(item_name: String)
-signal scrambled_by(attacker: Choppa)
+signal restocked
 
 ## Distance from the body origin to the bottom of the skids.
 const GROUND_CLEARANCE := 1.15
@@ -47,14 +46,13 @@ const VIBRATION := 0.9  ## rad/s of shaking with the main rotor wrecked.
 ## Damage each part takes before it is wrecked. The hull is `health`.
 const PART_HEALTH := {Part.ROTOR: 40.0, Part.TAIL: 30.0, Part.ENGINE: 50.0}
 const SPAWN_SHIELD := 2.0  ## Seconds of invulnerability after respawning.
-const SHIELD_HP := 40.0
-const SHIELD_TIME := 12.0
-const SCRAMBLE_TIME := 5.0
-const RAMPAGE_TIME := 6.0  ## GET TO THE CHOPPA.
 const MISSILE_CONE := deg_to_rad(45.0)
 const MISSILE_RANGE := 250.0
 ## A crash this soon after being shot counts as a kill for whoever shot you.
 const CRASH_CREDIT_TIME := 4.0
+## Seconds between shots while the trigger is held, per weapon.
+const WEAPON_INTERVAL := {"rockets": 0.22, "missiles": 1.5, "flares": 1.0, "mines": 1.0, "smoke": 1.0}
+const DECOY_TIME := 2.0  ## Seconds a flare burst fools missiles.
 const CRASH_WINDOW := 0.4  ## Seconds between crash damage events while scraping along.
 const SKID_FRICTION := 4.0  ## How fast horizontal speed bleeds off with the skids on the ground, per second.
 @export var team_color := Color(0.95, 0.5, 0.1)
@@ -73,7 +71,6 @@ var aim_assist := true  ## Guns snap onto a target in the cone; the player can t
 ## along the nose, so the choppa flies best the way it points and drifts in a slide.
 @export var drag := Vector3(0.016, 0.016, 0.0065)
 @export var afterburner_thrust := 22.0  ## Extra acceleration along the nose while burning.
-@export var turbo_thrust := 34.0  ## The TURBO item.
 @export var boost_drain := 0.5  ## Afterburner charge used per second...
 @export var boost_recharge := 0.2  ## ...and regained per second when off.
 @export var max_speed := 36.0  ## About the level top speed at a 35 degree nose-down (bots, docs).
@@ -102,8 +99,6 @@ var _thrust := GRAVITY  ## Current rotor thrust; follows the collective with `th
 var _aim := 0.0  ## Easy model: nose-down angle set by the stick, held.
 var _crash_cooldown := 0.0  ## Grinding along terrain hurts once per window, not every tick.
 var boost_meter := 1.0  ## Afterburner charge, 0..1.
-var turbo_time := 0.0
-var item := ""
 var stun := 0.0
 var locked := false  ## Ignores input, e.g. during a race countdown.
 var altitude := 500.0  ## Height of the skids above whatever is below.
@@ -113,11 +108,14 @@ var health := MAX_HEALTH
 var parts := {}  ## Part -> health left; see PART_HEALTH.
 var alive := true
 var mortal := true  ## False in races: hits still push, but never hurt.
-var standing := 0.5  ## 0 leading .. 1 last; set by the game mode, steers item odds.
-var shield := 0.0  ## Damage the shield bubble still absorbs.
-var shield_time := 0.0
-var scrambled := 0.0  ## Seconds left with left/right swapped.
-var rampage := 0.0  ## Seconds left of GET TO THE CHOPPA.
+## The helicopter class (Airframe). Set before adding the choppa, or with set_airframe().
+var airframe := Airframe.SCOUT
+var max_health := MAX_HEALTH
+var clearance := GROUND_CLEARANCE  ## Body origin to skid bottom for this airframe.
+var gun_factor := 1.0  ## Machine-gun damage multiplier of the airframe.
+## Rounds left: rockets, missiles, flares, mines, smoke. Refilled at service stations.
+var ammo := {"rockets": 0, "missiles": 0, "flares": 0, "mines": 0, "smoke": 0}
+var decoy_time := 0.0  ## Seconds left that flares fool missiles.
 var invulnerable := 0.0
 var clock := 0.0  ## Simulation seconds this choppa has existed.
 var last_shot_time := -10.0  ## `clock` at the last shot, for the muzzle flash.
@@ -127,7 +125,9 @@ var over_water := false  ## The ground below is water (for spray instead of dust
 
 var model: ChoppaModel
 
-var _prev_item := false
+var _cooldowns := {"rockets": 0.0, "missiles": 0.0, "flares": 0.0, "mines": 0.0, "smoke": 0.0}
+var _rocket_side := 1.0
+var _part_scale := 1.0
 var _gun_timer := 0.0
 var _gun_side := 1.0
 var _shape: CollisionShape3D
@@ -138,6 +138,7 @@ var _last_attacker_time := -100.0
 func _ready() -> void:
 	motion_mode = MOTION_MODE_FLOATING
 	_repair_all()
+	restock()
 	heading = rotation.y
 	add_to_group("choppas")
 
@@ -154,7 +155,9 @@ func _ready() -> void:
 	model.color = team_color
 	model.own = local_player
 	model.pilot = self
+	model.airframe = airframe
 	add_child(model)
+	set_airframe(airframe)
 
 
 func _physics_process(delta: float) -> void:
@@ -162,7 +165,7 @@ func _physics_process(delta: float) -> void:
 
 
 func is_boosting() -> bool:
-	return turbo_time > 0.0 or (input.boost and boost_meter > 0.0 and stun <= 0.0)
+	return input.boost and boost_meter > 0.0 and stun <= 0.0
 
 
 func facing() -> Basis:
@@ -175,28 +178,16 @@ func step(delta: float) -> void:
 	if not alive:
 		return
 	invulnerable = maxf(0.0, invulnerable - delta)
-	shield_time = maxf(0.0, shield_time - delta)
-	if shield_time <= 0.0:
-		shield = 0.0
-	scrambled = maxf(0.0, scrambled - delta)
-	rampage = maxf(0.0, rampage - delta)
+	decoy_time = maxf(0.0, decoy_time - delta)
 	var i := input
-	if scrambled > 0.0:
-		var swapped := PilotInput.new()
-		swapped.copy_from(i)
-		swapped.yaw = -i.yaw
-		swapped.cyclic.x = -i.cyclic.x
-		i = swapped
 	if stun > 0.0:
 		stun -= delta
 		i = PilotInput.new()
 	if locked:
 		i = PilotInput.new()
 
-	if i.use_item and not _prev_item:
-		use_item()
-	_prev_item = i.use_item
 	_update_gun(i, delta)
+	_update_weapons(i, delta)
 	_crash_cooldown = maxf(0.0, _crash_cooldown - delta)
 	if easy:
 		_step_easy(i, delta)
@@ -235,10 +226,7 @@ func step(delta: float) -> void:
 	_thrust = lerpf(_thrust, wanted_thrust, 1.0 - exp(-delta / thrust_lag))
 	var thrust := _thrust
 	var accel := b.y * thrust + Vector3.DOWN * GRAVITY
-	if turbo_time > 0.0:
-		turbo_time -= delta
-		accel += forward * turbo_thrust
-	elif is_boosting() and engine < 1.0:
+	if is_boosting() and engine < 1.0:
 		boost_meter = maxf(0.0, boost_meter - boost_drain * delta)
 		accel += forward * afterburner_thrust
 	elif not i.boost:
@@ -273,17 +261,14 @@ func _step_easy(i: PilotInput, delta: float) -> void:
 
 	var boosting := is_boosting() and engine < 1.0
 	var top := max_speed * (1.0 - 0.15 * rotor) * (1.0 - 0.35 * engine)
-	if turbo_time > 0.0:
-		turbo_time -= delta
-		top = turbo_speed()
-	elif boosting:
+	if boosting:
 		boost_meter = maxf(0.0, boost_meter - boost_drain * delta)
 		top = boost_speed
 	elif not i.boost:
 		boost_meter = minf(1.0, boost_meter + boost_recharge * delta)
 	var nose := Basis(Vector3.UP, heading) * Basis(Vector3.RIGHT, -_aim)
 	var wish := nose * Vector3(0.0, 0.0, -i.move.y) + facing() * Vector3(i.move.x, 0.0, 0.0)
-	if boosting or turbo_time > 0.0:
+	if boosting:
 		wish += nose * Vector3.FORWARD  # The afterburner always drives you along the nose.
 	wish = wish.limit_length(1.0)
 	var rate := easy_accel * (2.0 if boosting else 1.0)
@@ -310,11 +295,6 @@ func _step_easy(i: PilotInput, delta: float) -> void:
 	_handle_collisions(before)
 	_update_altitude()
 	model.update_pose(self, delta)
-
-
-## The TURBO item's top speed in the easy model.
-func turbo_speed() -> float:
-	return boost_speed * 1.2
 
 
 ## Pitch of the nose below the horizon, radians (negative: nose up).
@@ -412,7 +392,7 @@ func part_at(at: Vector3) -> Part:
 
 
 func damage_part(part: Part, amount: float) -> void:
-	if part == Part.HULL or not alive or not mortal or invulnerable > 0.0 or rampage > 0.0 or amount <= 0.0:
+	if part == Part.HULL or not alive or not mortal or invulnerable > 0.0 or amount <= 0.0:
 		return
 	parts[part] = maxf(0.0, parts[part] - amount)
 	part_damaged.emit(part, parts[part])
@@ -420,26 +400,25 @@ func damage_part(part: Part, amount: float) -> void:
 
 ## How wrecked a part is: 0 intact .. 1 gone.
 func wear(part: Part) -> float:
-	return 1.0 - parts[part] / PART_HEALTH[part]
+	return 1.0 - parts[part] / part_max(part)
+
+
+## How much damage this airframe's part takes before it is wrecked.
+func part_max(part: Part) -> float:
+	return PART_HEALTH[part] * _part_scale
 
 
 func _repair_all() -> void:
 	for part: Part in PART_HEALTH:
-		parts[part] = PART_HEALTH[part]
+		parts[part] = part_max(part)
 
 
 func damage(amount: float, attacker: Choppa) -> void:
-	if not alive or not mortal or invulnerable > 0.0 or rampage > 0.0 or amount <= 0.0:
+	if not alive or not mortal or invulnerable > 0.0 or amount <= 0.0:
 		return
 	if attacker and attacker != self:
 		_last_attacker = attacker
 		_last_attacker_time = clock
-	if shield > 0.0:
-		var absorbed := minf(shield, amount)
-		shield -= absorbed
-		amount -= absorbed
-		if amount <= 0.0:
-			return
 	health -= amount
 	damaged.emit(amount, attacker)
 	if health <= 0.0:
@@ -447,17 +426,76 @@ func damage(amount: float, attacker: Choppa) -> void:
 
 
 func heal(amount: float) -> bool:
-	var wrecked := false
-	for part: Part in PART_HEALTH:
-		wrecked = wrecked or parts[part] < PART_HEALTH[part]
-	if not alive or (health >= MAX_HEALTH and not wrecked):
+	if not alive or not needs_repair():
 		return false
 	var before := health
-	health = minf(MAX_HEALTH, health + amount)
-	for part: Part in PART_HEALTH:  # The crate patches the machine up too.
-		parts[part] = minf(PART_HEALTH[part], parts[part] + amount)
+	health = minf(max_health, health + amount)
+	for part: Part in PART_HEALTH:
+		parts[part] = minf(part_max(part), parts[part] + amount * _part_scale)
 	healed.emit(health - before)
 	return true
+
+
+## A share of a full repair (a service station calls this every tick it works on you).
+func repair(fraction: float) -> void:
+	if not alive:
+		return
+	var before := health
+	health = minf(max_health, health + max_health * fraction)
+	for part: Part in PART_HEALTH:
+		parts[part] = minf(part_max(part), parts[part] + part_max(part) * fraction)
+	if health > before:
+		healed.emit(health - before)
+
+
+func needs_repair() -> bool:
+	if health < max_health:
+		return true
+	for part: Part in PART_HEALTH:
+		if parts[part] < part_max(part):
+			return true
+	return false
+
+
+## Full loadout for the airframe (a service station, or a respawn).
+func restock() -> void:
+	var spec := Airframe.spec(airframe)
+	ammo = {"rockets": spec.rockets, "missiles": spec.missiles, "flares": spec.flares, "mines": 1, "smoke": 1}
+	restocked.emit()
+
+
+## Rounds the airframe carries of `weapon` when full.
+func full_ammo(weapon: String) -> int:
+	var spec := Airframe.spec(airframe)
+	return spec.get(weapon, 1) if weapon in ["rockets", "missiles", "flares"] else 1
+
+
+## Turns this choppa into one of the Airframe classes: numbers, hull, loadout, size.
+func set_airframe(id: String) -> void:
+	airframe = id
+	var spec := Airframe.spec(id)
+	max_health = spec.hull
+	health = max_health
+	_part_scale = spec.parts
+	pitch_rate = 2.0 * spec.rates
+	roll_rate = 2.8 * spec.rates
+	yaw_rate = 1.6 * spec.rates
+	turn_speed = 2.4 * spec.rates
+	angular_accel = 7.0 * spec.inertia
+	thrust_lag = spec.thrust_lag
+	max_speed = 36.0 * spec.speed
+	boost_speed = 60.0 * spec.speed
+	afterburner_thrust = 22.0 * spec.speed
+	gun_factor = spec.guns
+	clearance = GROUND_CLEARANCE * spec.size
+	if _shape:
+		var capsule := _shape.shape as CapsuleShape3D
+		capsule.radius = 1.1 * spec.size
+		capsule.height = 5.4 * spec.size
+	if model:
+		model.set_airframe(id)
+	_repair_all()
+	restock()
 
 
 func _die(killer: Choppa) -> void:
@@ -472,81 +510,91 @@ func _die(killer: Choppa) -> void:
 	died.emit(killer)
 
 
-func give_item(item_name: String) -> bool:
-	if item != "":
+func _update_weapons(i: PilotInput, delta: float) -> void:
+	for weapon: String in _cooldowns:
+		_cooldowns[weapon] = maxf(0.0, _cooldowns[weapon] - delta)
+	if i.rockets:
+		fire_rocket()
+	if i.missile:
+		fire_missile()
+	if i.flares:
+		fire_flares()
+	if i.mine:
+		drop_mine()
+	if i.smoke:
+		drop_smoke()
+
+
+## True when `weapon` has a round and its interval has passed; uses up the round.
+func _take(weapon: String) -> bool:
+	if not alive or ammo[weapon] <= 0 or _cooldowns[weapon] > 0.0:
 		return false
-	item = item_name
-	item_changed.emit(item)
+	ammo[weapon] -= 1
+	_cooldowns[weapon] = WEAPON_INTERVAL[weapon]
+	fired.emit(weapon)
 	return true
 
 
-func use_item() -> void:
-	match item:
-		"":
-			return
-		"TURBO":
-			_turbo(1.6)
-		"MISSILE":
-			var missile := Weapons.Missile.new()
-			missile.shooter = self
-			missile.target = missile_target()
-			missile.direction = -global_transform.basis.z
-			_drop(missile, Vector3(0.0, -0.6, -3.0))
-		"MINE":
-			var mine := Weapons.Mine.new()
-			mine.owner_choppa = self
-			_drop(mine, Vector3(0.0, -1.0, 9.0))
-		"FAKE BOX":
-			var fake := Weapons.FakeItemBox.new()
-			fake.owner_choppa = self
-			_drop(fake, Vector3(0.0, -0.5, 7.0))
-		"SMOKE":
-			_drop(Weapons.SmokeCloud.new(), Vector3(0.0, 0.0, 10.0))
-		"SCRAMBLER":
-			var victim := _scramble_target()
-			if victim:
-				victim.scrambled = SCRAMBLE_TIME
-				victim.scrambled_by.emit(self)
-		"SHIELD":
-			shield = SHIELD_HP
-			shield_time = SHIELD_TIME
-		"GET TO THE CHOPPA":
-			rampage = RAMPAGE_TIME
-			boost_meter = 1.0
-			_turbo(2.0)
-	var used := item
-	item = ""
-	item_changed.emit(item)
-	item_used.emit(used)
+## One unguided rocket from the pods, alternating sides, straight along the nose.
+func fire_rocket() -> bool:
+	if not _take("rockets"):
+		return false
+	var rocket := Weapons.Rocket.new()
+	rocket.shooter = self
+	rocket.direction = -global_transform.basis.z
+	rocket.speed = Weapons.Rocket.SPEED + maxf(0.0, velocity.dot(rocket.direction))
+	_drop(rocket, Vector3(1.45 * _rocket_side, -0.9, -1.4), true)
+	_rocket_side = -_rocket_side
+	return true
 
 
-func _turbo(seconds: float) -> void:
-	turbo_time = seconds
-	# Kick in instantly, like a mushroom.
-	var forward := -global_transform.basis.z
-	velocity = forward * maxf(velocity.length(), boost_speed) + Vector3.UP * velocity.y
+## A homing missile at whoever is in the missile cone, or straight ahead.
+func fire_missile() -> bool:
+	if not _take("missiles"):
+		return false
+	var missile := Weapons.Missile.new()
+	missile.shooter = self
+	missile.target = missile_target()
+	missile.direction = -global_transform.basis.z
+	_drop(missile, Vector3(0.0, -0.6, -3.0), true)
+	return true
 
 
-## Puts an item object into the world at `offset` in this choppa's frame (-Z ahead).
-func _drop(thing: Node3D, offset: Vector3) -> void:
+## Flares: every missile chasing this choppa loses it, and for DECOY_TIME new ones do too.
+func fire_flares() -> bool:
+	if not _take("flares"):
+		return false
+	decoy_time = DECOY_TIME
+	for node in get_tree().get_nodes_in_group("missiles"):
+		var missile := node as Weapons.Missile
+		if missile.is_hunting(self):
+			missile.shake_off()
+	_drop(Weapons.Flares.new(), Vector3(0.0, -0.8, 1.5))
+	return true
+
+
+func drop_mine() -> bool:
+	if not _take("mines"):
+		return false
+	var mine := Weapons.Mine.new()
+	mine.owner_choppa = self
+	_drop(mine, Vector3(0.0, -1.0, 9.0))
+	return true
+
+
+func drop_smoke() -> bool:
+	if not _take("smoke"):
+		return false
+	_drop(Weapons.SmokeCloud.new(), Vector3(0.0, 0.0, 10.0))
+	return true
+
+
+## Puts a weapon object into the world at `offset` in this choppa's frame (-Z ahead):
+## the body frame for things fired along the nose, the yaw frame for things dropped.
+func _drop(thing: Node3D, offset: Vector3, along_body := false) -> void:
 	get_parent().add_child(thing)
-	thing.global_position = global_position + facing() * offset
+	thing.global_position = global_position + (global_transform.basis if along_body else facing()) * offset
 	thing.reset_physics_interpolation()
-
-
-## The leader among everyone else (lowest standing), nearest one on a tie.
-func _scramble_target() -> Choppa:
-	var best: Choppa = null
-	for node in get_tree().get_nodes_in_group("choppas"):
-		var other := node as Choppa
-		if other == self or not other.alive:
-			continue
-		if best == null or other.standing < best.standing or (
-			other.standing == best.standing
-			and global_position.distance_to(other.global_position) < global_position.distance_to(best.global_position)
-		):
-			best = other
-	return best
 
 
 func respawn(at: Transform3D) -> void:
@@ -559,18 +607,15 @@ func respawn(at: Transform3D) -> void:
 	_thrust = GRAVITY
 	_aim = 0.0
 	stun = 0.0
-	turbo_time = 0.0
 	heat = 0.0
 	overheated = false
-	shield = 0.0
-	shield_time = 0.0
-	scrambled = 0.0
-	rampage = 0.0
+	decoy_time = 0.0
 	if not alive:
 		alive = true
 		_shape.set_deferred("disabled", false)
-	health = MAX_HEALTH
+	health = max_health
 	_repair_all()
+	restock()
 	invulnerable = SPAWN_SHIELD
 	model.visible = true
 	reset_physics_interpolation()
@@ -608,8 +653,7 @@ func _shoot() -> void:
 	last_shot_time = clock
 	var bullet := Bullet.new()
 	bullet.shooter = self
-	if rampage > 0.0:
-		bullet.damage *= 2.0
+	bullet.damage *= gun_factor
 	bullet.direction = direction
 	# Bullets inherit your speed so they never fall behind you while boosting.
 	bullet.speed = Bullet.SPEED + maxf(0.0, velocity.dot(direction))
@@ -663,7 +707,7 @@ func _update_altitude() -> void:
 	query.exclude = [get_rid()]
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if hit:
-		altitude = global_position.y - hit.position.y - GROUND_CLEARANCE
+		altitude = global_position.y - hit.position.y - clearance
 		over_water = (hit.collider as Node).is_in_group("water")
 	else:
 		altitude = 500.0

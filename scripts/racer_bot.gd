@@ -1,7 +1,7 @@
 class_name RacerBot
 extends Node
 ## AI pilot for races: flies through the next gate, boosts on straights, shoots whoever
-## is in its sights and uses items right away.
+## is in its sights.
 
 var choppa: Choppa
 var race: Race
@@ -50,7 +50,6 @@ func steer(delta := 1.0 / 60.0) -> void:
 	Autopilot.fly(choppa, i, to.normalized() * speed, target)
 	i.boost = absf(angle) < 0.12 and distance > 70.0 and choppa.boost_meter > lerpf(0.6, 0.25, skill)
 	i.fire = choppa.aim_target() != null
-	i.use_item = choppa.item != "" and absf(angle) < 0.2 and distance > 60.0
 
 
 ## Where to aim for `gate`: a point in front of it on the side facing away from the

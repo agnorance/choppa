@@ -35,15 +35,38 @@ var _rotor_sound: AudioStreamPlayer3D
 var _engine_sound: AudioStreamPlayer3D
 var _boost_sound: AudioStreamPlayer3D
 var _last_shot := -10.0
-var _bubble: MeshInstance3D
-var _bubble_material: StandardMaterial3D
-var _sparks: CPUParticles3D
+
+
+var airframe := Airframe.SCOUT  ## Which model to wear; see Airframe.TABLE.
 
 
 func _ready() -> void:
+	_build()
+
+
+## Swaps the model for another airframe's (rebuilds everything the model owns).
+func set_airframe(id: String) -> void:
+	if id == airframe:
+		return
+	airframe = id
+	if not is_inside_tree():
+		return
+	for child in get_children():
+		remove_child(child)
+		child.queue_free()
+	_haze.clear()
+	_trails.clear()
+	_flashes.clear()
+	_flash_lights.clear()
+	_casings.clear()
+	_cracks.clear()
+	_build()
+
+
+func _build() -> void:
 	_parts = Node3D.new()
 	add_child(_parts)
-	var model: Node3D = _scene().instantiate()
+	var model: Node3D = _scene(airframe).instantiate()
 	_parts.add_child(model)
 	var materials := part_materials(color.lerp(Color(0.36, 0.38, 0.3), 0.42))
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D"):
@@ -97,10 +120,8 @@ func _ready() -> void:
 	_boost_sound = Sounds.loop_on(self, "boost_loop", -6.0)
 	_boost_sound.position = _engine_sound.position + Vector3(0.0, 0.0, 1.0)
 	_boost_sound.stream_paused = true
-	if own and pilot:
-		pilot.item_changed.connect(func(item: String) -> void:
-			if item != "":
-				Sounds.play_ui(self, "pickup", -6.0))
+	if own and pilot and not pilot.restocked.is_connected(_on_restocked):
+		pilot.restocked.connect(_on_restocked)
 
 	# Rotor downwash kicking up dust (or spray over water) when flying low.
 	_dust_colors = Effects.gradient([
@@ -145,39 +166,6 @@ func _ready() -> void:
 		add_child(trail)
 		_trails.append(trail)
 
-	# Shield bubble; turns gold during GET TO THE CHOPPA.
-	var sphere := SphereMesh.new()
-	sphere.radius = 3.6
-	sphere.height = 5.4
-	sphere.radial_segments = 20
-	sphere.rings = 10
-	_bubble_material = StandardMaterial3D.new()
-	_bubble_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_bubble_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_bubble_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_bubble = MeshInstance3D.new()
-	_bubble.mesh = sphere
-	_bubble.material_override = _bubble_material
-	_bubble.position = Vector3(0.0, 0.2, 0.8)
-	_bubble.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_bubble.visible = false
-	add_child(_bubble)
-
-	# Purple sparks while the controls are scrambled.
-	_sparks = Effects.puffs(Effects.gradient([
-		Color(0.9, 0.5, 1.0, 1.0), Color(0.6, 0.2, 1.0, 0.0),
-	]), 30, 0.5)
-	_sparks.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	_sparks.emission_sphere_radius = 2.5
-	_sparks.direction = Vector3.UP
-	_sparks.spread = 180.0
-	_sparks.initial_velocity_min = 2.0
-	_sparks.initial_velocity_max = 5.0
-	_sparks.scale_amount_min = 0.3
-	_sparks.scale_amount_max = 0.6
-	_sparks.local_coords = true
-	_sparks.emitting = false
-	add_child(_sparks)
 
 	# Thick black smoke out of the engine when badly damaged: many big, slow, dark puffs
 	# that keep growing, so it reads as a plume from across the arena.
@@ -253,17 +241,10 @@ func update_pose(c: Choppa, delta: float) -> void:
 		_cracks[k].visible = k < visible_cracks
 	for trail in _trails:
 		trail.emitting = c.is_boosting()
-	_sparks.emitting = c.scrambled > 0.0
-	_bubble.visible = c.shield > 0.0 or c.rampage > 0.0
-	if _bubble.visible:
-		var gold := c.rampage > 0.0
-		var pulse := 0.5 + 0.5 * sin(c.clock * 6.0)
-		_bubble_material.albedo_color = Color(1.0, 0.8, 0.2, 0.18 + pulse * 0.1) if gold \
-			else Color(0.3, 0.85, 1.0, 0.12 + 0.12 * c.shield / Choppa.SHIELD_HP)
 	_smoke.emitting = c.health < 35.0 or c.wear(Choppa.Part.ENGINE) > 0.5
 	_tail_smoke.emitting = c.wear(Choppa.Part.TAIL) > 0.5
 	_dust.emitting = c.altitude < 14.0
-	var ground := c.global_position + Vector3.DOWN * (c.altitude + Choppa.GROUND_CLEARANCE - 0.3)
+	var ground := c.global_position + Vector3.DOWN * (c.altitude + c.clearance - 0.3)
 	if _dust.emitting:
 		_dust.global_position = ground
 		_dust.color_ramp = _spray_colors if c.over_water else _dust_colors
@@ -430,7 +411,7 @@ func _build_downwash() -> void:
 	add_child(_downwash)
 
 
-static var _cached_scene: PackedScene
+static var _cached_scenes := {}
 
 
 ## Position of an empty from the Blender model, in model space.
@@ -439,10 +420,21 @@ static func _marker(model: Node3D, marker_name: String) -> Vector3:
 	return node.position if node else Vector3.ZERO
 
 
-static func _scene() -> PackedScene:
-	if _cached_scene == null:
-		_cached_scene = load("res://assets/models/choppa/choppa.glb")
-	return _cached_scene
+## The airframe's model (assets/models/choppa/<model>.glb), or the scout's until that
+## model has been built in Blender.
+static func _scene(id := Airframe.SCOUT) -> PackedScene:
+	var model_name: String = Airframe.spec(id).model
+	if not _cached_scenes.has(model_name):
+		var path := "res://assets/models/choppa/%s.glb" % model_name
+		if not ResourceLoader.exists(path):
+			path = "res://assets/models/choppa/choppa.glb"
+		_cached_scenes[model_name] = load(path)
+	return _cached_scenes[model_name]
+
+
+func _on_restocked() -> void:
+	if is_inside_tree() and pilot and pilot.clock > 0.5:  # Not the restock at spawn.
+		Sounds.play_ui(self, "pickup", -6.0)
 
 
 ## Materials by the names the Blender scripts give them; `paint` uses the hull shader.

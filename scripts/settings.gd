@@ -30,6 +30,7 @@ const DEFAULTS := {
 	"bloom": AUTO,
 	"grass": AUTO,  ## 0 off, 1 sparse, 2 dense
 	# Gameplay
+	"airframe": 0,  ## Index into Airframe.ORDER: scout, gunship, heavy. Chosen on the title screen.
 	"bot_difficulty": 1,  ## 0 easy, 1 normal, 2 hard; chosen on the title screen.
 	"fov": 70,  ## Chase camera field of view, degrees.
 	"camera_shake": 2,  ## 0 off, 1 half, 2 full

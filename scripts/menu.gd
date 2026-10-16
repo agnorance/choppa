@@ -11,6 +11,7 @@ var _home: VBoxContainer
 var _chrome: Array[Control] = []  ## Version and hints, hidden with the title.
 var _settings: SettingsMenu
 var _battle: Button
+var _blurb: Label  ## One line about the chosen helicopter.
 
 
 func _ready() -> void:
@@ -44,13 +45,13 @@ func _ready() -> void:
 	_home.offset_right = 110.0
 	_home.grow_horizontal = Control.GROW_DIRECTION_END
 	_home.grow_vertical = Control.GROW_DIRECTION_BOTH
-	_home.add_theme_constant_override("separation", 6)
+	_home.add_theme_constant_override("separation", 4)
 	root.add_child(_home)
 
-	var title := UiKit.display("CHOPPA", 116)
+	var title := UiKit.display("CHOPPA", 92)
 	_home.add_child(title)
 	_home.add_child(UiKit.caption("Get to the choppa!", 16, UiKit.ACCENT))
-	_home.add_child(_gap(22))
+	_home.add_child(_gap(10))
 
 	var maps := GameMap.catalog()
 	var names := PackedStringArray()
@@ -59,11 +60,20 @@ func _ready() -> void:
 	_battle = _button("Battle  ·  3 bots", func() -> void: mode_chosen.emit("battle", maps[map_index][1]))
 	_button("Free flight", func() -> void: mode_chosen.emit("free", maps[map_index][1]))
 	_button("Race  ·  test range", func() -> void: mode_chosen.emit("race", "range"))
-	_home.add_child(_gap(8))
+	_home.add_child(_gap(4))
 	var map_row := SettingRow.new("MAP", names, map_index)
 	map_row.custom_minimum_size = Vector2(380, 46)
 	map_row.changed.connect(func(i: int) -> void: map_index = i)
 	_home.add_child(map_row)
+	var class_row := SettingRow.new("HELICOPTER", Airframe.names(), Settings.choice("airframe"))
+	class_row.custom_minimum_size = Vector2(380, 46)
+	class_row.changed.connect(func(i: int) -> void:
+		Settings.set_value("airframe", i)
+		Settings.save()
+		_blurb.text = Airframe.spec(Airframe.ORDER[i]).blurb)
+	_home.add_child(class_row)
+	_blurb = UiKit.label(Airframe.spec(Airframe.ORDER[Settings.choice("airframe")]).blurb, 14, UiKit.MUTED)
+	_home.add_child(_blurb)
 	var model_row := SettingRow.new("FLIGHT", ["Easy", "Realistic"], Settings.choice("flight_model"))
 	model_row.custom_minimum_size = Vector2(380, 46)
 	model_row.changed.connect(func(i: int) -> void:

@@ -233,9 +233,9 @@ stations**: lit helipads with a mast.
 | Weapon | Ammo | What it does |
 |---|---|---|
 | Machine gun | unlimited | 12.5 rounds/s, 4 damage, overheats (see Machine gun). |
-| Rockets | per class | Unguided, fast, 12 damage plus a small blast, hit the part they strike. Alternate pods. |
-| Missiles | per class | Lock on in a 45° cone, chase the target, 35 damage and a big shove. |
-| Flares | per class | Break every missile lock on you; the missile flies wide. Rolling hard also works. |
+| Rockets | 8 / 14 / 20 | Unguided, fast, 12 damage plus a small blast, hit the part they strike. Alternate pods. |
+| Missiles | 1 / 2 / 3 | Lock on in a 45° cone, chase the target, 35 damage and a big shove. |
+| Flares | 3 / 2 / 4 | Break every missile lock on you; the missile flies wide. Rolling hard also works. |
 | Mine | 1 | Dropped below, arms after 1 s, 40 damage blast. Good for denying a station. |
 | Smoke | 1 | Cloud for 9 s: nobody inside can lock on or be locked on. |
 
@@ -253,9 +253,9 @@ Pick one on the title screen. Same controls, different numbers; each has its own
 
 | Class | Model | Hull | Speed and handling | Loadout |
 |---|---|---|---|---|
-| **Scout** | Little Bird (the original) | 80 | Fastest, sharpest rates, lightest: drifts most | 8 rockets, 1 missile, 3 flares |
-| **Gunship** | Slim tandem attack helicopter | 110 | Middle | 14 rockets, 2 missiles, 2 flares |
-| **Heavy** | Armoured twin-engine transport | 160, parts tougher | Slow, heavy, sluggish, big target | 20 rockets, 3 missiles, 4 flares, double gun |
+| **Scout** | Little Bird (the original) | 100 | Fastest, sharpest rates, lightest: drifts most | 8 rockets, 1 missile, 3 flares |
+| **Gunship** | Slim tandem attack helicopter | 130 | Middle | 14 rockets, 2 missiles, 2 flares |
+| **Heavy** | Armoured twin-engine transport | 170, parts 1.8x tougher | Slow, heavy, sluggish, big target | 20 rockets, 3 missiles, 4 flares, double gun |
 
 Bots pick classes at random (seeded per name), so matches mix them.
 

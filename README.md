@@ -1,8 +1,8 @@
 # choppa
 
 GET TO THE CHOPPA! An arcade helicopter arena shooter: battle your friends through
-tunnels, trenches and ruins, pull sick moves, and use Mario Kart style items to fool
-them.
+tunnels, trenches and ruins in three classes of helicopter, with rockets, missiles and
+flares, and fight over the service stations that patch you up.
 
 Made with [Godot 4.7](https://godotengine.org). Runs on Windows and Android. Design and
 roadmap: [docs/DESIGN.md](docs/DESIGN.md).
@@ -35,8 +35,7 @@ Then add two repository secrets under **Settings > Secrets and variables > Actio
 Pick a map in the menu (Mesa Basin or Test Range), then:
 
 - **Battle vs 3 bots** (Easy / Normal / Hard on the title screen): free-for-all. First to 8 kills, or the leader after 5 minutes.
-  You respawn 3 s after being shot down, with a short spawn shield. Red-cross crates
-  repair 40 health.
+  You respawn 3 s after being shot down, with a short spawn shield and a full loadout.
 - **Free flight:** explore the map with three training dummies to shoot.
 - **Race (test range):** 3 laps through both tunnels against bots. No damage in races.
 
@@ -70,7 +69,10 @@ mouse, Q / E or the shoulder buttons.
 | Collective (climb / descend) | W S (or Space / C) | Right stick Y | Right half: drag up/down |
 | Afterburner | Shift | RB | BURN |
 | Machine gun | Ctrl or left mouse | RT | FIRE (also auto-fires when locked on) |
-| Use item | R | X | ITEM |
+| Rockets (hold) | Right mouse | LT | RKT |
+| Missile (locks on) | F | RB | MSL |
+| Flares | X | B | FLR |
+| Mine / smoke | R / G | X / D-pad down | |
 | Camera: chase view / cockpit | V | Y | CAM |
 | Respawn (race: at your last gate; not in battle) | Backspace | Back/Select | |
 | Pause | Esc | Start | Back button |
@@ -88,16 +90,17 @@ bullets and missiles.
 The machine gun overheats after about two seconds of continuous fire. Crashing hurts
 (anything over 8 m/s into an obstacle), and where you get hit matters: a wrecked tail
 rotor spins you, a chewed main rotor shakes you and loses lift, a dead engine cannot
-hold a hover. Repair crates fix all of it.
+hold a hover. Service stations fix all of it.
 
-Item boxes (rainbow "?") give a random item; the further behind you are, the better:
-turbo, homing missile (barrel-roll to shake one off), mine, fake item box (watch for the
-upside-down "?"), smoke screen, control scrambler (hits the leader), shield, and for last
-place only: GET TO THE CHOPPA.
+**Service stations** are the lit helipads: land on one and it repairs hull and parts and
+refills your loadout in about four seconds, then powers down for 45 s (lamp red) for
+everybody. **Loadout** (refilled only at stations): rockets (unguided, hit the part they
+strike), homing missiles (flares or a hard roll shake them off), flares, one mine, one
+smoke screen.
 
-Tricks: roll (trick + left/right), front flip (trick + forward), 180 snap (trick + back),
-pirouette (trick alone). Landing a trick close to the ground fills your boost meter
-twice as much.
+**Helicopters** (title screen): Scout (light, fast, 100 hull, few rockets), Gunship
+(130 hull, more rockets, two missiles, harder-hitting guns), Heavy (170 hull, tough
+parts, big loadout, slow and sluggish).
 
 ## Develop
 
@@ -117,7 +120,8 @@ godot --path . -- --mode=free --map=basin --autopilot=hover --cam=showcase --exp
 ```
 
 - `--mode=battle|free|race`, `--map=basin|range`: skip the menu.
-- `--autopilot=hover|shoot|bot|item:MISSILE`: let a script or bot fly.
+- `--autopilot=hover|shoot|bot|weapon:missile`: let a script or bot fly (`weapon:` rockets, missile, flares, mine, smoke).
+- `--airframe=scout|gunship|heavy`: fly that class.
 - `--cam=fp|showcase`: start in the cockpit, or with a fixed front view of the choppa.
 - `--health=30`: start damaged (cracked canopy, smoke); `--wear=tail,engine`: start with wrecked parts.
 - `--explode=60`: set off an explosion ahead of you at physics tick 60.
@@ -129,7 +133,8 @@ godot --path . -- --mode=free --map=basin --autopilot=hover --cam=showcase --exp
 ```powershell
 tools\try.ps1              # lists the scenes
 tools\try.ps1 settings     # straight into a scene: menu, settings, battle, free, easy, race, cockpit,
-                           # lake, damaged, tailrotor, engine, touch, bots, missile, explode
+                           # lake, damaged, tailrotor, engine, touch, bots, missile, rockets,
+                           # gunship, heavy, explode
 tools\check.ps1            # import, all tests, and screenshots of every screen into build\shots\
 ```
 - `--shot=out.png --frames=90`: save a screenshot after 90 ticks and quit.

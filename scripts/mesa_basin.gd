@@ -44,7 +44,6 @@ func _ready() -> void:
 
 	MapKit.rock(self, "mesa", Vector3(0.0, -2.0, 0.0), 0.0, 1.0, Color(0.76, 0.47, 0.31))
 	MapKit.tunnel_lights(self, Vector3.ZERO, 110.0, 12.0)
-	MapKit.item_row(self, Vector3(0.0, 50.0, 0.0), 0.0, 2, 10.0)
 
 	# Ring of ruined arches around the mesa.
 	for k in 6:
@@ -111,22 +110,12 @@ func _ready() -> void:
 
 
 	GameMap.report("basin: grass+boulders", t0)
-	# Pickups.
+	# Service stations on open ground between the mesa and the arches, and one down in the
+	# trench for those who sneak.
 	for k in 4:
-		var angle := TAU * k / 4.0
-		var at := Vector3(cos(angle), 0.0, sin(angle)) * 92.0
-		MapKit.item_row(self, Vector3(at.x, _ground(at.x, at.z) + 7.0, at.z), angle, 3)
-	MapKit.item_row(self, Vector3(_trench_center(-120.0), _ground(_trench_center(-120.0), -120.0) + 6.0, -120.0), 0.0, 2)
-	MapKit.item_row(self, Vector3(LAKE.x, WATER_LEVEL + 6.0, LAKE.y), 0.8, 3)
-	for at: Vector3 in [
-		Vector3(0.0, 6.0, 0.0),  # Where the tunnels cross.
-		Vector3(_trench_center(150.0), _ground(_trench_center(150.0), 150.0) + 5.0, 150.0),
-		Vector3(170.0, _ground(170.0, -165.0) + 6.0, -165.0),
-		Vector3(LAKE.x - 40.0, WATER_LEVEL + 5.0, LAKE.y + 30.0),
-	]:
-		var crate := HealthCrate.new()
-		crate.position = at
-		add_child(crate)
+		var angle := TAU * k / 4.0 + PI * 0.25
+		MapKit.station(self, Vector3(cos(angle), 0.0, sin(angle)) * 112.0, _ground)
+	MapKit.station(self, Vector3(_trench_center(-120.0), 0.0, -120.0), _ground)
 
 	for k in 8:
 		var angle := TAU * k / 8.0 + 0.2

@@ -2,7 +2,7 @@ class_name Cockpit
 extends Node3D
 ## First-person cockpit: the Blender shell (assets/models/choppa/cockpit.glb, built by
 ## tools/blender/make_cockpit.py) plus live instruments mounted at its "mount_*" markers:
-## needle gauges, an amber radar, a nixie kill counter, a health lamp bar, the item
+## needle gauges, an amber radar, a nixie kill counter, a health lamp bar, the loadout
 ## plate, warning lamps and a rotating missile beacon. Stick and collective follow the
 ## controls. Origin = the pilot's eye. Only built for the local player.
 
@@ -59,7 +59,7 @@ func _ready() -> void:
 	_build_health(_mount(shell, "health"))
 	_build_item_plate(_mount(shell, "item"))
 	for lamp: Array in [["missile", Color(1.0, 0.1, 0.05), "MSL"], ["overheat", Color(1.0, 0.5, 0.05), "HOT"],
-			["shield", Color(0.2, 0.8, 1.0), "SHLD"], ["scrambled", Color(0.75, 0.3, 1.0), "SCRM"]]:
+			["service", Color(0.3, 1.0, 0.4), "SVC"], ["lock", Color(0.2, 0.8, 1.0), "LOCK"]]:
 		_lamps[lamp[0]] = _build_lamp(_mount(shell, "lamp_" + lamp[0]), lamp[1], lamp[2])
 	_build_beacon(_mount(shell, "beacon"))
 	_warning = AudioStreamPlayer.new()
@@ -102,22 +102,25 @@ func _process(delta: float) -> void:
 	for k in 2:
 		_nixies[k].text = text[k]
 
-	var lit := ceili(choppa.health / Choppa.MAX_HEALTH * _health_cells.size())
+	var lit := ceili(choppa.health / choppa.max_health * _health_cells.size())
 	for k in _health_cells.size():
 		var on := k < lit
 		var level := float(k) / _health_cells.size()
 		var color := Color(0.9, 0.15, 0.05).lerp(Color(0.25, 1.0, 0.3), smoothstep(0.2, 0.7, level))
 		_health_cells[k].material_override = _cell_material(color) if on else _cell_off
 
-	_item_label.text = choppa.item if choppa.item != "" else "- - -"
-	_item_label.modulate = (Items.color(choppa.item) if choppa.item != "" else AMBER * 0.5) * 2.0
+	_item_label.text = "R%d  M%d  F%d" % [choppa.ammo.rockets, choppa.ammo.missiles, choppa.ammo.flares]
+	_item_label.modulate = AMBER * (2.0 if choppa.ammo.rockets + choppa.ammo.missiles > 0 else 0.6)
 
 	var blink := fmod(_clock, 0.5) < 0.3
 	var hunted := _missile_incoming()
 	_set_lamp("missile", hunted and blink)
 	_set_lamp("overheat", choppa.overheated or (choppa.heat > 0.8 and blink))
-	_set_lamp("shield", choppa.shield > 0.0 or choppa.rampage > 0.0)
-	_set_lamp("scrambled", choppa.scrambled > 0.0)
+	var serviced := false
+	for node in choppa.get_tree().get_nodes_in_group("stations"):
+		serviced = serviced or (node as ServiceStation).occupant == choppa
+	_set_lamp("service", serviced and blink)
+	_set_lamp("lock", choppa.ammo.missiles > 0 and choppa.missile_target() != null)
 	_beacon_light.visible = hunted
 	_warning.stream_paused = not hunted
 	_beacon_dome.emission_energy_multiplier = 4.0 if hunted else 0.2
@@ -535,7 +538,7 @@ class Gauge extends Node3D:
 
 
 ## The radar picture, drawn into a SubViewport: amber phosphor rings, a sweeping beam,
-## blips for other choppas (relative to your heading, up = ahead) and repair crates.
+## blips for other choppas (relative to your heading, up = ahead) and ready service stations.
 class RadarScreen extends Control:
 	const RANGE := 300.0
 	var cockpit: Cockpit
@@ -561,9 +564,9 @@ class RadarScreen extends Control:
 			return
 		var me := cockpit.choppa
 		var to_local := me.facing().inverse()
-		for node in me.get_tree().get_nodes_in_group("health_crates"):
+		for node in me.get_tree().get_nodes_in_group("stations"):
 			var p := _project(to_local * ((node as Node3D).global_position - me.global_position), c, r)
-			if p != Vector2.INF and (node as HealthCrate).is_available():
+			if p != Vector2.INF and (node as ServiceStation).is_ready():
 				draw_line(p - Vector2(5, 0), p + Vector2(5, 0), Color(0.4, 1.0, 0.4, 0.8), 2.0)
 				draw_line(p - Vector2(0, 5), p + Vector2(0, 5), Color(0.4, 1.0, 0.4, 0.8), 2.0)
 		for node in me.get_tree().get_nodes_in_group("choppas"):

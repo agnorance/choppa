@@ -324,12 +324,18 @@ static func ring(parent: Node3D, center: Vector3, yaw: float, radius := 5.0) -> 
 
 
 ## A row of item boxes across the local X axis.
-static func item_row(parent: Node3D, center: Vector3, yaw: float, count: int, spacing := 6.0) -> void:
-	var across := Basis(Vector3.UP, yaw) * Vector3.RIGHT
-	for i in count:
-		var box := ItemBox.new()
-		box.position = center + across * (i - (count - 1) * 0.5) * spacing
-		parent.add_child(box)
+## A service station centred at `at` (x, z). `ground` gives the terrain height; the pad
+## sits on the highest point under it so no terrain pokes through.
+static func station(parent: Node3D, at: Vector3, ground: Callable) -> ServiceStation:
+	var top := -INF
+	for k in 9:
+		var a := TAU * k / 8.0
+		var r := 0.0 if k == 8 else ServiceStation.PAD_RADIUS
+		top = maxf(top, ground.call(at.x + cos(a) * r, at.z + sin(a) * r))
+	var s := ServiceStation.new()
+	s.position = Vector3(at.x, top - 0.1, at.z)
+	parent.add_child(s)
+	return s
 
 
 ## A sculpted rock model from assets/models/rocks (see tools/blender/make_rocks.py),

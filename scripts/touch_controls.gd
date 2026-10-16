@@ -31,7 +31,9 @@ func _buttons() -> Dictionary:
 	return {
 		"boost": [Vector2(w - 110.0, h - 110.0), 70.0, "BURN"],
 		"fire": [Vector2(w - 260.0, h - 200.0), 62.0, "FIRE"],
-		"use_item": [Vector2(w - 100.0, h - 270.0), 55.0, "ITEM"],
+		"rockets": [Vector2(w - 100.0, h - 270.0), 55.0, "RKT"],
+		"missile": [Vector2(w - 270.0, h - 70.0), 50.0, "MSL"],
+		"flares": [Vector2(w - 400.0, h - 110.0), 45.0, "FLR"],
 		"toggle_camera": [Vector2(w - 60.0, 140.0), 38.0, "CAM"],
 	}
 

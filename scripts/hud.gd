@@ -1,6 +1,6 @@
 class_name Hud
 extends CanvasLayer
-## Speed, altitude, afterburner, heat, hull, item and call-outs for one choppa, the controls
+## Speed, altitude, afterburner, heat, hull, loadout and call-outs for one choppa, the controls
 ## overlay (settings or F1) and the touch controls on phones. Flat text and thin bars;
 ## the cockpit view hides most of it because the instruments show the same.
 
@@ -14,7 +14,8 @@ var _root: Control
 var _speed: Label
 var _altitude: Label
 var _fps: Label
-var _item: Label
+var _loadout: Label
+var _loadout_extra: Label
 var _effects: Label
 var _boost: UiKit.Bar
 var _heat: UiKit.Bar
@@ -92,14 +93,17 @@ func _ready() -> void:
 	flight.add_child(_fps)
 	_flight.append(flight)
 
-	# Top right: the held item and running effects.
+	# Top right: the loadout, then station status and running effects.
 	var item_column := _column(Vector2(1, 0), Vector2(-28, 18), BoxContainer.ALIGNMENT_BEGIN)
-	var item_caption := UiKit.outlined(UiKit.caption("Item", 14))
+	var item_caption := UiKit.outlined(UiKit.caption(Airframe.spec(choppa.airframe).name, 14))
 	item_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	item_column.add_child(item_caption)
-	_item = UiKit.outlined(UiKit.display("-", 30))
-	_item.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	item_column.add_child(_item)
+	_loadout = UiKit.outlined(UiKit.display("", 26))
+	_loadout.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	item_column.add_child(_loadout)
+	_loadout_extra = UiKit.outlined(UiKit.label("", 16, UiKit.MUTED, "condensed"))
+	_loadout_extra.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	item_column.add_child(_loadout_extra)
 	_effects = UiKit.outlined(UiKit.label("", 18, UiKit.MUTED, "condensed"))
 	_effects.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	item_column.add_child(_effects)
@@ -167,18 +171,17 @@ func _ready() -> void:
 	_root.add_child(touch)
 	refresh_settings()
 
-	choppa.item_changed.connect(func(_name: String) -> void: _update_item())
 	choppa.scored_hit.connect(func(_target: Choppa) -> void: _hit_flash = 0.12)
 	choppa.damaged.connect(func(amount: float, _attacker: Choppa) -> void:
 		if Settings.flag("damage_flash"):
 			_vignette.modulate.a = minf(1.0, _vignette.modulate.a + amount / 20.0))
-	choppa.scrambled_by.connect(func(by: Choppa) -> void:
-		_show_callout("SCRAMBLED BY %s" % by.pilot_name.to_upper(), Color(0.8, 0.4, 1.0)))
-	choppa.item_used.connect(func(item_name: String) -> void:
-		if item_name == "GET TO THE CHOPPA":
-			_show_callout("GET TO THE CHOPPA!", UiKit.ACCENT))
+	choppa.restocked.connect(func() -> void:
+		if choppa.clock > 0.5:
+			_show_callout("SERVICED", UiKit.GOOD))
+	choppa.fired.connect(func(weapon: String) -> void:
+		if weapon == "flares":
+			_show_callout("FLARES", UiKit.ACCENT))
 	choppa.gun_overheated.connect(func() -> void: _show_callout("OVERHEAT", UiKit.DANGER))
-	_update_item()
 
 
 ## F1: flips the controls overlay setting.
@@ -211,7 +214,7 @@ func _process(delta: float) -> void:
 	_boost.set_value(choppa.boost_meter)
 	_heat.set_value(choppa.heat, UiKit.DANGER if choppa.overheated else Color(UiKit.TEXT, 0.7))
 	_hit_flash = maxf(0.0, _hit_flash - delta)
-	var hp := choppa.health / Choppa.MAX_HEALTH
+	var hp := choppa.health / choppa.max_health
 	_health.set_value(hp, UiKit.DANGER.lerp(UiKit.GOOD, smoothstep(0.2, 0.6, hp)))
 	_health_text.text = str(ceili(choppa.health))
 	for part: Choppa.Part in _parts:
@@ -221,14 +224,19 @@ func _process(delta: float) -> void:
 			UiKit.FAINT if wear <= 0.0 else (UiKit.DANGER if wear >= 1.0 else UiKit.ACCENT.lerp(UiKit.DANGER, wear)))
 	_vignette.modulate.a = maxf(0.0, _vignette.modulate.a - delta * 1.5)
 	_smoke.color.a = move_toward(_smoke.color.a, 0.82 if choppa.in_smoke() else 0.0, delta * 3.0)
-	_warning.text = "MISSILE  -  ROLL!" if _missile_hunting() and fmod(choppa.clock, 0.4) < 0.25 else ""
+	_warning.text = "MISSILE  -  FLARES!" if choppa.ammo.flares > 0 and _missile_hunting() and fmod(choppa.clock, 0.4) < 0.25 else "MISSILE  -  ROLL!" if _missile_hunting() and fmod(choppa.clock, 0.4) < 0.25 else ""
+	var a := choppa.ammo
+	_loadout.text = "RKT %d   MSL %d   FLR %d" % [a.rockets, a.missiles, a.flares]
+	_loadout_extra.text = "MINE %d   SMOKE %d" % [a.mines, a.smoke]
+	_loadout.add_theme_color_override("font_color", UiKit.DANGER if a.rockets + a.missiles == 0 else UiKit.TEXT)
 	var effects := PackedStringArray()
-	if choppa.shield > 0.0:
-		effects.append("SHIELD %d" % ceili(choppa.shield))
-	if choppa.scrambled > 0.0:
-		effects.append("SCRAMBLED %d" % ceili(choppa.scrambled))
-	if choppa.rampage > 0.0:
-		effects.append("RAMPAGE %d" % ceili(choppa.rampage))
+	var station := _my_station()
+	if station:
+		effects.append("SERVICING  %d%%" % roundi(station.progress() * 100.0))
+	elif a.missiles > 0 and choppa.missile_target():
+		effects.append("MISSILE LOCK")
+	if choppa.decoy_time > 0.0:
+		effects.append("DECOY")
 	_effects.text = "\n".join(effects)
 	_crosshair.queue_redraw()
 	if _callout_time > 0.0:
@@ -265,9 +273,12 @@ func _show_callout(text: String, color: Color) -> void:
 	_callout_time = CALLOUT_TIME
 
 
-func _update_item() -> void:
-	_item.text = choppa.item if choppa.item != "" else "-"
-	_item.add_theme_color_override("font_color", Items.color(choppa.item) if choppa.item != "" else UiKit.MUTED)
+## The station working on this choppa right now, or null.
+func _my_station() -> ServiceStation:
+	for node in choppa.get_tree().get_nodes_in_group("stations"):
+		if (node as ServiceStation).occupant == choppa:
+			return node
+	return null
 
 
 func _missile_hunting() -> bool:

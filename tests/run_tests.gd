@@ -57,6 +57,8 @@ func _run() -> void:
 		"test_effects_start_where_placed",
 		"test_grass_only_on_flat_dry_ground",
 		"test_canopy_cracks_follow_damage",
+		"test_settings_roundtrip",
+		"test_mouse_steers",
 	]:
 		_world = Node3D.new()
 		root.add_child(_world)
@@ -781,3 +783,51 @@ func test_canopy_cracks_follow_damage() -> void:
 	c.heal(100.0)
 	await _fly(c, 2)
 	_check(cracked.call() == 0, "repaired when healed")
+
+
+func test_settings_roundtrip() -> void:
+	var path := "user://settings_test.cfg"
+	var sensitivity := Settings.mouse_sensitivity
+	Settings.mouse_sensitivity = 7
+	Settings.invert_mouse = true
+	Settings.render_scale = 0.8
+	Settings.save(path)
+	Settings.mouse_sensitivity = 1
+	Settings.invert_mouse = false
+	Settings.render_scale = 1.0
+	Settings.read(path)
+	_check(Settings.mouse_sensitivity == 7, "sensitivity read back: %d" % Settings.mouse_sensitivity)
+	_check(Settings.invert_mouse, "invert flag read back")
+	_check(is_equal_approx(Settings.render_scale, 0.8), "render scale read back: %f" % Settings.render_scale)
+	Settings.mouse_sensitivity = sensitivity
+	Settings.invert_mouse = false
+	Settings.render_scale = 1.0
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+func test_mouse_steers() -> void:
+	_ground()
+	var choppa := _choppa(Vector3(0.0, 10.0, 0.0))
+	var pilot := LocalPilot.new()
+	pilot.choppa = choppa
+	pilot.set_physics_process(false)  # Stepped by hand below.
+	_world.add_child(pilot)
+	Settings.mouse_steer = true
+	Settings.invert_mouse = false
+	Settings.mouse_sensitivity = 5
+	pilot.feed_mouse(Vector2(40.0, -40.0))  # Right, and forward (up the screen).
+	pilot._physics_process(TICK)
+	_check(choppa.input.yaw > 0.5, "mouse right yaws right: %f" % choppa.input.yaw)
+	_check(choppa.input.lift > 0.5, "mouse forward climbs: %f" % choppa.input.lift)
+	pilot._physics_process(TICK)
+	_check(choppa.input.yaw == 0.0 and choppa.input.lift == 0.0, "mouse travel is used up each tick")
+	Settings.invert_mouse = true
+	pilot.feed_mouse(Vector2(0.0, -40.0))
+	pilot._physics_process(TICK)
+	_check(choppa.input.lift < -0.5, "inverted: mouse forward dives: %f" % choppa.input.lift)
+	Settings.invert_mouse = false
+	Settings.mouse_steer = false
+	pilot.feed_mouse(Vector2(40.0, 0.0))
+	pilot._physics_process(TICK)
+	_check(choppa.input.yaw == 0.0, "mouse steering off: the mouse does nothing")
+	Settings.mouse_steer = true

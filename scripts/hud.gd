@@ -1,34 +1,34 @@
 class_name Hud
 extends CanvasLayer
-## Speed, altitude, boost meter, item slot and trick call-outs for one choppa.
+## Speed, altitude, boost, heat, hull, item and call-outs for one choppa, the controls
+## overlay (settings or F1) and the touch controls on phones. Flat text and thin bars;
+## the cockpit view hides most of it because the instruments show the same.
 
-const HELP := """WASD fly   Q/E turn   Space/C up/down   Shift boost   Ctrl/mouse fire
-F trick (+direction)   R item   V camera   Backspace respawn   F1 help"""
+const CALLOUT_TIME := 1.2
 
 var choppa: Choppa
 var camera: Camera3D
 var touch: TouchControls
 
+var _root: Control
 var _speed: Label
 var _altitude: Label
 var _fps: Label
-var _boost: ProgressBar
-var _heat: ProgressBar
-var _health: ProgressBar
-var _health_fill: StyleBoxFlat
+var _item: Label
+var _effects: Label
+var _boost: UiKit.Bar
+var _heat: UiKit.Bar
+var _health: UiKit.Bar
+var _health_text: Label
 var _vignette: TextureRect
-var _boost_label: Label
-var _hp_label: Label
 var _smoke: ColorRect
 var _warning: Label
-var _effects: Label
-var _heat_fill: StyleBoxFlat
 var _crosshair: Control
-var _hit_flash := 0.0
-var _item: Label
 var _callout: Label
-var _help: Label
 var _callout_time := 0.0
+var _hit_flash := 0.0
+var _controls: Control
+var _flight: Array[Control] = []  ## Hidden in the cockpit view.
 
 
 func _init(target: Choppa) -> void:
@@ -36,61 +36,20 @@ func _init(target: Choppa) -> void:
 
 
 func _ready() -> void:
-	var root := Control.new()
-	root.anchor_right = 1.0
-	root.anchor_bottom = 1.0
-	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(root)
+	_root = Control.new()
+	_root.anchor_right = 1.0
+	_root.anchor_bottom = 1.0
+	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.theme = UiKit.theme()
+	add_child(_root)
 
-	_speed = _label(root, 40, Vector2(0, 0), Vector2(24, 16))
-	_altitude = _label(root, 24, Vector2(0, 0), Vector2(24, 70))
-	_fps = _label(root, 16, Vector2(0, 0), Vector2(24, 104))
-	_fps.modulate.a = 0.6
-
-	_item = _label(root, 28, Vector2(1, 0), Vector2(-24, 16))
-
-	_boost = ProgressBar.new()
-	_boost.max_value = 1.0
-	_boost.show_percentage = false
-	_boost.custom_minimum_size = Vector2(360, 22)
-	_place(_boost, Vector2(0.5, 1), Vector2(0, -26))
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = Color(1.0, 0.55, 0.1)
-	fill.set_corner_radius_all(6)
-	var back := StyleBoxFlat.new()
-	back.bg_color = Color(0, 0, 0, 0.45)
-	back.set_corner_radius_all(6)
-	_boost.add_theme_stylebox_override("fill", fill)
-	_boost.add_theme_stylebox_override("background", back)
-	root.add_child(_boost)
-	_boost_label = _label(root, 16, Vector2(0.5, 1), Vector2(0, -52))
-	_boost_label.text = "BOOST"
-
-	_heat = ProgressBar.new()
-	_heat.max_value = 1.0
-	_heat.show_percentage = false
-	_heat.custom_minimum_size = Vector2(360, 6)
-	_place(_heat, Vector2(0.5, 1), Vector2(0, -14))
-	_heat_fill = StyleBoxFlat.new()
-	_heat_fill.bg_color = Color(1.0, 0.9, 0.5)
-	_heat.add_theme_stylebox_override("fill", _heat_fill)
-	_heat.add_theme_stylebox_override("background", back)
-	root.add_child(_heat)
-
-	_hp_label = _label(root, 16, Vector2(0, 1), Vector2(24, -50))
-	_hp_label.text = "HP"
-	_health = ProgressBar.new()
-	_health.max_value = Choppa.MAX_HEALTH
-	_health.show_percentage = false
-	_health.custom_minimum_size = Vector2(260, 18)
-	_place(_health, Vector2(0, 1), Vector2(24, -24))
-	_health_fill = StyleBoxFlat.new()
-	_health_fill.set_corner_radius_all(5)
-	_health.add_theme_stylebox_override("fill", _health_fill)
-	_health.add_theme_stylebox_override("background", back)
-	root.add_child(_health)
-
-	# Red screen edges when hit.
+	# Full-screen tints first, so everything else draws over them.
+	_smoke = ColorRect.new()
+	_smoke.color = Color(0.12, 0.12, 0.14, 0.0)
+	_smoke.anchor_right = 1.0
+	_smoke.anchor_bottom = 1.0
+	_smoke.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_smoke)
 	var edge := Gradient.new()
 	edge.set_color(0, Color(0.8, 0.0, 0.0, 0.0))
 	edge.set_color(1, Color(0.8, 0.0, 0.0, 0.9))
@@ -108,78 +67,145 @@ func _ready() -> void:
 	_vignette.stretch_mode = TextureRect.STRETCH_SCALE
 	_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_vignette.modulate.a = 0.0
-	root.add_child(_vignette)
+	_root.add_child(_vignette)
 
-	_smoke = ColorRect.new()
-	_smoke.color = Color(0.12, 0.12, 0.14, 0.0)
-	_smoke.anchor_right = 1.0
-	_smoke.anchor_bottom = 1.0
-	_smoke.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(_smoke)
-	root.move_child(_smoke, 0)  # Under the HUD, so speed and health stay readable.
+	# Top left: speed and altitude.
+	var flight := _column(Vector2(0, 0), Vector2(28, 14), BoxContainer.ALIGNMENT_BEGIN)
+	var speed_row := HBoxContainer.new()
+	speed_row.add_theme_constant_override("separation", 6)
+	flight.add_child(speed_row)
+	_speed = UiKit.outlined(UiKit.display("0", 54))
+	speed_row.add_child(_speed)
+	var unit := UiKit.outlined(UiKit.caption("km/h", 14))
+	unit.size_flags_vertical = Control.SIZE_SHRINK_END
+	speed_row.add_child(unit)
+	var altitude_row := HBoxContainer.new()
+	altitude_row.add_theme_constant_override("separation", 8)
+	flight.add_child(altitude_row)
+	var alt := UiKit.outlined(UiKit.caption("ALT", 14))
+	alt.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	altitude_row.add_child(alt)
+	_altitude = UiKit.outlined(UiKit.display("0 m", 24))
+	altitude_row.add_child(_altitude)
+	_fps = UiKit.outlined(UiKit.caption("", 13, UiKit.FAINT))
+	flight.add_child(_fps)
+	_flight.append(flight)
 
-	_warning = _label(root, 40, Vector2(0.5, 0.62), Vector2.ZERO)
-	_warning.add_theme_color_override("font_color", Color(1.0, 0.25, 0.2))
-	_effects = _label(root, 24, Vector2(1, 0), Vector2(-24, 52))
+	# Top right: the held item and running effects.
+	var item_column := _column(Vector2(1, 0), Vector2(-28, 18), BoxContainer.ALIGNMENT_BEGIN)
+	var item_caption := UiKit.outlined(UiKit.caption("Item", 14))
+	item_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	item_column.add_child(item_caption)
+	_item = UiKit.outlined(UiKit.display("-", 30))
+	_item.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	item_column.add_child(_item)
+	_effects = UiKit.outlined(UiKit.label("", 18, UiKit.MUTED, "condensed"))
+	_effects.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	item_column.add_child(_effects)
+	_flight.append(item_column)
+
+	# Bottom centre: boost, with the gun heat as a hairline under it.
+	var boost_column := _column(Vector2(0.5, 1), Vector2(0, -26), BoxContainer.ALIGNMENT_END)
+	boost_column.add_theme_constant_override("separation", 6)
+	var boost_caption := UiKit.outlined(UiKit.caption("Boost", 13))
+	boost_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boost_column.add_child(boost_caption)
+	_boost = UiKit.Bar.new(300.0, 5.0)
+	boost_column.add_child(_boost)
+	_heat = UiKit.Bar.new(300.0, 2.0)
+	_heat.color = Color(UiKit.TEXT, 0.7)
+	_heat.track = Color(1, 1, 1, 0.06)
+	boost_column.add_child(_heat)
+	_flight.append(boost_column)
+
+	# Bottom left: hull.
+	var hull_column := _column(Vector2(0, 1), Vector2(28, -26), BoxContainer.ALIGNMENT_END)
+	hull_column.add_theme_constant_override("separation", 6)
+	var hull_row := HBoxContainer.new()
+	hull_row.add_theme_constant_override("separation", 8)
+	hull_column.add_child(hull_row)
+	var hull_caption := UiKit.outlined(UiKit.caption("Hull", 13))
+	hull_caption.size_flags_vertical = Control.SIZE_SHRINK_END
+	hull_row.add_child(hull_caption)
+	_health_text = UiKit.outlined(UiKit.display("100", 22))
+	hull_row.add_child(_health_text)
+	_health = UiKit.Bar.new(240.0, 5.0)
+	hull_column.add_child(_health)
+	_flight.append(hull_column)
+
+	_warning = UiKit.outlined(UiKit.display("", 34, UiKit.DANGER))
+	_place(_warning, Vector2(0.5, 0.62), Vector2.ZERO)
+	_root.add_child(_warning)
+	_callout = UiKit.outlined(UiKit.display("", 46, UiKit.ACCENT))
+	_callout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_callout.modulate.a = 0.0
+	_place(_callout, Vector2(0.5, 0.3), Vector2.ZERO)
+	_root.add_child(_callout)
 
 	_crosshair = Control.new()
 	_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_crosshair.anchor_right = 1.0
 	_crosshair.anchor_bottom = 1.0
 	_crosshair.draw.connect(_draw_crosshair)
-	root.add_child(_crosshair)
+	_root.add_child(_crosshair)
 
-	_callout = _label(root, 56, Vector2(0.5, 0.3), Vector2.ZERO)
-	_callout.grow_vertical = Control.GROW_DIRECTION_END
-	_callout.modulate.a = 0.0
-
-	_help = _label(root, 18, Vector2(0, 0), Vector2(24, 132))
-	_help.text = HELP
+	_controls = _controls_sheet()
+	_place(_controls, Vector2(1, 1), Vector2(-28, -26))
+	_root.add_child(_controls)
 
 	touch = TouchControls.new()
 	touch.anchor_right = 1.0
 	touch.anchor_bottom = 1.0
 	touch.visible = DisplayServer.is_touchscreen_available()
-	_help.visible = not touch.visible
-	root.add_child(touch)
+	_root.add_child(touch)
+	refresh_settings()
 
 	choppa.trick_landed.connect(_on_trick_landed)
-	choppa.trick_botched.connect(func(_name: String) -> void: _show_callout("BOTCHED", Color(1, 0.3, 0.3)))
+	choppa.trick_botched.connect(func(_name: String) -> void: _show_callout("BOTCHED", UiKit.DANGER))
 	choppa.item_changed.connect(func(_name: String) -> void: _update_item())
 	choppa.scored_hit.connect(func(_target: Choppa) -> void: _hit_flash = 0.12)
 	choppa.damaged.connect(func(amount: float, _attacker: Choppa) -> void:
 		_vignette.modulate.a = minf(1.0, _vignette.modulate.a + amount / 20.0))
 	choppa.scrambled_by.connect(func(by: Choppa) -> void:
-		_show_callout("SCRAMBLED BY %s!" % by.pilot_name.to_upper(), Color(0.8, 0.4, 1.0)))
+		_show_callout("SCRAMBLED BY %s" % by.pilot_name.to_upper(), Color(0.8, 0.4, 1.0)))
 	choppa.item_used.connect(func(item_name: String) -> void:
 		if item_name == "GET TO THE CHOPPA":
-			_show_callout("GET TO THE CHOPPA!", Color(1.0, 0.85, 0.2)))
-	choppa.gun_overheated.connect(func() -> void: _show_callout("OVERHEAT", Color(1, 0.4, 0.2)))
+			_show_callout("GET TO THE CHOPPA!", UiKit.ACCENT))
+	choppa.gun_overheated.connect(func() -> void: _show_callout("OVERHEAT", UiKit.DANGER))
 	_update_item()
 
 
+## F1: flips the controls overlay setting.
 func toggle_help() -> void:
-	_help.visible = not _help.visible
+	Settings.show_controls = not Settings.show_controls
+	Settings.save()
+	refresh_settings()
+
+
+## Re-reads the settings that change what the HUD shows.
+func refresh_settings() -> void:
+	_controls.visible = Settings.show_controls and not touch.visible
+	_fps.visible = Settings.show_fps
 
 
 func _process(delta: float) -> void:
 	# In the cockpit the instruments show all this; keep the screen clean.
 	var cockpit := camera is ChaseCamera and (camera as ChaseCamera).first_person
-	for control: Control in [_speed, _altitude, _boost, _heat, _health, _item, _effects, _boost_label, _hp_label, _help]:
+	for control in _flight:
 		control.visible = not cockpit
-	_speed.text = "%d km/h" % roundi(choppa.velocity.length() * 3.6)
-	_altitude.text = "ALT %d m" % roundi(maxf(choppa.altitude, 0.0))
-	_fps.text = "%d fps" % Engine.get_frames_per_second()
-	_boost.value = choppa.boost_meter
-	_heat.value = choppa.heat
-	_heat_fill.bg_color = Color(1.0, 0.25, 0.15) if choppa.overheated else Color(1.0, 0.9, 0.5)
+	_speed.text = str(roundi(choppa.velocity.length() * 3.6))
+	_altitude.text = "%d m" % roundi(maxf(choppa.altitude, 0.0))
+	if _fps.visible:
+		_fps.text = "%d FPS" % Engine.get_frames_per_second()
+	_boost.set_value(choppa.boost_meter)
+	_heat.set_value(choppa.heat, UiKit.DANGER if choppa.overheated else Color(UiKit.TEXT, 0.7))
 	_hit_flash = maxf(0.0, _hit_flash - delta)
-	_health.value = choppa.health
 	var hp := choppa.health / Choppa.MAX_HEALTH
-	_health_fill.bg_color = Color(0.9, 0.2, 0.15).lerp(Color(0.3, 0.85, 0.35), smoothstep(0.2, 0.6, hp))
+	_health.set_value(hp, UiKit.DANGER.lerp(UiKit.GOOD, smoothstep(0.2, 0.6, hp)))
+	_health_text.text = str(ceili(choppa.health))
 	_vignette.modulate.a = maxf(0.0, _vignette.modulate.a - delta * 1.5)
 	_smoke.color.a = move_toward(_smoke.color.a, 0.82 if choppa.in_smoke() else 0.0, delta * 3.0)
-	_warning.text = "MISSILE!  ROLL!" if _missile_hunting() and fmod(choppa.clock, 0.4) < 0.25 else ""
+	_warning.text = "MISSILE  -  ROLL!" if _missile_hunting() and fmod(choppa.clock, 0.4) < 0.25 else ""
 	var effects := PackedStringArray()
 	if choppa.shield > 0.0:
 		effects.append("SHIELD %d" % ceili(choppa.shield))
@@ -194,17 +220,18 @@ func _process(delta: float) -> void:
 		_callout.modulate.a = clampf(_callout_time / 0.4, 0.0, 1.0)
 
 
-## A cross where your guns point, or a ring around the locked-on target.
+## A small cross where your guns point, or a ring around the locked-on target.
 func _draw_crosshair() -> void:
 	if camera == null or choppa.trick != "" or not choppa.alive:
 		return
-	var color := Color(1, 0.3, 0.2) if _hit_flash > 0.0 else Color(1, 1, 1, 0.85)
+	var color := UiKit.DANGER if _hit_flash > 0.0 else Color(UiKit.TEXT, 0.9)
 	var target := choppa.aim_target()
 	if target:
 		if not camera.is_position_behind(target.global_position):
 			var at := camera.unproject_position(target.global_position)
-			_crosshair.draw_arc(at, 34.0, 0.0, TAU, 32, color, 3.0)
-			_crosshair.draw_arc(at, 40.0, 0.0, TAU, 32, Color(color, 0.4), 2.0)
+			_crosshair.draw_arc(at, 30.0, 0.0, TAU, 48, color if _hit_flash > 0.0 else UiKit.ACCENT, 2.0, true)
+			for d: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
+				_crosshair.draw_line(at + d * 30.0, at + d * 38.0, color, 2.0, true)
 		return
 	if camera is ChaseCamera and (camera as ChaseCamera).first_person:
 		return  # The gunsight in the cockpit is the crosshair.
@@ -213,25 +240,25 @@ func _draw_crosshair() -> void:
 		return
 	var c := camera.unproject_position(ahead)
 	for d: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
-		_crosshair.draw_line(c + d * 6.0, c + d * 16.0, color, 2.0)
+		_crosshair.draw_line(c + d * 5.0, c + d * 13.0, color, 1.5, true)
 
 
 func _on_trick_landed(trick_name: String, reward: float, low: bool) -> void:
-	var text := "%s!  +%d%%" % [trick_name, roundi(reward * 100.0)]
+	var text := "%s  +%d%%" % [trick_name, roundi(reward * 100.0)]
 	if low:
-		text += "\nLOW x2"
-	_show_callout(text, Color(1.0, 0.85, 0.2))
+		text += "\nLOW  x2"
+	_show_callout(text, UiKit.ACCENT)
 
 
 func _show_callout(text: String, color: Color) -> void:
 	_callout.text = text
 	_callout.add_theme_color_override("font_color", color)
-	_callout_time = 1.2
+	_callout_time = CALLOUT_TIME
 
 
 func _update_item() -> void:
-	_item.text = "ITEM: %s" % (choppa.item if choppa.item != "" else "-")
-	_item.add_theme_color_override("font_color", Items.color(choppa.item) if choppa.item != "" else Color.WHITE)
+	_item.text = choppa.item if choppa.item != "" else "-"
+	_item.add_theme_color_override("font_color", Items.color(choppa.item) if choppa.item != "" else UiKit.MUTED)
 
 
 func _missile_hunting() -> bool:
@@ -240,6 +267,55 @@ func _missile_hunting() -> bool:
 		if missile.is_hunting(choppa) and missile.global_position.distance_to(choppa.global_position) < 200.0:
 			return true
 	return false
+
+
+## The key bindings, as a compact table in the corner.
+func _controls_sheet() -> Control:
+	var panel := UiKit.panel(false, 14.0)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	var head := HBoxContainer.new()
+	box.add_child(head)
+	var title := UiKit.caption("Controls", 13)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	head.add_child(UiKit.caption("F1 hides", 13, UiKit.FAINT))
+	box.add_child(UiKit.rule())
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 18)
+	grid.add_theme_constant_override("v_separation", 5)
+	box.add_child(grid)
+	for row: Array in Controls.cheat_sheet(Settings.mouse_steer):
+		var what := UiKit.label(row[0], 15, UiKit.MUTED)
+		what.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		grid.add_child(what)
+		var keys := HBoxContainer.new()
+		keys.add_theme_constant_override("separation", 4)
+		keys.alignment = BoxContainer.ALIGNMENT_END
+		keys.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		for key: String in row[1]:
+			if key.begins_with("~"):
+				var note := UiKit.label(key.substr(1), 14, UiKit.MUTED)
+				note.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				keys.add_child(note)
+			else:
+				keys.add_child(UiKit.keycap(key))
+		grid.add_child(keys)
+	return panel
+
+
+## A VBox pinned to a corner or an edge, growing away from it.
+func _column(anchor: Vector2, offset: Vector2, alignment: BoxContainer.AlignmentMode) -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.alignment = alignment
+	box.add_theme_constant_override("separation", 0)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(box)
+	_place(box, anchor, offset)
+	return box
 
 
 ## Pins a control's corner (or edge middle, for 0.5) at `anchor` (fractions of the
@@ -263,15 +339,3 @@ func _grow(anchor: float) -> Control.GrowDirection:
 	if anchor == 1.0:
 		return Control.GROW_DIRECTION_BEGIN
 	return Control.GROW_DIRECTION_BOTH
-
-
-func _label(parent: Control, font_size: int, anchor: Vector2, offset: Vector2) -> Label:
-	var label := Label.new()
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	label.add_theme_constant_override("outline_size", maxi(4, font_size / 6))
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.horizontal_alignment = int(anchor.x * 2.0) as HorizontalAlignment
-	parent.add_child(label)
-	_place(label, anchor, offset)
-	return label

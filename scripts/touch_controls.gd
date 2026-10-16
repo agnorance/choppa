@@ -86,20 +86,21 @@ func _update_axes() -> void:
 			look = v
 
 
+## Thin rings and translucent discs; a held button fills with the accent.
 func _draw() -> void:
-	var font := ThemeDB.fallback_font
+	var font := UiKit.spaced("condensed", 1)
 	for stick: Dictionary in _sticks.values():
-		draw_circle(stick.origin, STICK_RADIUS, Color(1, 1, 1, 0.12))
+		draw_arc(stick.origin, STICK_RADIUS, 0.0, TAU, 64, Color(UiKit.TEXT, 0.35), 2.0, true)
 		var knob: Vector2 = stick.origin + (stick.pos - stick.origin).limit_length(STICK_RADIUS)
-		draw_circle(knob, 34.0, Color(1, 1, 1, 0.35))
+		draw_circle(knob, 28.0, Color(UiKit.TEXT, 0.45), true, -1.0, true)
 	var buttons := _buttons()
 	for button: String in buttons:
 		var center: Vector2 = buttons[button][0]
 		var radius: float = buttons[button][1]
-		var alpha := 0.45 if is_pressed(button) else 0.2
-		draw_circle(center, radius, Color(1, 1, 1, alpha))
-		draw_arc(center, radius, 0.0, TAU, 32, Color(1, 1, 1, 0.6), 3.0)
+		var held := is_pressed(button)
+		draw_circle(center, radius, Color(UiKit.ACCENT, 0.85) if held else Color(0.05, 0.06, 0.08, 0.45), true, -1.0, true)
+		draw_arc(center, radius - 1.0, 0.0, TAU, 64, UiKit.ACCENT if held else Color(UiKit.TEXT, 0.35), 2.0, true)
 		var label: String = buttons[button][2]
 		var text_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_CENTER, -1, 20)
 		draw_string(font, center + Vector2(-text_size.x * 0.5, 7.0), label,
-			HORIZONTAL_ALIGNMENT_CENTER, -1, 20, Color.WHITE)
+			HORIZONTAL_ALIGNMENT_CENTER, -1, 20, UiKit.INK if held else UiKit.TEXT)

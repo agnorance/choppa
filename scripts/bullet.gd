@@ -52,7 +52,7 @@ func _physics_process(delta: float) -> void:
 	var target := hit.collider as Choppa
 	if target and target.take_hit(direction * KNOCKBACK, shooter, damage) and is_instance_valid(shooter):
 		shooter.scored_hit.emit(target)
-	if target == null or not target.trick == "BARREL ROLL":
+	if target == null or not target.is_rolling_hard():
 		_impact(hit)
 		queue_free()
 	else:

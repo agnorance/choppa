@@ -64,6 +64,12 @@ func _ready() -> void:
 	map_row.custom_minimum_size = Vector2(380, 46)
 	map_row.changed.connect(func(i: int) -> void: map_index = i)
 	_home.add_child(map_row)
+	var bots_row := SettingRow.new("BOTS", ["Easy", "Normal", "Hard"], Settings.choice("bot_difficulty"))
+	bots_row.custom_minimum_size = Vector2(380, 46)
+	bots_row.changed.connect(func(i: int) -> void:
+		Settings.set_value("bot_difficulty", i)
+		Settings.save())
+	_home.add_child(bots_row)
 	_button("Settings", open_settings)
 	if OS.get_name() != "Android":
 		_button("Quit", func() -> void: get_tree().quit())

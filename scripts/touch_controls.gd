@@ -1,14 +1,15 @@
 class_name TouchControls
 extends Control
-## On-screen controls for phones: drag anywhere on the left half to fly, on the right
-## half to turn and climb, plus buttons. Sticks appear wherever your thumb lands.
+## On-screen controls for phones: drag anywhere on the left half for the cyclic (pitch
+## and roll), on the right half for yaw and collective, plus buttons. Sticks appear
+## wherever your thumb lands.
 
 signal camera_pressed
 
 const STICK_RADIUS := 90.0
 
-var move := Vector2.ZERO  ## Same convention as PilotInput.move.
-var look := Vector2.ZERO  ## x: yaw, y: lift.
+var cyclic := Vector2.ZERO  ## Same convention as PilotInput.cyclic: x roll right, y nose down.
+var look := Vector2.ZERO  ## x: yaw, y: collective.
 
 var _pressed := {}  ## button name -> true while held
 var _sticks := {}  ## finger index -> {"left": bool, "origin": Vector2, "pos": Vector2}
@@ -28,9 +29,8 @@ func _buttons() -> Dictionary:
 	var w := size.x
 	var h := size.y
 	return {
-		"boost": [Vector2(w - 110.0, h - 110.0), 70.0, "BOOST"],
-		"trick": [Vector2(w - 270.0, h - 80.0), 58.0, "TRICK"],
-		"fire": [Vector2(w - 260.0, h - 230.0), 62.0, "FIRE"],
+		"boost": [Vector2(w - 110.0, h - 110.0), 70.0, "BURN"],
+		"fire": [Vector2(w - 260.0, h - 200.0), 62.0, "FIRE"],
 		"use_item": [Vector2(w - 100.0, h - 270.0), 55.0, "ITEM"],
 		"toggle_camera": [Vector2(w - 60.0, 140.0), 38.0, "CAM"],
 	}
@@ -75,15 +75,14 @@ func _release(finger: int) -> void:
 
 
 func _update_axes() -> void:
-	move = Vector2.ZERO
+	cyclic = Vector2.ZERO
 	look = Vector2.ZERO
 	for stick: Dictionary in _sticks.values():
 		var v: Vector2 = ((stick.pos - stick.origin) / STICK_RADIUS).limit_length(1.0)
-		v.y = -v.y  # Screen up means forward / climb.
 		if stick.left:
-			move = v
+			cyclic = Vector2(v.x, -v.y)  # Thumb up: nose down, like pushing a stick.
 		else:
-			look = v
+			look = Vector2(v.x, -v.y)  # Thumb up: more collective.
 
 
 ## Thin rings and translucent discs; a held button fills with the accent.

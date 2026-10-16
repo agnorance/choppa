@@ -89,13 +89,13 @@ func _process(delta: float) -> void:
 	(_gauges.altitude as Gauge).value = choppa.altitude
 	(_gauges.boost as Gauge).value = choppa.boost_meter * 100.0
 	(_gauges.heat as Gauge).value = choppa.heat * 100.0
-	(_gauges.rpm as Gauge).value = 330.0 + choppa.input.lift * 50.0 + (70.0 if choppa.is_boosting() else 0.0)
+	(_gauges.rpm as Gauge).value = 330.0 + choppa.input.collective * 50.0 + (70.0 if choppa.is_boosting() else 0.0)
 
 	var i := choppa.input
 	if _stick:
-		_stick.rotation = Vector3(-i.move.y * 0.3, 0.0, -i.move.x * 0.3)
+		_stick.rotation = Vector3(-i.cyclic.y * 0.3, 0.0, -i.cyclic.x * 0.3)
 	if _collective:
-		_collective.rotation.x = i.lift * 0.3
+		_collective.rotation.x = i.collective * 0.3
 
 	var kills: int = kills_source.call()
 	var text := "--" if kills < 0 else "%02d" % mini(kills, 99)

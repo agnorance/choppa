@@ -68,7 +68,8 @@ func _process(delta: float) -> void:
 		return
 
 	cull_mask = 0xFFFFF
-	var body := target.get_global_transform_interpolated()
+	# Follow the heading only: the body pitches and rolls, the chase camera stays level.
+	var body := Transform3D(target.facing(), target.get_global_transform_interpolated().origin)
 	if showcase:
 		global_position = body.origin + body.basis * Vector3(7.0, 1.2, -8.0)
 		look_at(body.origin + Vector3.UP * 0.5, Vector3.UP)

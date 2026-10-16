@@ -1,7 +1,7 @@
 class_name ScriptedPilot
 extends Node
 ## Canned flight plans for screenshots and smoke tests (`--autopilot=<plan>`).
-## Plans: hover, shoot, forward, boost, roll, flip, snap, pirouette, and item:<NAME>
+## Plans: hover, shoot, forward, boost, roll, flip, pirouette, and item:<NAME>
 ## (hover, then get and use that item, e.g. item:MISSILE).
 
 const CRUISE_ALTITUDE := 7.0
@@ -20,29 +20,27 @@ func _physics_process(_delta: float) -> void:
 	_tick += 1
 	var i := choppa.input
 	i.clear()
-	i.lift = clampf((CRUISE_ALTITUDE - choppa.altitude) * 0.3, -1.0, 1.0)
-	if plan == "hover":
-		return
+	var pos := choppa.global_position
+	var forward := choppa.facing() * Vector3.FORWARD
+	var want := Vector3(0.0, (CRUISE_ALTITUDE - choppa.altitude) * 0.5, 0.0)
 	if plan.begins_with("item:"):
 		if _tick == 20:
 			choppa.give_item(plan.substr(5))
 		i.use_item = _tick == 30
-		return
-	if plan == "shoot":
+	elif plan == "shoot":
 		i.fire = true
-		return
-	i.move.y = 1.0
+	elif plan != "hover":
+		want += forward * 25.0
+	Autopilot.fly(choppa, i, want, pos + forward * 50.0)
 	match plan:
 		"boost":
 			i.boost = true
-		"roll":
-			i.trick = _tick > 60 and _tick < 64
-			i.move = Vector2(1.0, 0.0) if i.trick else Vector2(0.0, 1.0)
-		"flip":
-			i.trick = _tick > 60 and _tick < 64
-		"snap":
-			i.trick = _tick > 60 and _tick < 64
-			i.move = Vector2(0.0, -1.0) if i.trick else Vector2(0.0, 1.0)
+		"roll":  # Full stick after a run-up: a barrel roll.
+			if _tick > 60 and _tick < 100:
+				i.cyclic.x = 1.0
+		"flip":  # Full back stick: a loop.
+			if _tick > 60 and _tick < 130:
+				i.cyclic.y = -1.0
 		"pirouette":
-			i.trick = _tick > 60 and _tick < 64
-			i.move = Vector2.ZERO if i.trick else Vector2(0.0, 1.0)
+			if _tick > 60 and _tick < 120:
+				i.yaw = 1.0

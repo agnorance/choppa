@@ -13,10 +13,6 @@ func _ready() -> void:
 func _physics_process(_delta: float) -> void:
 	var i := choppa.input
 	i.clear()
-	var to_inverse := choppa.facing().inverse()
-	var offset := to_inverse * (home - choppa.global_position)
-	var vel := to_inverse * choppa.velocity
-	# Proportional pull to the post, damped by current speed.
-	var steer := Vector3(offset.x, offset.y, offset.z) * 0.15 - vel * 0.08
-	i.move = Vector2(steer.x, -steer.z).limit_length(1.0)
-	i.lift = clampf(steer.y * 2.0, -1.0, 1.0)
+	# Proportional pull to the post; the autopilot turns it into stick and collective.
+	var want := ((home - choppa.global_position) * 0.6).limit_length(12.0)
+	Autopilot.fly(choppa, i, want, choppa.global_position + choppa.facing() * Vector3.FORWARD * 10.0)

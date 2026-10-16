@@ -1,11 +1,9 @@
 class_name Choppa
 extends CharacterBody3D
-## Arcade helicopter. Reads `input` every physics tick and never touches Input directly,
+## Arcade helicopter with real forces: gravity, rotor thrust along the body, drag, inertia
+## in the turns. Reads `input` every physics tick and never touches Input directly,
 ## so the same code runs for local players, bots and (later) network peers.
 
-signal trick_started(trick_name: String)
-signal trick_landed(trick_name: String, reward: float, low: bool)
-signal trick_botched(trick_name: String)
 signal bumped(impact: float)
 signal item_changed(item_name: String)
 signal hit_taken(impulse: Vector3, shooter: Choppa)
@@ -17,12 +15,14 @@ signal healed(amount: float)
 signal item_used(item_name: String)
 signal scrambled_by(attacker: Choppa)
 
-## Below this altitude a trick counts as "low" and its boost reward doubles.
-const LOW_ALTITUDE := 6.0
 ## Distance from the body origin to the bottom of the skids.
 const GROUND_CLEARANCE := 1.15
 const BOUNCE_IMPACT := 14.0
-const TRICK_COOLDOWN := 0.15
+const GRAVITY := 9.81
+const DODGE_ROLL_RATE := 2.8  ## rad/s: rolling this fast throws off bullets and missiles.
+const LEVEL_GAIN := 2.5  ## Flight assist: rate per radian of tilt that brings the body level.
+const GROUND_EFFECT := 0.08  ## Extra thrust fraction right above the ground...
+const GROUND_EFFECT_HEIGHT := 6.0  ## ...fading out by this altitude.
 const GUN_INTERVAL := 0.08  ## Seconds between shots.
 const GUN_HEAT_PER_SHOT := 0.035  ## About 2.3 s of continuous fire to overheat.
 const GUN_COOL_RATE := 0.6  ## Heat lost per second when not firing.
@@ -40,34 +40,35 @@ const MISSILE_CONE := deg_to_rad(45.0)
 const MISSILE_RANGE := 250.0
 ## A crash this soon after being shot counts as a kill for whoever shot you.
 const CRASH_CREDIT_TIME := 4.0
-const TRICKS := {
-	"BARREL ROLL": {"duration": 0.55, "reward": 0.15},
-	"FRONT FLIP": {"duration": 0.6, "reward": 0.18},
-	"180 SNAP": {"duration": 0.45, "reward": 0.12},
-	"PIROUETTE": {"duration": 0.7, "reward": 0.12},
-}
-
 @export var team_color := Color(0.95, 0.5, 0.1)
 @export var pilot_name := "Pilot"
 var aim_assist := true  ## Guns snap onto a target in the cone; the player can turn it off in the settings.
 @export var local_player := false  ## Hide own model from the cockpit camera.
 
 @export_group("Flight")
-@export var max_speed := 36.0
-@export var boost_speed := 60.0
-@export var turbo_speed := 72.0
-@export var accel := 28.0
-@export var climb_speed := 16.0
-@export var climb_accel := 45.0
-@export var turn_speed := 2.4  ## rad/s
-@export var turn_accel := 14.0
-@export var boost_drain := 0.35  ## meter per second
+@export var hover_thrust := 9.81  ## Rotor thrust at collective 0: holds a level hover.
+@export var collective_range := 0.6  ## Collective +-1 adds or takes this fraction of hover thrust.
+@export var pitch_rate := 2.4  ## rad/s at full stick.
+@export var roll_rate := 3.6
+@export var yaw_rate := 2.0
+@export var angular_accel := 10.0  ## How fast the rates follow the stick (inertia).
+## Drag per body axis (x across, y up, z along the nose), times speed squared. Lower
+## along the nose, so the choppa flies best the way it points and drifts in a slide.
+@export var drag := Vector3(0.02, 0.02, 0.0065)
+@export var afterburner_thrust := 22.0  ## Extra acceleration along the nose while burning.
+@export var turbo_thrust := 34.0  ## The TURBO item.
+@export var boost_drain := 0.5  ## Afterburner charge used per second...
+@export var boost_recharge := 0.2  ## ...and regained per second when off.
+@export var max_speed := 36.0  ## About the level top speed at a 35 degree nose-down (bots, docs).
+@export var boost_speed := 60.0  ## About the top speed with the afterburner (camera, visuals).
 @export var max_altitude := 140.0
 
 var input := PilotInput.new()
-var heading := 0.0  ## Yaw in radians; 0 faces -Z.
-var turn_rate := 0.0
-var boost_meter := 0.5
+var heading := 0.0  ## Yaw in radians; 0 faces -Z. Derived from the body each tick.
+var turn_rate := 0.0  ## Yaw rate, rad/s (positive turns left).
+var rates := Vector3.ZERO  ## Body rotation rates: x pitch (nose up), y yaw (left), z roll (left).
+var flight_assist := false  ## Level out and hold height when the stick is centred (a setting).
+var boost_meter := 1.0  ## Afterburner charge, 0..1.
 var turbo_time := 0.0
 var item := ""
 var stun := 0.0
@@ -89,16 +90,9 @@ var last_shot_time := -10.0  ## `clock` at the last shot, for the muzzle flash.
 var last_shot_side := 1.0  ## Which gun fired it: -1 left, 1 right.
 var over_water := false  ## The ground below is water (for spray instead of dust).
 
-var trick := ""  ## Name of the trick in progress, "" when none.
-var trick_time := 0.0
-var trick_dir := 1.0
 
 var model: ChoppaModel
 
-var _trick_cooldown := 0.0
-var _trick_low := false
-var _snap_from := 0.0
-var _prev_trick := false
 var _prev_item := false
 var _gun_timer := 0.0
 var _gun_side := 1.0
@@ -136,12 +130,6 @@ func is_boosting() -> bool:
 	return turbo_time > 0.0 or (input.boost and boost_meter > 0.0 and stun <= 0.0)
 
 
-func trick_progress() -> float:
-	if trick == "":
-		return 0.0
-	return clampf(trick_time / TRICKS[trick].duration, 0.0, 1.0)
-
-
 func facing() -> Basis:
 	return Basis(Vector3.UP, heading)
 
@@ -162,7 +150,7 @@ func step(delta: float) -> void:
 		var swapped := PilotInput.new()
 		swapped.copy_from(i)
 		swapped.yaw = -i.yaw
-		swapped.move.x = -i.move.x
+		swapped.cyclic.x = -i.cyclic.x
 		i = swapped
 	if stun > 0.0:
 		stun -= delta
@@ -170,54 +158,67 @@ func step(delta: float) -> void:
 	if locked:
 		i = PilotInput.new()
 
-	if i.trick and not _prev_trick:
-		_start_trick(i)
 	if i.use_item and not _prev_item:
 		use_item()
-	_prev_trick = i.trick
 	_prev_item = i.use_item
-
-	_trick_cooldown = maxf(0.0, _trick_cooldown - delta)
-	_update_trick(delta)
 	_update_gun(i, delta)
 
-	if trick == "180 SNAP":
-		turn_rate = 0.0
-	else:
-		turn_rate = move_toward(turn_rate, -i.yaw * turn_speed, turn_accel * delta)
-		heading = wrapf(heading + turn_rate * delta, -PI, PI)
+	# Attitude: the stick asks for rotation rates and the body follows with some inertia.
+	# Nothing pulls the nose back by itself unless flight assist is on.
+	var wanted := Vector3(-i.cyclic.y * pitch_rate, -i.yaw * yaw_rate, -i.cyclic.x * roll_rate)
+	if flight_assist and i.cyclic.is_zero_approx():
+		wanted.x += nose_down() * LEVEL_GAIN
+		wanted.z += bank_right() * LEVEL_GAIN
+	rates = rates.move_toward(wanted, angular_accel * delta)
+	var b := (global_transform.basis * Basis.from_euler(rates * delta)).orthonormalized()
+	turn_rate = rates.y
+	var forward := -b.z
+	if Vector2(forward.x, forward.z).length() > 0.05:
+		heading = atan2(-forward.x, -forward.z)
 
-	var boosting := is_boosting()
-	var top := max_speed
+	# Forces: gravity, rotor thrust along the body's up axis, the afterburner along the
+	# nose, and drag that is lower along the body than across it.
+	var thrust := hover_thrust * (1.0 + i.collective * collective_range)
+	if flight_assist:
+		thrust /= clampf(b.y.y, 0.5, 1.0)  # Hold height when tilted.
+	thrust *= 1.0 + GROUND_EFFECT * clampf(1.0 - altitude / GROUND_EFFECT_HEIGHT, 0.0, 1.0)
+	var accel := b.y * thrust + Vector3.DOWN * GRAVITY
 	if turbo_time > 0.0:
 		turbo_time -= delta
-		top = turbo_speed
-	elif boosting:
+		accel += forward * turbo_thrust
+	elif is_boosting():
 		boost_meter = maxf(0.0, boost_meter - boost_drain * delta)
-		top = boost_speed
-
-	var wish := facing() * Vector3(i.move.x, 0.0, -i.move.y)
-	if boosting:
-		# Boost always drives you forward, steering still blends in.
-		wish += facing() * Vector3.FORWARD
-	wish = wish.limit_length(1.0)
-
-	var horizontal := Vector3(velocity.x, 0.0, velocity.z)
-	var rate := accel * 2.0 if boosting else accel
-	if wish.length_squared() < 0.01 or horizontal.length() > top:
-		rate = accel * 0.6
-	horizontal = horizontal.move_toward(wish * top, rate * delta)
-	var vertical := move_toward(velocity.y, i.lift * climb_speed, climb_accel * delta)
+		accel += forward * afterburner_thrust
+	elif not i.boost:
+		boost_meter = minf(1.0, boost_meter + boost_recharge * delta)
+	var local_v := b.inverse() * velocity
+	accel += b * Vector3(-local_v.x * absf(local_v.x) * drag.x, -local_v.y * absf(local_v.y) * drag.y,
+		-local_v.z * absf(local_v.z) * drag.z)
+	velocity += accel * delta
 	if global_position.y > max_altitude:
-		vertical = minf(vertical, 0.0)
-	velocity = horizontal + Vector3.UP * vertical
+		velocity.y = minf(velocity.y, 0.0)
 
-	rotation = Vector3(0.0, heading, 0.0)
+	global_transform.basis = b
 	var before := velocity
 	move_and_slide()
 	_handle_collisions(before)
 	_update_altitude()
 	model.update_pose(self, delta)
+
+
+## Pitch of the nose below the horizon, radians (negative: nose up).
+func nose_down() -> float:
+	return -asin(clampf(-global_transform.basis.z.y, -1.0, 1.0))
+
+
+## Bank to the right, radians (negative: left).
+func bank_right() -> float:
+	return -asin(clampf(global_transform.basis.x.y, -1.0, 1.0))
+
+
+## Rolling fast enough to throw off bullets and missiles.
+func is_rolling_hard() -> bool:
+	return absf(rates.z) > DODGE_ROLL_RATE
 
 
 ## The choppa that aim assist would shoot at right now, or null.
@@ -263,7 +264,7 @@ func _target_in_cone(cone: float, reach: float) -> Choppa:
 
 ## Called by a bullet. Returns false when the hit is dodged.
 func take_hit(impulse: Vector3, shooter: Choppa, amount := 0.0) -> bool:
-	if not alive or trick == "BARREL ROLL":
+	if not alive or is_rolling_hard():
 		return false
 	velocity += impulse
 	hit_taken.emit(impulse, shooter)
@@ -301,7 +302,6 @@ func heal(amount: float) -> bool:
 func _die(killer: Choppa) -> void:
 	alive = false
 	health = 0.0
-	trick = ""
 	velocity = Vector3.ZERO
 	model.visible = false
 	_shape.set_deferred("disabled", true)
@@ -329,7 +329,7 @@ func use_item() -> void:
 			var missile := Weapons.Missile.new()
 			missile.shooter = self
 			missile.target = missile_target()
-			missile.direction = facing() * Vector3.FORWARD
+			missile.direction = -global_transform.basis.z
 			_drop(missile, Vector3(0.0, -0.6, -3.0))
 		"MINE":
 			var mine := Weapons.Mine.new()
@@ -362,7 +362,7 @@ func use_item() -> void:
 func _turbo(seconds: float) -> void:
 	turbo_time = seconds
 	# Kick in instantly, like a mushroom.
-	var forward := facing() * Vector3.FORWARD
+	var forward := -global_transform.basis.z
 	velocity = forward * maxf(velocity.length(), boost_speed) + Vector3.UP * velocity.y
 
 
@@ -391,10 +391,10 @@ func _scramble_target() -> Choppa:
 func respawn(at: Transform3D) -> void:
 	global_position = at.origin
 	heading = at.basis.get_euler().y
-	rotation = Vector3(0.0, heading, 0.0)
+	global_transform.basis = Basis(Vector3.UP, heading)
 	velocity = Vector3.ZERO
 	turn_rate = 0.0
-	trick = ""
+	rates = Vector3.ZERO
 	stun = 0.0
 	turbo_time = 0.0
 	heat = 0.0
@@ -422,7 +422,7 @@ func _update_gun(i: PilotInput, delta: float) -> void:
 	if not i.fire:
 		heat = maxf(0.0, heat - GUN_COOL_RATE * delta)
 		return
-	if trick != "" or _gun_timer > 0.0:
+	if _gun_timer > 0.0:
 		return
 	_shoot()
 	_gun_timer = GUN_INTERVAL
@@ -434,11 +434,11 @@ func _update_gun(i: PilotInput, delta: float) -> void:
 
 
 func _shoot() -> void:
-	var muzzle := global_position + facing() * Vector3(1.12 * _gun_side, -0.8, -2.35)
+	var muzzle := global_position + global_transform.basis * Vector3(1.12 * _gun_side, -0.8, -2.35)
 	last_shot_side = _gun_side
 	_gun_side = -_gun_side
 	var target := aim_target()
-	var direction := facing() * Vector3.FORWARD
+	var direction := -global_transform.basis.z
 	if target:
 		direction = (target.global_position - muzzle).normalized()
 	last_shot_time = clock
@@ -454,54 +454,6 @@ func _shoot() -> void:
 	bullet.reset_physics_interpolation()
 
 
-func _start_trick(i: PilotInput) -> void:
-	if trick != "" or _trick_cooldown > 0.0:
-		return
-	var f := facing()
-	if absf(i.move.x) > 0.5 and absf(i.move.x) >= absf(i.move.y):
-		trick = "BARREL ROLL"
-		trick_dir = signf(i.move.x)
-		velocity += f * Vector3(trick_dir * 26.0, 2.0, 0.0)
-	elif i.move.y > 0.5:
-		trick = "FRONT FLIP"
-		velocity += f * Vector3(0.0, 3.0, -24.0)
-	elif i.move.y < -0.5:
-		trick = "180 SNAP"
-		_snap_from = heading
-		# Keep your speed, but it now points where you are about to face.
-		velocity = Vector3(-velocity.x, velocity.y, -velocity.z)
-	else:
-		trick = "PIROUETTE"
-		trick_dir = -1.0 if i.yaw > 0.0 else 1.0
-		velocity.y += 14.0
-	trick_time = 0.0
-	_trick_low = altitude < LOW_ALTITUDE
-	trick_started.emit(trick)
-
-
-func _update_trick(delta: float) -> void:
-	if trick == "":
-		return
-	trick_time += delta
-	if altitude < LOW_ALTITUDE:
-		_trick_low = true
-	if trick == "180 SNAP":
-		heading = wrapf(_snap_from + PI * smoothstep(0.0, 1.0, trick_progress()), -PI, PI)
-	if trick_time >= TRICKS[trick].duration:
-		var reward: float = TRICKS[trick].reward * (2.0 if _trick_low else 1.0)
-		boost_meter = minf(1.0, boost_meter + reward)
-		trick_landed.emit(trick, reward, _trick_low)
-		trick = ""
-		_trick_cooldown = TRICK_COOLDOWN
-
-
-func _botch_trick() -> void:
-	var botched := trick
-	trick = ""
-	_trick_cooldown = TRICK_COOLDOWN
-	trick_botched.emit(botched)
-
-
 func _handle_collisions(before: Vector3) -> void:
 	var impact := 0.0
 	var normal := Vector3.ZERO
@@ -513,12 +465,11 @@ func _handle_collisions(before: Vector3) -> void:
 			normal = collision.get_normal()
 	if impact <= 0.0:
 		return
-	if trick != "":
-		_botch_trick()
 	var is_ground := normal.y > 0.7
 	if impact > BOUNCE_IMPACT and not is_ground:
 		velocity = before.bounce(normal) * 0.45
 		stun = clampf(impact / 60.0, 0.15, 0.5)
+		rates *= 0.3  # The knock takes most of the spin out.
 		bumped.emit(impact)
 	if impact > CRASH_DAMAGE_FROM:
 		var credit := _last_attacker if clock - _last_attacker_time < CRASH_CREDIT_TIME else null

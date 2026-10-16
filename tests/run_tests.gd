@@ -17,13 +17,10 @@ func _initialize() -> void:
 func _run() -> void:
 	for test in [
 		"test_neutral_input_hovers",
-		"test_forward_input_flies_forward",
+		"test_nose_down_accelerates_forward",
 		"test_yaw_right_turns_right",
 		"test_cannot_dive_through_ground",
 		"test_boost_is_faster_and_drains_meter",
-		"test_barrel_roll_dashes_sideways_and_rewards_boost",
-		"test_low_trick_rewards_double",
-		"test_180_snap_reverses_heading_and_keeps_speed",
 		"test_wall_hit_bounces_and_stuns",
 		"test_turbo_item",
 		"test_item_box_gives_item_and_respawns",
@@ -32,7 +29,7 @@ func _run() -> void:
 		"test_gun_cools_down_after_overheat",
 		"test_bullets_knock_target_back",
 		"test_aim_assist_hits_target_above",
-		"test_barrel_roll_dodges_bullets",
+		"test_rolling_hard_dodges_bullets",
 		"test_bullets_stop_at_walls",
 		"test_race_counts_gates_in_order_and_laps",
 		"test_race_standings_and_results",
@@ -47,7 +44,7 @@ func _run() -> void:
 		"test_terrain_collision_matches_mesh",
 		"test_bots_battle_in_arena",
 		"test_missile_homes_and_hits",
-		"test_barrel_roll_shakes_off_missile",
+		"test_rolling_hard_shakes_off_missile",
 		"test_mine_arms_then_explodes",
 		"test_fake_item_box_explodes",
 		"test_smoke_blocks_lock_on",
@@ -113,13 +110,16 @@ func test_neutral_input_hovers() -> void:
 	_check(choppa.velocity.length() < 0.1, "stays still, v=%s" % choppa.velocity)
 
 
-func test_forward_input_flies_forward() -> void:
+func test_nose_down_accelerates_forward() -> void:
 	_ground()
-	var choppa := _choppa(Vector3(0.0, 10.0, 0.0))
-	await _fly(choppa, 120, func(i: PilotInput, _t: int) -> void: i.move = Vector2(0.0, 1.0))
-	_check(choppa.global_position.z < -30.0, "moved along -Z, z=%f" % choppa.global_position.z)
-	_check(absf(choppa.global_position.x) < 0.1, "no sideways drift")
-	_check(absf(choppa.velocity.length() - choppa.max_speed) < 1.0, "reached top speed")
+	var choppa := _choppa(Vector3(0.0, 30.0, 0.0))
+	# Push the stick for a moment: the nose stays down afterwards and the choppa keeps
+	# accelerating, sinking a little because the rotor now pushes forward as well.
+	await _fly(choppa, 180, func(i: PilotInput, t: int) -> void: i.cyclic.y = 1.0 if t < 15 else 0.0)
+	_check(choppa.nose_down() > 0.3, "nose held down, %f rad" % choppa.nose_down())
+	_check(choppa.global_position.z < -12.0, "moved along -Z, z=%f" % choppa.global_position.z)
+	_check(absf(choppa.global_position.x) < 0.5, "no sideways drift, x=%f" % choppa.global_position.x)
+	_check(choppa.global_position.y < 29.0, "sank a little without extra collective, y=%f" % choppa.global_position.y)
 
 
 func test_yaw_right_turns_right() -> void:
@@ -132,7 +132,7 @@ func test_yaw_right_turns_right() -> void:
 func test_cannot_dive_through_ground() -> void:
 	_ground()
 	var choppa := _choppa(Vector3(0.0, 4.0, 0.0))
-	await _fly(choppa, 120, func(i: PilotInput, _t: int) -> void: i.lift = -1.0)
+	await _fly(choppa, 120, func(i: PilotInput, _t: int) -> void: i.collective = -1.0)
 	_check(choppa.global_position.y > 0.9, "stopped on ground, y=%f" % choppa.global_position.y)
 	_check(choppa.altitude < 0.2, "altitude near zero, alt=%f" % choppa.altitude)
 
@@ -141,45 +141,11 @@ func test_boost_is_faster_and_drains_meter() -> void:
 	var choppa := _choppa(Vector3(0.0, 10.0, 0.0))
 	choppa.boost_meter = 1.0
 	await _fly(choppa, 120, func(i: PilotInput, _t: int) -> void: i.boost = true)
-	_check(choppa.velocity.length() > choppa.max_speed + 10.0, "faster than cruise, v=%f" % choppa.velocity.length())
-	_check(choppa.boost_meter < 0.4, "meter drained, meter=%f" % choppa.boost_meter)
-
-
-func test_barrel_roll_dashes_sideways_and_rewards_boost() -> void:
-	var choppa := _choppa(Vector3(0.0, 30.0, 0.0))
-	choppa.boost_meter = 0.0
-	var landed := []
-	choppa.trick_landed.connect(func(trick_name: String, _r: float, low: bool) -> void: landed.append([trick_name, low]))
-	await _fly(choppa, 60, func(i: PilotInput, t: int) -> void:
-		i.trick = t < 3
-		i.move = Vector2(1.0, 0.0) if t < 3 else Vector2.ZERO)
-	_check(choppa.global_position.x > 5.0, "dashed right, x=%f" % choppa.global_position.x)
-	_check(landed == [["BARREL ROLL", false]], "landed a high barrel roll, got %s" % [landed])
-	_check(is_equal_approx(choppa.boost_meter, 0.15), "boost reward, meter=%f" % choppa.boost_meter)
-
-
-func test_low_trick_rewards_double() -> void:
-	_ground()
-	var choppa := _choppa(Vector3(0.0, 4.0, 0.0))
-	choppa.boost_meter = 0.0
-	await _fly(choppa, 2)  # Let the altitude probe run.
-	await _fly(choppa, 60, func(i: PilotInput, t: int) -> void:
-		i.trick = t < 3
-		i.move = Vector2(-1.0, 0.0) if t < 3 else Vector2.ZERO)
-	_check(is_equal_approx(choppa.boost_meter, 0.3), "double reward, meter=%f" % choppa.boost_meter)
-
-
-func test_180_snap_reverses_heading_and_keeps_speed() -> void:
-	var choppa := _choppa(Vector3(0.0, 30.0, 0.0))
-	await _fly(choppa, 90, func(i: PilotInput, _t: int) -> void: i.move = Vector2(0.0, 1.0))
-	var speed_before := choppa.velocity.length()
-	await _fly(choppa, 40, func(i: PilotInput, t: int) -> void:
-		i.trick = t < 3
-		i.move = Vector2(0.0, -1.0) if t < 3 else Vector2.ZERO)
-	var forward := choppa.facing() * Vector3.FORWARD
-	_check(forward.z > 0.99, "now facing +Z, forward=%s" % forward)
-	_check(choppa.velocity.z > 0.0, "moving +Z, v=%s" % choppa.velocity)
-	_check(choppa.velocity.length() > speed_before * 0.6, "kept most speed")
+	_check(choppa.velocity.length() > 25.0, "the afterburner pushed it along, v=%f" % choppa.velocity.length())
+	_check(choppa.boost_meter < 0.1, "charge used up, meter=%f" % choppa.boost_meter)
+	choppa.input.clear()
+	await _fly(choppa, 120)
+	_check(choppa.boost_meter > 0.3, "charge comes back when off, meter=%f" % choppa.boost_meter)
 
 
 func test_wall_hit_bounces_and_stuns() -> void:
@@ -188,7 +154,7 @@ func test_wall_hit_bounces_and_stuns() -> void:
 	var bumps := []
 	choppa.bumped.connect(func(impact: float) -> void: bumps.append(impact))
 	choppa.velocity = Vector3(0.0, 0.0, -40.0)
-	await _fly(choppa, 40, func(i: PilotInput, _t: int) -> void: i.move = Vector2(0.0, 1.0))
+	await _fly(choppa, 40)
 	_check(bumps.size() >= 1, "bumped the wall")
 	_check(choppa.global_position.z > -20.0, "did not pass through, z=%f" % choppa.global_position.z)
 
@@ -208,7 +174,8 @@ func test_item_box_gives_item_and_respawns() -> void:
 	box.position = Vector3(0.0, 10.0, -15.0)
 	_world.add_child(box)
 	var choppa := _choppa(Vector3(0.0, 10.0, 0.0))
-	await _fly(choppa, 60, func(i: PilotInput, _t: int) -> void: i.move = Vector2(0.0, 1.0))
+	choppa.velocity = Vector3(0.0, 0.0, -20.0)  # Coasting into it.
+	await _fly(choppa, 60)
 	_check(Items.TABLE.has(choppa.item), "got an item, item=%s" % choppa.item)
 	_check(not box.is_available(), "box broke")
 	box._process(ItemBox.RESPAWN_TIME + 0.1)
@@ -288,23 +255,19 @@ func test_aim_assist_hits_target_above() -> void:
 	_check(hits.size() >= 3, "assisted shots hit, got %d" % hits.size())
 
 
-func test_barrel_roll_dodges_bullets() -> void:
+func test_rolling_hard_dodges_bullets() -> void:
 	var shooter := _choppa(Vector3(0.0, 30.0, 0.0))
 	var target := _choppa(Vector3(0.0, 30.0, -30.0))
 	var taken := []
 	target.hit_taken.connect(func(_i: Vector3, _s: Choppa) -> void: taken.append(true))
-	# Start rolling, then fire a burst that arrives while the roll lasts.
-	target.input.trick = true
-	target.input.move = Vector2(1.0, 0.0)
-	target.step(TICK)
-	_check(target.trick == "BARREL ROLL", "rolling")
-	target.input.clear()
-	for t in 12:
-		shooter.input.fire = t < 4
+	# Full roll stick: the rate builds up over a few ticks, then the burst arrives mid-roll.
+	for t in 30:
+		shooter.input.fire = t >= 12 and t < 16
+		target.input.cyclic.x = 1.0
 		await physics_frame
 		shooter.step(TICK)
-		target.set("trick_time", 0.0)  # Freeze the roll so every round arrives mid-roll.
 		target.step(TICK)
+	_check(target.is_rolling_hard(), "rolling hard, %f rad/s" % target.rates.z)
 	_check(taken.is_empty(), "no hits taken while rolling, got %d" % taken.size())
 
 
@@ -457,7 +420,7 @@ func test_bullets_damage_and_kill() -> void:
 	_check(deaths == [shooter], "killed by the shooter, got %s" % [deaths])
 	_check(not target.alive and target.health == 0.0, "dead")
 	_check(shooter.aim_target() == null, "dead choppas are not targets")
-	target.input.move = Vector2(0.0, 1.0)
+	target.input.cyclic = Vector2(0.0, 1.0)
 	var at := target.global_position
 	target.step(TICK)
 	_check(target.global_position == at, "dead choppas don't fly")
@@ -528,7 +491,8 @@ func test_health_crate_heals() -> void:
 	_world.add_child(crate)
 	var choppa := _choppa(Vector3(0.0, 10.0, 0.0))
 	choppa.damage(70.0, null)
-	await _fly(choppa, 60, func(i: PilotInput, _t: int) -> void: i.move = Vector2(0.0, 1.0))
+	choppa.velocity = Vector3(0.0, 0.0, -20.0)  # Coasting into it.
+	await _fly(choppa, 60)
 	_check(is_equal_approx(choppa.health, 30.0 + HealthCrate.HEAL), "healed, hp=%f" % choppa.health)
 	_check(not crate.is_available(), "crate used up")
 
@@ -621,7 +585,7 @@ func test_missile_homes_and_hits() -> void:
 	_check(shooter.health == Choppa.MAX_HEALTH, "shooter unhurt")
 
 
-func test_barrel_roll_shakes_off_missile() -> void:
+func test_rolling_hard_shakes_off_missile() -> void:
 	var shooter := _choppa(Vector3(0.0, 20.0, 0.0))
 	var target := _choppa(Vector3(0.0, 20.0, -120.0))
 	shooter.give_item("MISSILE")
@@ -629,8 +593,8 @@ func test_barrel_roll_shakes_off_missile() -> void:
 	var missile: Weapons.Missile = _world.get_children().filter(func(n: Node) -> bool: return n is Weapons.Missile)[0]
 	for t in 150:
 		await physics_frame
-		target.input.trick = missile and is_instance_valid(missile) and target.global_position.distance_to(missile.global_position) < 22.0
-		target.input.move = Vector2(1.0, 0.0) if target.input.trick else Vector2.ZERO
+		var close := missile and is_instance_valid(missile) and target.global_position.distance_to(missile.global_position) < 60.0
+		target.input.cyclic.x = 1.0 if close else 0.0
 		shooter.step(TICK)
 		target.step(TICK)
 	_check(target.health == Choppa.MAX_HEALTH, "dodged, hp=%f" % target.health)
@@ -645,9 +609,8 @@ func test_mine_arms_then_explodes() -> void:
 	_check(layer.health == Choppa.MAX_HEALTH, "doesn't go off under its owner before arming")
 	await _step_all([layer], 60)
 	# Fly the victim into it.
-	victim.velocity = Vector3(0.0, 0.0, -30.0)
 	for t in 120:
-		victim.input.move = Vector2(0.0, 1.0)
+		victim.velocity = Vector3(0.0, 0.0, -30.0)  # Held at speed; drag would slow it.
 		await physics_frame
 		victim.step(TICK)
 	_check(victim.health <= Choppa.MAX_HEALTH - 25.0, "mine went off, hp=%f" % victim.health)
@@ -659,9 +622,8 @@ func test_fake_item_box_explodes() -> void:
 	layer.use_item()
 	await _step_all([layer], 70)
 	var victim := _choppa(Vector3(0.0, 20.0, 40.0))
-	victim.velocity = Vector3(0.0, 0.0, -25.0)
 	for t in 120:
-		victim.input.move = Vector2(0.0, 1.0)
+		victim.velocity = Vector3(0.0, 0.0, -25.0)  # Held at speed; drag would slow it.
 		await physics_frame
 		victim.step(TICK)
 	_check(victim.health < Choppa.MAX_HEALTH, "fake box hurt, hp=%f" % victim.health)
@@ -817,15 +779,20 @@ func test_mouse_steers() -> void:
 	Settings.reset()
 	pilot.feed_mouse(Vector2(40.0, -40.0))  # Right, and forward (up the screen).
 	pilot._physics_process(TICK)
-	_check(choppa.input.yaw > 0.5, "mouse right yaws right: %f" % choppa.input.yaw)
-	_check(choppa.input.lift > 0.5, "mouse forward climbs: %f" % choppa.input.lift)
+	_check(choppa.input.cyclic.x > 0.5, "mouse right rolls right: %f" % choppa.input.cyclic.x)
+	_check(choppa.input.cyclic.y > 0.5, "mouse forward puts the nose down: %f" % choppa.input.cyclic.y)
+	_check(choppa.input.yaw == 0.0, "no yaw from the mouse in the pitch & roll layout")
 	pilot._physics_process(TICK)
-	_check(choppa.input.yaw == 0.0 and choppa.input.lift == 0.0, "mouse travel is used up each tick")
+	_check(choppa.input.cyclic == Vector2.ZERO, "mouse travel is used up each tick")
 	Settings.set_value("invert_mouse", true)
 	pilot.feed_mouse(Vector2(0.0, -40.0))
 	pilot._physics_process(TICK)
-	_check(choppa.input.lift < -0.5, "inverted: mouse forward dives: %f" % choppa.input.lift)
+	_check(choppa.input.cyclic.y < -0.5, "inverted: mouse forward pulls the nose up: %f" % choppa.input.cyclic.y)
 	Settings.set_value("invert_mouse", false)
+	Settings.set_value("mouse_mode", 1)
+	pilot.feed_mouse(Vector2(40.0, 0.0))
+	pilot._physics_process(TICK)
+	_check(choppa.input.yaw > 0.5 and choppa.input.cyclic.x == 0.0, "pitch & yaw layout: mouse right turns right")
 	Settings.set_value("mouse_steer", false)
 	pilot.feed_mouse(Vector2(40.0, 0.0))
 	pilot._physics_process(TICK)

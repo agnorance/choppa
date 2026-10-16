@@ -34,7 +34,7 @@ Then add two repository secrets under **Settings > Secrets and variables > Actio
 
 Pick a map in the menu (Mesa Basin or Test Range), then:
 
-- **Battle vs 3 bots:** free-for-all. First to 8 kills, or the leader after 5 minutes.
+- **Battle vs 3 bots** (Easy / Normal / Hard on the title screen): free-for-all. First to 8 kills, or the leader after 5 minutes.
   You respawn 3 s after being shot down, with a short spawn shield. Red-cross crates
   repair 40 health.
 - **Free flight:** explore the map with three training dummies to shoot.
@@ -55,33 +55,35 @@ mouse, Q / E or the shoulder buttons.
   reflections, volumetric fog, bloom, grass. "Auto" follows the preset; the preset and
   the grass apply when the next match starts, everything else at once.
 - **Gameplay:** field of view, camera shake, default view (chase or cockpit), HUD size,
-  damage flash, aim assist, controls overlay.
-- **Controls:** mouse steering, sensitivity, invert, gamepad deadzone, touch controls
-  (auto, off, on); key bindings listed beside them.
+  damage flash, aim assist, flight assist, controls overlay.
+- **Controls:** mouse steering, mouse controls (pitch & roll / pitch & yaw), sensitivity,
+  invert, gamepad deadzone, touch controls (auto, off, on); key bindings beside them.
 - **Audio:** master and effects volume.
 - **Reset to defaults** at the bottom.
 
 ## Controls
 
-| Action | Keyboard | Gamepad | Touch |
+| Action | Keyboard + mouse | Gamepad | Touch |
 |---|---|---|---|
-| Fly / strafe | W A S D | Left stick | Left half: drag |
-| Turn | Q E or ← →, or mouse | Right stick X | Right half: drag sideways |
-| Climb / dive | Space / C or ↑ ↓, or mouse | Right stick Y | Right half: drag up/down |
-| Boost | Shift | RB | BOOST |
+| Pitch and roll | Mouse (or arrow keys) | Left stick | Left half: drag |
+| Turn (yaw) | A D (or Q E) | Right stick X | Right half: drag sideways |
+| Collective (climb / descend) | W S (or Space / C) | Right stick Y | Right half: drag up/down |
+| Afterburner | Shift | RB | BURN |
 | Machine gun | Ctrl or left mouse | RT | FIRE (also auto-fires when locked on) |
-| Trick (+ direction) | F | A | TRICK |
 | Use item | R | X | ITEM |
 | Camera: chase view / cockpit | V | Y | CAM |
 | Respawn (race: at your last gate; not in battle) | Backspace | Back/Select | |
 | Pause | Esc | Start | Back button |
 | Controls overlay on/off | F1 | | |
 
-Mouse steering is on by default on desktop: the mouse is captured while you fly and
-released in menus. Turn it off or tune it in the settings.
+The mouse flies the choppa: push forward to put the nose down and accelerate, pull
+back to climb or loop, move sideways to bank. Nothing levels the nose for you; the
+attitude stays where you leave it. "Mouse controls" in the settings swaps roll for yaw
+on the mouse (then A/D roll), "Flight assist" adds auto-level and height hold, and
+"Aim assist" (off by default) snaps the guns onto targets. Rolling hard throws off
+bullets and missiles.
 
-The machine gun snaps onto targets in a narrow cone ahead (white ring) and overheats
-after about two seconds of continuous fire. A barrel roll dodges bullets. Crashing into
+The machine gun overheats after about two seconds of continuous fire. Crashing into
 walls hurts too.
 
 Item boxes (rainbow "?") give a random item; the further behind you are, the better:

@@ -208,6 +208,7 @@ func _build_gameplay(page: VBoxContainer) -> void:
 	_pick(page, "HUD size", ["Small", "Normal", "Large"], "hud_scale")
 	_toggle(page, "Damage flash", "damage_flash")
 	_toggle(page, "Aim assist", "aim_assist")
+	_toggle(page, "Flight assist", "flight_assist")
 	if not _touch:
 		_toggle(page, "Controls overlay", "show_controls")
 
@@ -215,6 +216,7 @@ func _build_gameplay(page: VBoxContainer) -> void:
 func _build_controls(page: VBoxContainer) -> void:
 	if not _touch:
 		_toggle(page, "Mouse steering", "mouse_steer")
+		_pick(page, "Mouse controls", ["Pitch & roll", "Pitch & yaw"], "mouse_mode")
 		var levels := PackedStringArray()
 		for k in 10:
 			levels.append(str(k + 1))
@@ -310,7 +312,7 @@ func _bindings() -> Control:
 	grid.add_theme_constant_override("h_separation", 18)
 	grid.add_theme_constant_override("v_separation", 8)
 	box.add_child(grid)
-	for row: Array in Controls.cheat_sheet(true):
+	for row: Array in Controls.cheat_sheet(true, Settings.choice("mouse_mode") == 1):
 		var what := UiKit.label(row[0], 16, UiKit.MUTED)
 		what.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		what.size_flags_horizontal = Control.SIZE_EXPAND_FILL

@@ -64,8 +64,11 @@ Godot must be 4.7.2. Two environments:
 
 ## Code rules
 
-- A choppa only reads a `PilotInput`; keep input sources (keyboard, touch, network, bots)
-  out of `choppa.gd` so multiplayer stays straightforward. The simulation (`Choppa.step`)
+- A choppa only reads a `PilotInput` (cyclic, yaw, collective, boost, fire, item); keep
+  input sources (keyboard, touch, network, bots) out of `choppa.gd` so multiplayer stays
+  straightforward. Bots go through `Autopilot.fly()`, which turns a wanted velocity and
+  look point into stick inputs. The flight model is force-based (DESIGN.md, "Flight
+  model"); no scripted moves, no auto-level unless `flight_assist`. The simulation (`Choppa.step`)
   must stay independent of visuals (`ChoppaModel` is purely visual).
 - Maps and models are built from primitives in code or Blender scripts; keep scene files
   minimal. Maps extend `GameMap`; reusable pieces live in `MapKit`; terrain is `Terrain`.

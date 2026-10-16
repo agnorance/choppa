@@ -30,17 +30,20 @@ const DEFAULTS := {
 	"bloom": AUTO,
 	"grass": AUTO,  ## 0 off, 1 sparse, 2 dense
 	# Gameplay
+	"bot_difficulty": 1,  ## 0 easy, 1 normal, 2 hard; chosen on the title screen.
 	"fov": 70,  ## Chase camera field of view, degrees.
 	"camera_shake": 2,  ## 0 off, 1 half, 2 full
 	"cockpit_view": false,  ## Start matches in the cockpit.
 	"hud_scale": 1,  ## 0 small, 1 normal, 2 large
 	"damage_flash": true,  ## Red screen edges when hit.
-	"aim_assist": true,
+	"aim_assist": false,
+	"flight_assist": false,  ## Level out and hold height when the stick is centred.
 	"show_controls": true,  ## Key overlay on the HUD (desktop only).
 	# Controls
-	"mouse_steer": true,  ## Moving the mouse yaws and climbs.
+	"mouse_steer": true,  ## The mouse flies the choppa.
+	"mouse_mode": 0,  ## 0 pitch and roll on the mouse (yaw on A/D), 1 pitch and yaw (roll on A/D).
 	"mouse_sensitivity": 5,  ## 1..10
-	"invert_mouse": false,  ## Mouse forward dives instead of climbing.
+	"invert_mouse": false,  ## Mouse forward pulls the nose up instead of pushing it down.
 	"deadzone": 0.2,  ## Gamepad sticks, 0.1..0.4.
 	"touch_controls": AUTO,  ## 0 off, 1 on, AUTO = when a touchscreen is present.
 	# Audio
@@ -52,6 +55,8 @@ const HUD_SCALES := [0.85, 1.0, 1.2]
 const SHAKE_AMOUNTS := [0.0, 0.5, 1.0]
 
 static var _values := {}
+## Screenshot runs keep the window the command line asked for, whatever the player saved.
+static var keep_window := false
 static var _loaded := false
 ## The project's own anti-aliasing and shadow settings, kept for "Auto".
 static var _project := {}
@@ -109,8 +114,10 @@ static func read(path: String) -> void:
 	if file.load(path) != OK:
 		return
 	for key: String in DEFAULTS:
-		var stored: Variant = file.get_value("settings", key, null)
-		if stored != null and typeof(stored) == typeof(DEFAULTS[key]):
+		if not file.has_section_key("settings", key):
+			continue
+		var stored: Variant = file.get_value("settings", key)
+		if typeof(stored) == typeof(DEFAULTS[key]):
 			_values[key] = stored
 
 
@@ -135,7 +142,8 @@ static func apply(tree: SceneTree) -> void:
 	if choice("quality") >= 0:
 		Graphics.quality = choice("quality") as Graphics.Quality
 
-	_apply_window()
+	if not keep_window:
+		_apply_window()
 	Engine.max_fps = choice("fps_limit")
 	var root := tree.root
 	root.scaling_3d_scale = number("render_scale")

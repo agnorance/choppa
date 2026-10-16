@@ -29,10 +29,15 @@ const RIVALS := [
 	["Wasp", Color(0.95, 0.85, 0.2), 0.95],
 ]
 const RACE_GRID_SLOT := 3  ## Start the race in the second row, like the underdog you are.
+## Bot skill multiplier per difficulty (Settings "bot_difficulty"): easy, normal, hard.
+const BOT_SKILL := [0.55, 1.0, 1.2]
 
 ## Survive reload_current_scene() so "again" skips the menu.
 static var next_mode := ""
 static var next_map := "basin"
+## The command line picks mode and map for the first start only; after that the menus
+## decide (otherwise "Main menu" from a `--mode=battle` start lands in another battle).
+static var started := false
 
 var mode := ""
 var map: GameMap
@@ -51,11 +56,14 @@ var _menu_orbit := 0.0
 
 func _ready() -> void:
 	_parse_args()
+	Settings.keep_window = _args.has("shot")
 	Settings.load_once(get_tree())
-	mode = _args.get("mode", next_mode)
-	if mode == "" and not _args.has("menu") and (_args.has("shot") or _args.has("autopilot")):
+	var first_start := not started
+	started = true
+	mode = _args.get("mode", next_mode) if first_start else next_mode
+	if first_start and mode == "" and not _args.has("menu") and (_args.has("shot") or _args.has("autopilot")):
 		mode = "free"
-	var map_id: String = _args.get("map", next_map)
+	var map_id: String = _args.get("map", next_map) if first_start else next_map
 	if mode == "race":
 		map_id = "range"
 	next_mode = ""
@@ -95,6 +103,7 @@ func _start() -> void:
 	var slot := RACE_GRID_SLOT if mode == "race" else 0
 	choppa = _new_choppa("You", Color(0.95, 0.5, 0.1), map.spawn_points[slot], true)
 	choppa.aim_assist = Settings.flag("aim_assist")
+	choppa.flight_assist = Settings.flag("flight_assist")
 	if mode == "free" and _args.has("spawn"):
 		choppa.respawn(_spawn_arg())
 	if _args.has("health"):
@@ -173,7 +182,7 @@ func _start_race() -> void:
 	add_child(race)
 	race.setup(map.gates, field, int(_args.get("laps", "3")))
 	for n in range(1, field.size()):
-		_add_racer_bot(field[n], RIVALS[n - 1][2])
+		_add_racer_bot(field[n], RIVALS[n - 1][2] * BOT_SKILL[Settings.choice("bot_difficulty")])
 
 	var race_hud := RaceHud.new()
 	race_hud.race = race
@@ -199,7 +208,7 @@ func _start_battle() -> void:
 	if choppa.model.cockpit_view:
 		choppa.model.cockpit_view.kills_source = func() -> int: return battle.kills_of(choppa)
 	for n in range(1, field.size()):
-		_add_fighter_bot(field[n], RIVALS[n - 1][2])
+		_add_fighter_bot(field[n], RIVALS[n - 1][2] * BOT_SKILL[Settings.choice("bot_difficulty")])
 
 	var battle_hud := BattleHud.new()
 	battle_hud.battle = battle
@@ -336,6 +345,7 @@ func _toggle_pause() -> void:
 func _on_settings_changed() -> void:
 	hud.refresh_settings()
 	choppa.aim_assist = Settings.flag("aim_assist")
+	choppa.flight_assist = Settings.flag("flight_assist")
 	_update_mouse()
 
 

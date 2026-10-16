@@ -84,20 +84,22 @@ cockpit's), dark translucent panels with 1 px lines, thin bars, no gradients or 
   The controls overlay (key caps) sits bottom right, toggled in settings or with F1.
   The cockpit view hides the flight readouts.
 - **Pause** (Esc / Start): resume, settings, restart, main menu, quit; the match stops.
-- **Mouse steering:** horizontal travel yaws, vertical climbs (invertible), captured
-  while flying and released in menus and on the results screen.
+- **Mouse flying:** pitch and roll (or pitch and yaw, a setting), captured while
+  flying and released in menus and on the results screen.
 - **Touch:** translucent discs with thin rings; a held button fills amber.
 
 ## Game feel (decided)
 
 **Easy to pick up, very hard to master.**
 
-- Easy: the choppa hovers by itself, the gun has aim assist, items are one button, a
-  crash is never instant death.
-- Deep: boost economy fed by tricks (double reward flying low), momentum and drifting,
-  barrel rolls timed against bullets and missiles, item tactics, reading the arena.
+- Easy: a level choppa with the collective centred hovers by itself, items are one
+  button, a crash is never instant death. Newcomers can switch on flight assist and
+  aim assist in the settings.
+- Deep: the flying itself (owner's request after the first build: free controls, no
+  help, Wardogs-like): momentum, tilt-to-accelerate, energy in dives and climbs,
+  rolls timed against bullets and missiles, item tactics, reading the arena.
 - Rule for new features: they may add depth for experts, but must not make the first
-  minute harder.
+  minute harder than the settings can make it easy.
 
 ## Platform and tech (decided)
 
@@ -108,46 +110,47 @@ cockpit's), dark translucent panels with 1 px lines, thin bars, no gradients or 
   toggle.
 - **Builds:** GitHub Actions exports a Windows zip and an Android APK on every push.
 
-## Flight model
+## Flight model (decided)
 
-Arcade, not a sim. The choppa hovers by itself when you let go; everything is about
-moving fast and looking good.
+Real forces, arcade numbers, no hand-holding: the owner wants flying to depend on the
+pilot alone, like the helicopters in Wardogs. Built in `Choppa.step`, deterministic and
+cheap for netcode.
 
-| Input | Effect |
-|---|---|
-| Move (left stick / WASD) | Fly forward/back, strafe left/right. The body tilts into it. |
-| Yaw (right stick X / Q E / arrows) | Turn. |
-| Lift (right stick Y / Space C / arrows) | Climb and dive. |
-| Boost (RB / Shift) | Burn boost meter for top speed. |
-| Fire (RT / Ctrl / mouse) | Machine gun. |
-| Trick (A / F) + direction | Pull a move (below). |
-| Item (X / R) | Use the held item. |
-| Camera (Y / V) | Toggle chase / cockpit view. |
+- **Forces:** gravity; rotor thrust along the body's up axis (collective 0 holds a
+  level hover, +-1 adds or takes 60 %); the afterburner along the nose; drag per body
+  axis, lowest along the nose, so the choppa flies best the way it points and slides
+  in a turn. Tilting the nose down is what accelerates you; bank to slide sideways;
+  a hard pull makes a loop, a hard roll a barrel roll. No scripted moves.
+- **Attitude:** the stick asks for rotation rates (pitch 2.4, roll 3.6, yaw 2.0 rad/s
+  at full deflection) and the body follows with inertia. Nothing levels the nose by
+  itself. *Flight assist* (setting, off by default) adds auto-level and height hold.
+- **Afterburner:** Shift / RB. About two seconds of charge, back in five when off;
+  the HUD bar shows it. The TURBO item is a stronger burst.
+- **Ground effect:** a little extra thrust in the last six metres.
+- **Ceiling:** no climbing above the map's ceiling.
+- Collisions bounce you off walls, stun you briefly and kill most of the spin. Hard
+  crashes cost health; a crash soon after being shot credits the shooter.
+- Rolling hard (over 2.8 rad/s) throws off bullets and shakes a missile's lock, which
+  then veers wide. Pilot skill, not a button.
 
-Collisions bounce you off walls and stun you briefly. Hard crashes cost health; if you
-crash soon after being shot, the kill goes to whoever shot you.
+| Input | Keyboard + mouse (default "pitch & roll") | Alternative "pitch & yaw" | Gamepad |
+|---|---|---|---|
+| Pitch | Mouse forward/back (or arrows) | Mouse | Left stick Y |
+| Roll | Mouse left/right (or arrows) | A / D | Left stick X |
+| Yaw | A / D (Q / E) | Mouse left/right | Right stick X |
+| Collective | W / S (Space / C) | same | Right stick Y |
+| Afterburner | Shift | same | RB |
+| Fire | LMB / Ctrl | same | RT |
+| Item | R | same | X |
+| Camera | V | same | Y |
 
-### Physics ideas (proposal, not built yet)
+Touch: left half drag is the cyclic, right half yaw and collective.
 
-Today the flight is purely kinematic (`Choppa.step`): velocity eases toward the wished
-velocity at a fixed acceleration, lift is a target climb rate with no gravity, and the
-body tilt is only visual. Easy, predictable and good for netcode, but shallow. Ideas
-for the feel pass, keeping the auto-hover and aim assist so the first minute stays easy:
+### Bots
 
-1. **Momentum and drift:** sideways speed bleeds off slowly, so experts slide round
-   corners and juke; beginners barely notice.
-2. **Thrust from tilt:** the choppa has to lean before it accelerates, like a real one;
-   heavier, more mechanical feel.
-3. **Gravity and energy:** without lift it sinks a little; dive for speed, trade speed
-   for a zoom climb.
-4. **Ground effect:** a little extra lift and speed close to the ground, matching the
-   double boost for low tricks.
-5. **Outside forces:** blasts and other choppas' downwash push you; missile hits send
-   you spinning.
-6. **Skid suspension:** soft, springy landings.
-
-Recommended first: 1, 3 and 4, tuned with a gamepad on real hardware. Keep the model
-deterministic and cheap so client-side prediction stays simple for multiplayer.
+Bots fly through `Autopilot`: a proportional controller that turns "fly at this
+velocity, look there" into stick, collective and pedals. Difficulty (title screen:
+Easy / Normal / Hard) scales their skill: speed, aim lead, dodging, trigger discipline.
 
 ### Machine gun (decided)
 
@@ -156,26 +159,18 @@ knockback** (25 hits from full health); in races it only pushes. Items are meant
 the big hitters.
 
 - Rapid fire (12.5 rounds/s, 4 damage each), tracers, rounds stopped by walls.
-- Aim assist: rounds snap to a choppa inside a 12° cone ahead (lock ring on the HUD).
+- Aim assist (setting, **off by default** on desktop): rounds snap to a choppa inside a
+  12° cone ahead (lock ring on the HUD). Bots and touch players use it.
 - Overheats after ~2.3 s of continuous fire, then cools down.
-- A barrel roll dodges bullets.
+- Rolling hard dodges bullets.
 - On touch screens it auto-fires while locked on, since the right thumb is steering.
 
-### Sick moves
+### Moves
 
-Tricks are short committed animations with a gameplay effect. Landing one cleanly
-(no collision while it plays) fills the boost meter, and doing it **low to the ground**
-doubles the reward. So the loop is: trick → boost → go faster → take risks.
-
-| Trick | Input | Effect |
-|---|---|---|
-| Barrel roll | Trick + left/right | Sideways dash with a full roll. Dodges missiles. |
-| Front flip | Trick + forward | Forward burst with a full flip. |
-| 180 snap | Trick + back | Whip around to face the other way, keeping speed. Great for battle mode. |
-| Pirouette | Trick alone | Vertical hop with a spin. |
-
-Later: chained tricks for combo multipliers, near-miss bonus (skimming walls and
-opponents), tunnel-threading bonus, and tricks that cancel incoming items when timed.
+There is no trick button any more (owner's decision after flying the first build):
+every move is flown. A barrel roll is full roll stick, a loop full back stick, a hard
+turn bank plus pedal. Rolling hard still dodges bullets and shakes off missiles.
+Later: near-miss and tunnel-threading bonuses that reward daring flying.
 
 ## Modes
 
@@ -241,7 +236,7 @@ Low-poly, flat-shaded look with strong colours.
 
 ## Milestones
 
-1. **Foundation** *(done)*: project, flight model, tricks, boost, chase/cockpit camera,
+1. **Foundation** *(done)*: project, flight model, chase/cockpit camera,
    machine gun, touch controls, tests, CI builds.
 2. **Battle mode and first arena** *(done)*: health, damage, death, respawn, deathmatch
    rules, kill feed, scoreboard, combat bots, Mesa Basin, terrain, effects (explosions,
@@ -262,8 +257,9 @@ Low-poly, flat-shaded look with strong colours.
      the built scene and the first frame (shader and pipeline compilation, SDFGI).
    - Only if profiling ever shows a hot spot (bots, netcode): a GDExtension in C++.
      Not C#: it complicates the Android export.
-5. **Feel pass:** tune on real hardware (Windows + Android): physics (see Physics
-   ideas), sound mix, camera shake, hit markers. Music is still missing.
+5. **Feel pass:** the flight model is now force-based (above); tune its numbers on real
+   hardware (Windows + Android), then sound mix, camera shake, hit markers. Music is
+   still missing.
    **UI overhaul** *(done, see "UI" below)*.
 6. **LAN multiplayer:** host/join, discovery, prediction and interpolation.
 7. **More arenas** and battle variants.

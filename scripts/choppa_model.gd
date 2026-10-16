@@ -1,7 +1,7 @@
 class_name ChoppaModel
 extends Node3D
 ## The helicopter model (assets/models/choppa, built by tools/blender/make_choppa.py)
-## with its hull materials, tilt and trick animations, spinning rotors and effects.
+## with its hull materials, spinning rotors and effects.
 ## Purely visual: it never affects the simulation. Forward is -Z.
 
 ## Render layer bit for the local player's own choppa, hidden from the cockpit camera.
@@ -17,7 +17,6 @@ var _parts: Node3D  ## All meshes, so the spawn shield can blink them.
 var _rotor: Node3D
 var _tail_rotor: Node3D
 var _blur_material: StandardMaterial3D
-var _tilt := Vector2.ZERO  ## x: pitch, y: roll.
 var _rotor_speed := 0.0
 var _dust: CPUParticles3D
 var _trails: Array[CPUParticles3D] = []
@@ -195,37 +194,16 @@ func _ready() -> void:
 	add_child(_smoke)
 
 
-## Tilts the body with motion, plays trick animations and spins the rotors.
+## Spins the rotors and drives the effects; the body's attitude is the choppa's own
+## transform now, so the model sits straight on it.
 func update_pose(c: Choppa, delta: float) -> void:
-	var local_v := c.facing().inverse() * c.velocity
-	var target := Vector2(
-		clampf(local_v.z / c.boost_speed, -1.0, 1.0) * 0.45,
-		clampf(-local_v.x / c.boost_speed, -1.0, 1.0) * 0.5 + c.turn_rate * 0.12
-	)
-	_tilt = _tilt.lerp(target, 1.0 - exp(-6.0 * delta))
-
-	var pitch := _tilt.x
-	var yaw := 0.0
-	var roll := _tilt.y
-	var p := smoothstep(0.0, 1.0, c.trick_progress())
-	match c.trick:
-		"BARREL ROLL":
-			roll -= c.trick_dir * TAU * p
-		"FRONT FLIP":
-			pitch -= TAU * p
-		"PIROUETTE":
-			yaw += c.trick_dir * TAU * p
-		"180 SNAP":
-			roll -= 0.7 * sin(p * PI)
-	transform.basis = Basis.from_euler(Vector3(pitch, yaw, roll))
-
 	var target_rotor := 20.0 + (10.0 if c.is_boosting() else 0.0) + c.velocity.y * 0.3
 	_rotor_speed = lerpf(_rotor_speed, target_rotor, 1.0 - exp(-3.0 * delta))
 	_rotor.rotate_y(_rotor_speed * delta)
 	_tail_rotor.rotate_x(_rotor_speed * 1.6 * delta)
 	_blur_material.albedo_color.a = clampf((_rotor_speed - 8.0) / 80.0, 0.0, 0.1)
 	_rotor_sound.pitch_scale = clampf(_rotor_speed / 22.0, 0.5, 1.6)
-	_engine_sound.pitch_scale = clampf(0.85 + _rotor_speed / 80.0 + c.input.lift * 0.08, 0.6, 1.5)
+	_engine_sound.pitch_scale = clampf(0.85 + _rotor_speed / 80.0 + c.input.collective * 0.08, 0.6, 1.5)
 	_rotor_sound.stream_paused = not c.alive
 	_engine_sound.stream_paused = not c.alive
 	_boost_sound.stream_paused = not c.is_boosting() or not c.alive

@@ -1,6 +1,6 @@
 class_name Hud
 extends CanvasLayer
-## Speed, altitude, boost, heat, hull, item and call-outs for one choppa, the controls
+## Speed, altitude, afterburner, heat, hull, item and call-outs for one choppa, the controls
 ## overlay (settings or F1) and the touch controls on phones. Flat text and thin bars;
 ## the cockpit view hides most of it because the instruments show the same.
 
@@ -104,10 +104,10 @@ func _ready() -> void:
 	item_column.add_child(_effects)
 	_flight.append(item_column)
 
-	# Bottom centre: boost, with the gun heat as a hairline under it.
+	# Bottom centre: afterburner charge, with the gun heat as a hairline under it.
 	var boost_column := _column(Vector2(0.5, 1), Vector2(0, -26), BoxContainer.ALIGNMENT_END)
 	boost_column.add_theme_constant_override("separation", 6)
-	var boost_caption := UiKit.outlined(UiKit.caption("Boost", 13))
+	var boost_caption := UiKit.outlined(UiKit.caption("Afterburner", 13))
 	boost_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	boost_column.add_child(boost_caption)
 	_boost = UiKit.Bar.new(300.0, 5.0)
@@ -159,8 +159,6 @@ func _ready() -> void:
 	_root.add_child(touch)
 	refresh_settings()
 
-	choppa.trick_landed.connect(_on_trick_landed)
-	choppa.trick_botched.connect(func(_name: String) -> void: _show_callout("BOTCHED", UiKit.DANGER))
 	choppa.item_changed.connect(func(_name: String) -> void: _update_item())
 	choppa.scored_hit.connect(func(_target: Choppa) -> void: _hit_flash = 0.12)
 	choppa.damaged.connect(func(amount: float, _attacker: Choppa) -> void:
@@ -227,7 +225,7 @@ func _process(delta: float) -> void:
 
 ## A small cross where your guns point, or a ring around the locked-on target.
 func _draw_crosshair() -> void:
-	if camera == null or choppa.trick != "" or not choppa.alive:
+	if camera == null or not choppa.alive:
 		return
 	var color := UiKit.DANGER if _hit_flash > 0.0 else Color(UiKit.TEXT, 0.9)
 	var target := choppa.aim_target()
@@ -240,19 +238,12 @@ func _draw_crosshair() -> void:
 		return
 	if camera is ChaseCamera and (camera as ChaseCamera).first_person:
 		return  # The gunsight in the cockpit is the crosshair.
-	var ahead := choppa.global_position + choppa.facing() * Vector3(0.0, -0.5, -80.0)
+	var ahead := choppa.global_position - choppa.global_transform.basis.z * 80.0
 	if camera.is_position_behind(ahead):
 		return
 	var c := camera.unproject_position(ahead)
 	for d: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
 		_crosshair.draw_line(c + d * 5.0, c + d * 13.0, color, 1.5, true)
-
-
-func _on_trick_landed(trick_name: String, reward: float, low: bool) -> void:
-	var text := "%s  +%d%%" % [trick_name, roundi(reward * 100.0)]
-	if low:
-		text += "\nLOW  x2"
-	_show_callout(text, UiKit.ACCENT)
 
 
 func _show_callout(text: String, color: Color) -> void:
@@ -293,7 +284,7 @@ func _controls_sheet() -> Control:
 	grid.add_theme_constant_override("h_separation", 18)
 	grid.add_theme_constant_override("v_separation", 5)
 	box.add_child(grid)
-	for row: Array in Controls.cheat_sheet(Settings.flag("mouse_steer")):
+	for row: Array in Controls.cheat_sheet(Settings.flag("mouse_steer"), Settings.choice("mouse_mode") == 1):
 		var what := UiKit.label(row[0], 15, UiKit.MUTED)
 		what.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		grid.add_child(what)

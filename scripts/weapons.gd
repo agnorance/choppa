@@ -74,8 +74,13 @@ class Missile extends Node3D:
 			target = null
 		if target:
 			var to := target.global_position - global_position
-			if to.length() < 25.0 and target.trick == "BARREL ROLL":
-				target = null  # Shaken off.
+			if to.length() < 25.0 and target.is_rolling_hard():
+				# Shaken off: the seeker loses the lock and the missile veers wide.
+				var side := direction.cross(Vector3.UP).normalized()
+				if side.dot(to) > 0.0:
+					side = -side
+				direction = (direction + side * 0.8).normalized()
+				target = null
 			elif to.length() < 2.5:
 				_explode(global_position)
 				return

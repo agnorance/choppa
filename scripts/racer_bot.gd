@@ -22,22 +22,17 @@ func steer() -> void:
 	var i := choppa.input
 	i.clear()
 	if race == null or race.is_done(choppa):
-		i.lift = clampf(-choppa.velocity.y * 0.2, -1.0, 1.0)
+		Autopilot.fly(choppa, i, Vector3.ZERO, choppa.global_position + choppa.facing() * Vector3.FORWARD * 10.0)
 		return
 	var target := approach_point(race.next_gate(choppa))
 	var to := target - choppa.global_position
 	var local := choppa.facing().inverse() * to
-	var local_velocity := choppa.facing().inverse() * choppa.velocity
 	var angle := atan2(local.x, -local.z)  # Positive: target is to the right.
 	var distance := Vector2(local.x, local.z).length()
 
-	i.yaw = clampf(angle * 2.5, -1.0, 1.0)
 	# Ease off for sharp turns so we don't overshoot the gate.
-	var throttle := clampf(1.0 - absf(angle) / 1.4, 0.15, 1.0)
-	# Strafe toward the line and against sideways drift.
-	var strafe := clampf(local.x * 0.04 - local_velocity.x * 0.08, -1.0, 1.0)
-	i.move = Vector2(strafe, throttle * lerpf(0.85, 1.0, skill))
-	i.lift = clampf(to.y * 0.3 - choppa.velocity.y * 0.15, -1.0, 1.0)
+	var speed := clampf(1.0 - absf(angle) / 1.4, 0.15, 1.0) * lerpf(0.7, 0.85, skill) * choppa.max_speed
+	Autopilot.fly(choppa, i, to.normalized() * speed, target)
 	i.boost = absf(angle) < 0.12 and distance > 70.0 and choppa.boost_meter > lerpf(0.6, 0.25, skill)
 	i.fire = choppa.aim_target() != null
 	i.use_item = choppa.item != "" and absf(angle) < 0.2 and distance > 60.0
@@ -55,4 +50,4 @@ func approach_point(gate: RingGate) -> Vector3:
 	var after := race.gates[(gate.index + 1) % race.gates.size()].global_position
 	if axis.dot(after - center) < 0.0:
 		axis = -axis
-	return center - axis * clampf(distance * 0.5, 0.0, 35.0)
+	return center - axis * clampf(distance * 0.5, 0.0, 50.0)

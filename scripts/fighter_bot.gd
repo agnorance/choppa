@@ -1,14 +1,14 @@
 class_name FighterBot
 extends Node
 ## AI pilot for battles: hunts an opponent, circles it at gun range and shoots when lined
-## up, barrel-rolls when under fire, fetches repair kits when hurt, and feels its way
+## up, rolls hard when under fire, fetches repair kits when hurt, and feels its way
 ## around obstacles with ray probes.
 
 const PREFERRED_RANGE := 45.0
 const PROBE_LENGTH := 14.0
 
 var choppa: Choppa
-var skill := 1.0  ## 0..1: speed, dodging and trigger discipline.
+var skill := 1.0  ## Around 1: speed, dodging, aim lead and trigger discipline. Hard bots go above 1.
 var ceiling := 90.0
 var arena_radius := 200.0  ## Where to wander when nobody is around.
 var rng := RandomNumberGenerator.new()
@@ -22,6 +22,8 @@ var _stuck := 0.0
 var _unstick := 0.0
 var _unstick_dir := Vector3.ZERO
 var _dodge_cooldown := 0.0
+var _dodge_time := 0.0
+var _dodge_dir := 1.0
 var _under_fire := 0.0
 var _cooling_gun := false
 var _wander := Vector3.ZERO
@@ -93,7 +95,7 @@ func steer(delta: float) -> void:
 		var side := away.cross(Vector3.UP) * _orbit
 		goal = target.global_position + away * PREFERRED_RANGE + side * 25.0
 		goal.y = target.global_position.y + 2.0
-		look = target.global_position + target.velocity * 0.25  # Lead the target.
+		look = target.global_position + target.velocity * lerpf(0.0, 0.3, clampf(skill - 0.3, 0.0, 1.0))  # Lead the target.
 	else:
 		if _wander_time <= 0.0:
 			var angle := rng.randf() * TAU
@@ -105,21 +107,11 @@ func steer(delta: float) -> void:
 	# Keep off the ground and under the ceiling, unless grabbing a pickup.
 	goal.y = clampf(goal.y, 2.0 if pickup and _unstick <= 0.0 else 8.0, ceiling - 8.0)
 
-	var to_local := choppa.facing().inverse()
-	var local_look := to_local * (look - pos)
+	var local_look := choppa.facing().inverse() * (look - pos)
 	var angle := atan2(local_look.x, -local_look.z)  # Positive: look point is to the right.
-	i.yaw = clampf(angle * 2.5, -1.0, 1.0)
-
-	var local_goal := to_local * (goal - pos)
-	var local_velocity := to_local * choppa.velocity
-	var move := Vector2(local_goal.x, -local_goal.z) * 0.06 - Vector2(local_velocity.x, -local_velocity.z) * 0.04
-	var lift := (goal.y - pos.y) * 0.25 - choppa.velocity.y * 0.1
-	var push := _avoidance()
-	var local_push := to_local * push
-	move += Vector2(local_push.x, -local_push.z)
-	lift += push.y
-	i.move = move.limit_length(lerpf(0.75, 1.0, skill))
-	i.lift = clampf(lift, -1.0, 1.0)
+	var want := ((goal - pos) * 0.6).limit_length(lerpf(0.75, 1.0, skill) * choppa.max_speed)
+	want += _avoidance() * 20.0
+	Autopilot.fly(choppa, i, want, look)
 
 	# Trigger discipline: let the gun cool before it overheats.
 	if choppa.heat > lerpf(0.6, 0.9, skill):
@@ -135,11 +127,14 @@ func steer(delta: float) -> void:
 	if _missile_incoming():
 		dodge_chance = 0.25 * skill
 	if _dodge_cooldown <= 0.0 and rng.randf() < dodge_chance:
-		i.trick = true
-		i.move = Vector2(1.0 if rng.randf() < 0.5 else -1.0, 0.0)
+		_dodge_dir = 1.0 if rng.randf() < 0.5 else -1.0
+		_dodge_time = 0.7
 		_dodge_cooldown = 3.0
+	if _dodge_time > 0.0:
+		_dodge_time -= delta
+		i.cyclic.x = _dodge_dir  # A full roll throws off bullets and missiles.
 
-	if choppa.velocity.length() < 3.0 and i.move.length() > 0.4:
+	if choppa.velocity.length() < 3.0 and want.length() > 5.0:
 		_stuck += delta
 	else:
 		_stuck = maxf(0.0, _stuck - delta)

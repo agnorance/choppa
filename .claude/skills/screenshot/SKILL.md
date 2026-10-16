@@ -18,7 +18,7 @@ bad, before claiming a change works.
 | Goal | Arguments |
 |---|---|
 | Model from the front | `--cam=showcase --autopilot=hover --frames=150 --dummies=0` |
-| Chase view in flight | `--autopilot=forward --frames=120` |
+| Chase view in flight | `--autopilot=forward --frames=120` (`roll`, `flip`, `pirouette`: a move after a run-up) |
 | Cockpit | `--cam=fp --autopilot=hover --frames=40` |
 | Specific place / facing | `--spawn=x,y,z,yaw_degrees` (free mode); lake on Mesa Basin: `--spawn=150,4,150,45` |
 | Damage look (cracks, smoke) | `--health=20` |

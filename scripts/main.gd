@@ -90,6 +90,8 @@ func _ready() -> void:
 	Settings.load_once(get_tree())
 	Controls.apply_bindings()  # The player's own keys, now that the settings are read.
 	MapKit.time_override = ["day", "dusk", "night"].find(_args.get("time", ""))
+	if _args.has("shot") and _args.has("airframe"):  # Screenshots of the menu and hangar too (not saved).
+		Settings.set_value("airframe", maxi(0, Airframe.ORDER.find(_args.airframe)))
 	if _args.has("clean"):  # In memory only: a recording run saves nothing.
 		Settings.set_value("show_controls", false)
 		Settings.set_value("music_volume", 0)
@@ -659,10 +661,12 @@ func _update_mouse() -> void:
 
 
 ## Testing aids: --level=N plays as a pilot of that level, --entitle=hangar,collector,apex
-## grants packs. Neither is saved; the real profile stays as it was.
+## grants packs. Neither is saved; the real profile stays as it was. Nor is anything an
+## automated run earns: screenshots, autopilots and video recordings played matches
+## into the player's own XP and stats.
 func _profile_args() -> void:
 	var profile := Progression.profile()
-	profile.testing = _args.has("level") or _args.has("entitle") or _args.has("camo")
+	profile.testing = _args.has("level") or _args.has("entitle") or _args.has("camo") or _args.has("shot") 		or _args.has("autopilot") or _args.has("clean") or OS.get_cmdline_args().has("--write-movie")
 	if _args.has("level"):
 		profile.xp = Progression.total_xp_for(int(_args.level))
 	if _args.has("entitle"):

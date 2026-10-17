@@ -188,7 +188,7 @@ func _rebuild_preview() -> void:
 	# Every class the same size on the turntable, spun about the middle of its length
 	# (nose about 2.5 m ahead of the mast, the tail rotor 5 to 7 m behind).
 	_pivot.scale = Vector3.ONE / size
-	_preview.position = Vector3(0.0, 0.0, -1.6 * size)
+	_preview.position = Vector3(0.0, 0.0, Airframe.spec(_airframe).get("turntable", -1.6) * size)
 	_pivot.add_child(_preview)
 	_show_detail(_preview.camo)
 

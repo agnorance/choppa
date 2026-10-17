@@ -61,7 +61,7 @@ const TABLE := {
 		"rates": 0.5, "inertia": 0.5, "thrust_lag": 0.6, "speed": 0.86, "climb": 0.85, "size": 1.4, "camera": 1.75,
 		"rotor": [4.3, 1.95, -3.2], "rotor2": [4.3, 2.8, 3.6],
 		"rounds": 700, "rockets": 0, "missiles": 4, "flares": 6, "guns": 0.9, "fire": 0.7, "recoil": 0.6,
-		"spool": 5.5, "pitch": 0.72, "coaxial": true,
+		"spool": 5.5, "pitch": 0.72, "coaxial": true, "turntable": 0.0,  ## Its middle is the middle (hangar).
 		"blurb": "Tandem rotors, a flying fortress: door miniguns, four missiles, six flares. Slow to turn, hard to kill.",
 	},
 }

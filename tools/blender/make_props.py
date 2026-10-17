@@ -267,8 +267,28 @@ def pylon():
     for x in (-4.5, 0.0, 4.5):
         for k in range(5):
             parts.append(cyl((x, 0, 26.45 - k * 0.12), (x, 0, 26.4 - k * 0.12), 0.11, "glass", 12))
-    # Warning plate and climbing pegs.
-    parts.append(box((0, 2.0, 3.0), (0.6, 0.02, 0.4), "hazard"))
+    for x in (-4.5, 0.0, 4.5):  # Insulator caps and the clamp the cable hangs in.
+        parts.append(cyl((x, 0, 26.6), (x, 0, 26.75), 0.06, "metal", 8))
+        parts.append(box((x, 0, 25.85), (0.1, 0.2, 0.12), "dark"))
+    # Danger plates on every face, an anti-climb guard of barbs, climbing pegs up a leg.
+    for a in range(4):
+        rot = Matrix.Rotation(a * math.pi / 2, 4, "Z")
+        parts.append(base.place(box((0, 0, 0), (0.6, 0.02, 0.4), "hazard"), Matrix.Translation(rot @ Vector((0, 2.05, 3.0)))
+                                @ rot))
+        parts.append(base.place(box((0, 0, 0), (4.0, 0.06, 0.06), "rust"), Matrix.Translation(rot @ Vector((0, 2.1, 4.2))) @ rot))
+        for k in range(7):
+            parts.append(base.place(box((0, 0, 0), (0.02, 0.3, 0.02), "rust"),
+                                    Matrix.Translation(rot @ Vector((-1.8 + k * 0.6, 2.25, 4.3))) @ rot @
+                                    Matrix.Rotation(0.6, 4, "X")))
+    for k in range(20):
+        t = (5.0 + k * 0.9) / 24
+        p = Vector((2.6 + (0.7 - 2.6) * t, 2.6 + (0.7 - 2.6) * t, 5.0 + k * 0.9))
+        parts.append(cyl(p, p + Vector((0.25, 0, 0)), 0.02, "metal", 6))
+    for sx, sy in ((1, 1), (-1, 1), (-1, -1), (1, -1)):  # Bolts on the feet.
+        for k in range(4):
+            a = math.pi / 2 * k + math.pi / 4
+            parts.append(cyl((sx * 2.6 + math.cos(a) * 0.3, sy * 2.6 + math.sin(a) * 0.3, 0.3),
+                             (sx * 2.6 + math.cos(a) * 0.3, sy * 2.6 + math.sin(a) * 0.3, 0.4), 0.04, "metal", 6))
     return join(parts, "pylon")
 
 
@@ -294,6 +314,21 @@ def water_tower():
         parts.append(beam((-0.25, -2.5, 0.5 + k * 0.5), (0.25, -2.5, 0.5 + k * 0.5), 0.04, "rust"))
     for x in (-0.25, 0.25):
         parts.append(beam((x, -2.5, 0.2), (x, -2.5, 9.4), 0.05, "rust"))
+    for k in range(8):  # The ladder's safety cage.
+        z = 3.0 + k * 0.85
+        parts.append(tube([(-0.25, -2.5, z), (-0.4, -2.85, z), (0, -3.0, z), (0.4, -2.85, z), (0.25, -2.5, z)], 0.02, "rust", 5))
+    # Catwalk round the foot of the tank, its railing and posts.
+    parts.append(ring((0, 0, 9.3), (0, 0, 1), 2.85, 0.32, "wood_dark", 40))
+    parts.append(ring((0, 0, 10.35), (0, 0, 1), 3.05, 0.03, "rust", 40))
+    parts.append(ring((0, 0, 9.85), (0, 0, 1), 3.05, 0.02, "rust", 40))
+    for k in range(16):
+        a = 2 * math.pi * k / 16
+        parts.append(cyl((3.05 * math.cos(a), 3.05 * math.sin(a), 9.35), (3.05 * math.cos(a), 3.05 * math.sin(a), 10.35),
+                         0.03, "rust", 6))
+    parts.append(ball((0, 0, 15.05), 0.15, "rust", segments=10, rings=5))  # Finial.
+    hatch = box((0, 0, 0), (0.7, 0.7, 0.06), "rust")
+    parts.append(base.place(hatch, Matrix.Translation((0, -1.4, 14.25)) @ Matrix.Rotation(math.radians(30), 4, "X")))
+    parts.append(tube([(2.2, 0.8, 13.2), (2.7, 0.9, 13.0), (2.7, 0.9, 9.5)], 0.06, "rust", 8))  # Overflow.
     return join(parts, "water_tower")
 
 
@@ -327,25 +362,164 @@ def headframe():
         parts.append(plate)
     parts.append(box((0, -7.48, 1.4), (1.6, 0.05, 2.0), "dark"))
     parts.append(cyl((-0.6, -7.7, 1.3), (0.6, -7.7, 1.3), 0.5, "rust", 20))
+    parts.append(cyl((0, -7.7, 1.75), (0, 0, 17.95), 0.03, "dark", 6))  # Hoist cable up to the sheave...
+    parts.append(cyl((0, 1.3, 16.9), (0, 1.3, 0.8), 0.03, "dark", 6))  # ...and down the shaft.
+    cage = Vector((0, 1.3, 0.6))  # The cage at the shaft collar.
+    parts.append(box(cage + Vector((0, 0, 1.1)), (1.4, 1.4, 0.06), "rust"))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            parts.append(beam(cage + Vector((sx * 0.68, sy * 0.68, 0)), cage + Vector((sx * 0.68, sy * 0.68, 1.1)), 0.05, "rust"))
+    parts.append(box(cage, (1.4, 1.4, 0.08), "rust"))
+    for sx in (-1, 1):  # X-bracing on the legs.
+        for z0, z1 in ((0.0, 4.0), (4.0, 8.0), (8.0, 12.0)):
+            w0, w1 = 2.5 - 1.5 * z0 / 16, 2.5 - 1.5 * z1 / 16
+            parts.append(beam((sx * w0, -(2.0 - z0 / 16), z0), (sx * w1, (2.0 - z1 / 16), z1), 0.12, "wood_dark"))
+            parts.append(beam((sx * w0, (2.0 - z0 / 16), z0), (sx * w1, -(2.0 - z1 / 16), z1), 0.12, "wood_dark"))
+    for k in range(10):  # A stair up to the first landing.
+        parts.append(box((2.6, -1.0 + k * 0.32, 0.2 + k * 0.4), (0.9, 0.3, 0.06), "wood"))
+    parts.append(box((2.4, 2.4, 4.0), (1.6, 1.6, 0.1), "wood"))
+    parts.append(cyl((1.6, 1.6, 4.2), (1.6, 1.6, 4.6), 0.18, "brass", 12, radius2=0.08))  # Signal bell.
+    for z in (8.0, 15.5):  # Lamps on the frame.
+        parts.append(box((1.3 - z * 0.03, 1.2, z), (0.2, 0.2, 0.25), "dark"))
+        parts.append(box((1.3 - z * 0.03, 1.3, z), (0.15, 0.02, 0.18), "lamp"))
     return join(parts, "headframe")
 
 
 def shack(name, length):
-    parts = [box((0, 0, 0.25), (length + 0.4, 4.4, 0.5), "concrete")]
-    walls = box((0, 0, 1.9), (length, 4.0, 2.8), "wood")
-    parts.append(walls)
+    """A site hut: a concrete slab with steps, board-and-batten walls, a pitched tin roof
+    with a ridge cap and gutters, a door with its handle under a little porch roof,
+    framed windows, a stove pipe, a gas bottle and a rain barrel."""
+    parts = [box((0, 0, 0.25), (length + 0.4, 4.4, 0.5), "concrete", bevel_width=0.03)]
+    parts.append(box((0, 0, 1.9), (length, 4.0, 2.8), "wood"))
     for k in range(int(length / 0.6)):
         x = -length / 2 + 0.3 + k * 0.6
         for y in (-2.01, 2.01):
             parts.append(box((x, y, 1.9), (0.04, 0.02, 2.7), "wood_dark"))
-    # Pitched corrugated roof with a little overhang.
-    for side in (-1, 1):
+    for y in (-2.02, 2.02):  # Sill and top plates.
+        parts.append(box((0, y, 0.6), (length + 0.05, 0.05, 0.12), "wood_dark"))
+        parts.append(box((0, y, 3.25), (length + 0.05, 0.05, 0.12), "wood_dark"))
+    for side in (-1, 1):  # Pitched corrugated roof with a little overhang, gutters.
         plate = box((0, 0, 0), (length + 0.8, 2.5, 0.08), "corrugated")
         base.place(plate, Matrix.Translation((0, side * 1.1, 3.75)) @ Matrix.Rotation(side * math.radians(-18), 4, "X"))
         parts.append(plate)
-    parts.append(box((length / 2 - 1.2, 2.02, 1.6), (0.9, 0.05, 2.0), "wood_dark"))  # Door.
-    parts.append(box((-length / 2 + 1.0, 2.02, 2.1), (0.9, 0.05, 0.8), "glass"))
+        parts.append(cyl((-length / 2 - 0.4, side * 2.3, 3.33), (length / 2 + 0.4, side * 2.3, 3.33), 0.07, "metal", 8))
+    parts.append(box((0, 0, 4.15), (length + 0.85, 0.35, 0.08), "metal"))  # Ridge cap.
+    parts.append(cyl((length / 2 + 0.35, 2.3, 3.33), (length / 2 + 0.35, 2.3, 0.6), 0.05, "metal", 8))  # Down pipe.
+    # The door: frame, panel, handle, a porch roof over it and two steps.
+    dx = length / 2 - 1.2
+    parts.append(box((dx, 2.03, 1.6), (1.05, 0.05, 2.15), "wood_dark"))
+    parts.append(box((dx, 2.06, 1.6), (0.85, 0.04, 1.95), "wood"))
+    parts.append(box((dx + 0.3, 2.1, 1.5), (0.04, 0.06, 0.16), "brass"))
+    porch = box((0, 0, 0), (1.6, 0.9, 0.05), "corrugated")
+    parts.append(base.place(porch, Matrix.Translation((dx, 2.45, 2.85)) @ Matrix.Rotation(math.radians(-12), 4, "X")))
+    for x in (dx - 0.7, dx + 0.7):
+        parts.append(beam((x, 2.85, 0.5), (x, 2.85, 2.8), 0.08, "wood_dark"))
+    for k in range(2):
+        parts.append(box((dx, 2.5 + k * 0.3, 0.12 + k * 0.12), (1.2, 0.35, 0.24 - k * 0.12), "concrete"))
+    # Windows: glass in a frame with a sill.
+    for wx, wy in ((-length / 2 + 1.0, 2.02), (0.3, -2.02)):
+        s = 1 if wy > 0 else -1
+        parts.append(box((wx, wy, 2.1), (0.9, 0.05, 0.8), "glass"))
+        parts.append(box((wx, wy + s * 0.01, 2.1), (1.05, 0.04, 0.95), "wood_dark"))
+        parts.append(box((wx, wy + s * 0.03, 2.1), (0.04, 0.03, 0.8), "wood_dark"))
+        parts.append(box((wx, wy + s * 0.08, 1.6), (1.1, 0.14, 0.05), "wood_dark"))
     parts.append(cyl((length / 2 - 0.5, -1.2, 3.4), (length / 2 - 0.5, -1.2, 4.9), 0.15, "rust", 10))  # Stove pipe.
+    parts.append(cyl((length / 2 - 0.5, -1.2, 4.9), (length / 2 - 0.5, -1.2, 5.0), 0.25, "rust", 10))
+    parts.append(cyl((-length / 2 - 0.45, 1.2, 0.5), (-length / 2 - 0.45, 1.2, 1.55), 0.18, "marking_red", 14,
+                     bevel_width=0.04))  # Gas bottle.
+    parts += drum((-length / 2 - 0.5, -1.2, 0.5), material="wood_dark")  # Rain barrel under the gutter.
+    return join(parts, name)
+
+
+def fuel_tank():
+    """A bulk fuel tank on concrete saddles: hoop straps, a manhole and vent on top with
+    a railed walkway and a ladder up to it, the outlet valve and pipe, a level gauge,
+    and a hazard placard (no wall round it: maps place
+    these big, next to service pads)."""
+    parts = [cyl((-3.5, 0, 1.6), (3.5, 0, 1.6), 1.4, "rust", 32, bevel_width=0.05)]
+    for x in (-3.55, 3.55):
+        parts.append(ball((x, 0, 1.6), 1.4, "rust", scale=(0.25, 1, 1), segments=24, rings=12))
+    for x in (-2.0, 2.0):
+        parts.append(box((x, 0, 0.5), (0.5, 2.6, 1.0), "concrete", bevel_width=0.03))
+        parts.append(ring((x, 0, 1.6), (1, 0, 0), 1.42, 0.06, "dark", 32))
+    for x in (-3.0, -1.0, 1.0, 3.0):  # Weld seams.
+        parts.append(ring((x, 0, 1.6), (1, 0, 0), 1.405, 0.015, "rust", 32))
+    parts.append(box((0, -1.42, 1.6), (3.0, 0.03, 0.8), "hazard"))
+    parts.append(base.place(box((0, 0, 0), (0.5, 0.03, 0.5), "decal"),
+                            Matrix.Translation((2.2, -1.42, 1.6)) @ Matrix.Rotation(math.radians(45), 4, "Y")))  # Placard.
+    parts.append(cyl((0, 0, 2.95), (0, 0, 3.15), 0.35, "dark", 16))  # Manhole...
+    for k in range(8):
+        a = 2 * math.pi * k / 8
+        parts.append(ball((0.3 * math.cos(a), 0.3 * math.sin(a), 3.15), 0.025, "metal", segments=6, rings=3))
+    parts.append(cyl((-1.2, 0, 2.95), (-1.2, 0, 3.5), 0.06, "metal", 8))  # ...and the vent.
+    parts.append(cyl((-1.2, 0, 3.5), (-1.2, 0, 3.6), 0.14, "metal", 10))
+    for y in (-0.55, 0.55):  # Walkway rails along the top.
+        for x in (-2.0, 2.0):
+            parts.append(cyl((x, y, 2.9), (x, y, 3.9), 0.025, "hazard", 6))
+        parts.append(cyl((-2.0, y, 3.9), (2.0, y, 3.9), 0.025, "hazard", 6))
+    for k in range(7):  # Ladder up the end.
+        parts.append(cyl((3.9, -0.25, 0.4 + k * 0.4), (3.9, 0.25, 0.4 + k * 0.4), 0.02, "metal", 6))
+    for y in (-0.25, 0.25):
+        parts.append(tube([(3.9, y, 0.0), (3.9, y, 2.6), (3.4, y, 3.05)], 0.03, "metal", 6))
+    valve = Vector((-3.0, -1.2, 0.5))  # Outlet: a valve wheel and the pipe away.
+    parts.append(tube([(-3.0, -0.8, 0.7), valve, valve + Vector((0, -1.0, -0.3))], 0.08, "dark", 10))
+    parts.append(ring(valve + Vector((0, 0, 0.2)), (0, 0, 1), 0.16, 0.02, "marking_red", 14))
+    parts.append(cyl(valve, valve + Vector((0, 0, 0.2)), 0.03, "metal", 6))
+    parts.append(cyl((3.0, -1.3, 1.0), (3.0, -1.3, 2.4), 0.03, "glass", 6))  # Level gauge.
+    return join(parts, "fuel_tank")
+
+
+def crates():
+    """A stack of ammunition crates on a pallet: battened lids, rope handles, stencilled
+    markings and hazard bands; one lid off and leaning, a loose crate beside."""
+    parts = [box((0.4, 0.2, 0.08), (3.4, 2.0, 0.16), "wood_dark", bevel_width=0.02)]  # Pallet.
+    for k in range(5):
+        parts.append(box((-1.2 + k * 0.8, 0.2, 0.02), (0.12, 2.0, 0.04), "wood"))
+    for (x, y, z, s, yaw) in ((0, 0, 0.16, 1.4, 0), (1.5, 0.2, 0.16, 1.3, 0.2), (0.7, 0.1, 1.56, 1.2, -0.3),
+                              (-1.4, 1.6, 0, 1.0, 0.5)):
+        rot = Matrix.Rotation(yaw, 4, "Z")
+        at = Matrix.Translation((x, y, z + s / 2)) @ rot
+        parts.append(base.place(box((0, 0, 0), (s, s, s), "wood", bevel_width=0.03), at))
+        for k in (-1, 1):
+            parts.append(base.place(box((0, k * s * 0.3, 0), (s + 0.02, 0.12, s + 0.02), "wood_dark"), at))  # Battens.
+            parts.append(base.place(tube([(k * (s / 2 + 0.02), -0.15, 0.1), (k * (s / 2 + 0.07), 0, 0.02),
+                                          (k * (s / 2 + 0.02), 0.15, 0.1)], 0.02, "rubber", 5), at))  # Rope handles.
+        parts.append(base.place(box((0, -s / 2 - 0.005, 0.1), (s * 0.6, 0.01, s * 0.18), "decal"), at))  # Stencil.
+        parts.append(base.place(box((0, -s / 2 - 0.006, -s * 0.3), (s + 0.01, 0.01, 0.08), "hazard"), at))
+    lid = Matrix.Translation((2.45, -0.6, 0.65)) @ Matrix.Rotation(math.radians(-70), 4, "Y")  # A lid leaning against it.
+    parts.append(base.place(box((0, 0, 0), (1.3, 1.3, 0.06), "wood", bevel_width=0.01), lid))
+    return join(parts, "crates")
+
+
+def container(name, paint):
+    """A 40 ft shipping container: ribbed sides and roof, corner posts with castings, top
+    and bottom rails, the door end with its hinges, four locking bars and handles, a
+    number placard. Many are drawn at once (MultiMesh), so the detail stays light."""
+    L, W, H = 12.2, 2.44, 2.6
+    parts = [box((0, 0, H / 2), (L - 0.1, W - 0.12, H - 0.1), paint)]
+    for k in range(30):  # Corrugation on the long sides.
+        x = -L / 2 + 0.3 + k * (L - 0.6) / 29
+        for side in (-1, 1):
+            parts.append(box((x, side * (W / 2 - 0.04), H / 2), (0.14, 0.08, H - 0.3), paint))
+    for k in range(5):  # And the roof.
+        parts.append(box((-L / 2 + 1.2 + k * (L - 2.4) / 4, 0, H - 0.03), (0.2, W - 0.3, 0.06), paint))
+    for side in (-1, 1):  # Top and bottom side rails.
+        parts.append(box((0, side * (W / 2 - 0.05), H - 0.08), (L - 0.3, 0.1, 0.14), paint))
+        parts.append(box((0, side * (W / 2 - 0.05), 0.1), (L - 0.3, 0.12, 0.18), "dark"))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            parts.append(box((sx * (L / 2 - 0.1), sy * (W / 2 - 0.1), H / 2), (0.2, 0.2, H), "dark"))
+            for z in (0.09, H - 0.09):  # Corner castings.
+                parts.append(box((sx * (L / 2 - 0.09), sy * (W / 2 - 0.09), z), (0.2, 0.2, 0.18), "metal"))
+    for sy in (-0.55, -0.2, 0.2, 0.55):  # Locking bars on the doors, with their handles.
+        parts.append(cyl((L / 2 + 0.02, sy, 0.25), (L / 2 + 0.02, sy, H - 0.25), 0.03, "metal", 6))
+        parts.append(box((L / 2 + 0.05, sy + 0.08, 1.1), (0.04, 0.2, 0.05), "metal"))
+    for sy in (-1.12, 1.12):  # Door hinges.
+        for z in (0.5, 1.3, 2.1):
+            parts.append(box((L / 2 + 0.03, sy, z), (0.06, 0.08, 0.12), "dark"))
+    parts.append(box((L / 2 + 0.01, 0, H / 2), (0.02, 0.04, H - 0.4), "dark"))
+    for side in (-1, 1):  # Owner's number placard high on each side.
+        parts.append(box((L / 2 - 1.4, side * (W / 2 + 0.005), H - 0.45), (1.6, 0.01, 0.3), "decal"))
     return join(parts, name)
 
 
@@ -368,54 +542,23 @@ def trestle():
         parts.append(box((x, 0, 12.1), (0.22, 3.2, 0.12), "wood_dark"))
     for y in (-0.75, 0.75):
         parts.append(beam((-span / 2, y, 12.2), (span / 2, y, 12.2), 0.1, "rust"))
-    # A tipped ore cart on the deck.
-    parts.append(box((5.0, 0.0, 12.75), (1.6, 1.1, 0.9), "rust", bevel_width=0.05))
+    bents = (-span / 2, -span / 6, span / 6, span / 2)  # Open between them: you fly under the deck.
+    for k in range(17):  # A railing along the deck edge.
+        x = -span / 2 + k * span / 16
+        for y in (-1.75, 1.75):
+            parts.append(beam((x, y, 12.05), (x, y, 13.1), 0.1, "wood_dark"))
+    for y in (-1.75, 1.75):
+        parts.append(beam((-span / 2, y, 13.05), (span / 2, y, 13.05), 0.1, "wood_dark"))
+    for x in bents:  # Bolts through the cap beams.
+        for y in (-1.3, 1.3):
+            parts.append(cyl((x, y, 11.45), (x, y, 11.8), 0.04, "metal", 6))
+    # An ore cart on the deck: its body, wheels on the rails, a coupling.
+    parts.append(box((5.0, 0.0, 12.85), (1.6, 1.1, 0.8), "rust", bevel_width=0.05))
+    for x in (4.5, 5.5):
+        for y in (-0.75, 0.75):
+            parts.append(cyl((x, y - 0.06, 12.45), (x, y + 0.06, 12.45), 0.2, "dark", 12))
+    parts.append(cyl((5.8, 0, 12.5), (6.1, 0, 12.5), 0.04, "metal", 6))
     return join(parts, "trestle")
-
-
-def fuel_tank():
-    parts = [cyl((-3.5, 0, 1.6), (3.5, 0, 1.6), 1.4, "rust", 32, bevel_width=0.05)]
-    for x in (-3.55, 3.55):
-        parts.append(ball((x, 0, 1.6), 1.4, "rust", scale=(0.25, 1, 1), segments=24, rings=12))
-    for x in (-2.0, 2.0):
-        parts.append(box((x, 0, 0.5), (0.5, 2.6, 1.0), "concrete"))
-        parts.append(ring((x, 0, 1.6), (1, 0, 0), 1.42, 0.06, "dark", 32))
-    parts.append(box((0, -1.42, 1.6), (3.0, 0.03, 0.8), "hazard"))
-    parts.append(cyl((0, 0, 3.0), (0, 0, 3.4), 0.3, "dark", 12))
-    return join(parts, "fuel_tank")
-
-
-def crates():
-    parts = []
-    for (x, y, z, s, yaw) in ((0, 0, 0, 1.4, 0), (1.5, 0.2, 0, 1.3, 0.2), (0.7, 0.1, 1.4, 1.2, -0.3), (-1.4, 1.2, 0, 1.0, 0.5)):
-        rot = Matrix.Rotation(yaw, 4, "Z")
-        c = box((0, 0, 0), (s, s, s), "wood", bevel_width=0.03)
-        base.place(c, Matrix.Translation((x, y, z + s / 2)) @ rot)
-        parts.append(c)
-        for k in (-1, 1):
-            band = box((0, 0, 0), (s + 0.02, 0.12, s + 0.02), "wood_dark")
-            base.place(band, Matrix.Translation((x, y, z + s / 2)) @ rot @ Matrix.Translation((0, k * s * 0.3, 0)))
-            parts.append(band)
-    return join(parts, "crates")
-
-
-def container(name, paint):
-    """A 40 ft shipping container: ribbed sides, corner posts, door bars at the +X end."""
-    L, W, H = 12.2, 2.44, 2.6
-    parts = [box((0, 0, H / 2), (L - 0.1, W - 0.12, H - 0.1), paint)]
-    for k in range(30):  # Corrugation on the long sides.
-        x = -L / 2 + 0.3 + k * (L - 0.6) / 29
-        for side in (-1, 1):
-            parts.append(box((x, side * (W / 2 - 0.04), H / 2), (0.14, 0.08, H - 0.3), paint))
-    for k in range(5):  # And the roof.
-        parts.append(box((-L / 2 + 1.2 + k * (L - 2.4) / 4, 0, H - 0.03), (0.2, W - 0.3, 0.06), paint))
-    for sx in (-1, 1):
-        for sy in (-1, 1):
-            parts.append(box((sx * (L / 2 - 0.1), sy * (W / 2 - 0.1), H / 2), (0.2, 0.2, H), "dark"))
-    for sy in (-0.55, -0.2, 0.2, 0.55):  # Locking bars on the doors.
-        parts.append(cyl((L / 2 + 0.02, sy, 0.25), (L / 2 + 0.02, sy, H - 0.25), 0.03, "metal", 6))
-    parts.append(box((L / 2 + 0.01, 0, H / 2), (0.02, 0.04, H - 0.4), "dark"))
-    return join(parts, name)
 
 
 def gantry_crane():
@@ -1070,8 +1213,9 @@ if __name__ == "__main__":
             if only and name not in only:
                 continue
             # Framed on the prop itself: its size from its bounding box.
-            size = max(max(bpy.data.objects[name].dimensions), 2.0)
-            base.VIEWS[name] = ((k * 40.0 + size * 0.75, -size * 1.0, size * 0.55), (k * 40.0, 0.0, size * 0.22))
+            dims = bpy.data.objects[name].dimensions
+            size = max(max(dims), 2.0)
+            base.VIEWS[name] = ((k * 40.0 + size * 0.9, -size * 1.25, size * 0.45 + dims.z * 0.35), (k * 40.0, 0.0, dims.z * 0.45))
         base.preview(args[1], list(base.VIEWS))
     else:
         base.OUT = OUT

@@ -100,9 +100,16 @@ func steer(delta: float) -> void:
 	var want := ((goal - pos) * 0.6).limit_length(lerpf(0.75, 1.0, skill) * choppa.max_speed)
 	var flat_to_goal := Vector2(goal.x - pos.x, goal.z - pos.z).length()
 	if landing and flat_to_goal < 40.0:
-		# Final approach: slow down over the pad, then sink onto it gently.
-		want = (goal - pos) * 0.5
-		want.y = clampf(want.y, -2.5 if flat_to_goal < 4.0 else 0.0, 3.0)
+		# Final approach down a glide slope: the closer to the pad, the lower, so it
+		# arrives low and slow instead of high over the pad and drifting past it.
+		# Brake early: the speed over the ground shrinks with the distance left, so its
+		# momentum is gone by the time it is over the middle.
+		var across := Vector3(goal.x - pos.x, 0.0, goal.z - pos.z) * 0.35
+		want = across.limit_length(minf(8.0, flat_to_goal * 0.3 + 0.3))
+		var slope_y := goal.y + flat_to_goal * 0.35
+		want.y = clampf((slope_y - pos.y) * 0.8, -4.0, 3.0)
+		if flat_to_goal < 4.0:
+			want.y = minf(want.y, -2.5 if pos.y - goal.y > 1.5 else -0.8)
 		if station.occupant == choppa:
 			want = Vector3(0.0, -1.0, 0.0)
 	else:

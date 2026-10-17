@@ -852,6 +852,11 @@ func test_canopy_cracks_follow_damage() -> void:
 	c.heal(100.0)
 	await _fly(c, 2)
 	_check(cracked.call() == 0, "repaired when healed")
+	# Every class's glass cracks, not only the Little Bird's (they were detailed alike).
+	for id: String in Airframe.ORDER:
+		c.set_airframe(id)
+		await _fly(c, 1)
+		_check(c.model._cracks.size() >= 6, "%s has crack spots, got %d" % [id, c.model._cracks.size()])
 
 
 func test_settings_roundtrip() -> void:

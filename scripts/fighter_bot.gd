@@ -188,7 +188,7 @@ func _station_if_needed(delta: float) -> ServiceStation:
 		return _station  # Already on the pad: stay until it is done.
 	var worn := choppa.wear(Choppa.Part.TAIL) > 0.5 or choppa.wear(Choppa.Part.ENGINE) > 0.5 or choppa.wear(Choppa.Part.ROTOR) > 0.6
 	var dry: bool = choppa.ammo.rockets + choppa.ammo.missiles == 0 or choppa.ammo.gun < choppa.full_ammo("gun") * 0.2
-	var hurt := choppa.health < choppa.max_health * 0.55  # Early enough to make it there alive.
+	var hurt := choppa.health < choppa.max_health * 0.65  # Early enough to make it there alive.
 	if not (worn or dry or hurt):
 		_station = null
 		return null

@@ -363,6 +363,19 @@ static func rock(
 	return body
 
 
+## The highest point of `node`'s meshes within `radius` of (x, z), in world space: where
+## to set something down on a rock model (e.g. a station on top of the mesa).
+static func top_of(node: Node3D, x: float, z: float, radius := 1.5) -> float:
+	var best := -INF
+	for mi: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false):
+		var xf := mi.global_transform if mi.is_inside_tree() else node.transform * mi.transform
+		for v: Vector3 in mi.mesh.get_faces():
+			var w := xf * v
+			if Vector2(w.x - x, w.z - z).length() < radius:
+				best = maxf(best, w.y)
+	return best
+
+
 ## Warm lights along two crossing tunnels (along local X and Z), as in the mesa model.
 static func tunnel_lights(parent: Node3D, center: Vector3, half_length: float, height: float) -> void:
 	for at: Vector3 in [

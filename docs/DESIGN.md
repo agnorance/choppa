@@ -260,6 +260,12 @@ stations**: lit helipads with a mast.
 - Keys: LMB / Ctrl gun, RMB rockets, F missile, X flares, R mine, G smoke (gamepad:
   RT gun, LT rockets, RB missile, B flares, X mine, D-pad down smoke; afterburner moves to
   LB / Shift).
+- **Placement is tactical** (owner, 2026-10-17): repair pads are few and exposed or
+  awkward (Mesa Basin: on top of the mesa, down in the trench, in a clearing in the
+  hoodoo field; Slot Canyon: the open camp and mid-canyon). Ammo pads are quick and
+  in cover (behind the arches, beside the trench bridge, on the lake shore; the canyon
+  ends). New cover: tall pillars between the basin's arches, rock pillars on the
+  canyon floor, power lines strung across the basin trench.
 - **Ammo stations** (owner's request): blue lamp and rim, crates by the mast. They only
   rearm (no repairs), in 2 s, and are back after 20 s. Two per battle map, between the
   repair pads, and one on the test range.

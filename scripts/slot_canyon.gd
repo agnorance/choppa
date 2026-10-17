@@ -220,7 +220,7 @@ func _near_feature(at: Vector3) -> bool:
 	for z: float in [120.0, -60.0, 40.0, -180.0, 260.0, -330.0]:
 		if absf(at.z - z) < (60.0 if z == 120.0 else 14.0):
 			return true
-	for s: Vector3 in _station_spots() + _ammo_spots():
+	for s: Vector3 in _station_spots() + _ammo_spots() + _pillar_spots():
 		if Vector2(at.x - s.x, at.z - s.z).length() < 14.0:
 			return true
 	return false
@@ -228,22 +228,36 @@ func _near_feature(at: Vector3) -> bool:
 
 func _station_spots() -> Array[Vector3]:
 	var out: Array[Vector3] = []
-	for entry: Array in [[120.0, -0.25], [-250.0, 0.45], [330.0, 0.3], [-370.0, 0.0]]:
+	# Repair pads are scarce (owner: "place them more tactically"): the open mining camp
+	# and one mid-canyon. The ends only rearm (see _ammo_spots).
+	for entry: Array in [[120.0, -0.25], [-250.0, 0.45]]:
 		var z: float = entry[0]
 		out.append(Vector3(center_x(z) + entry[1] * half_width(z), 0.0, z))
 	return out
 
 
-## Ammo-only stations, between the repair pads and clear of the power lines.
+## Ammo-only stations: between the repair pads, clear of the power lines, and at the ends.
 func _ammo_spots() -> Array[Vector3]:
 	var out: Array[Vector3] = []
-	for entry: Array in [[-110.0, 0.35], [190.0, -0.3]]:
+	for entry: Array in [[-110.0, 0.35], [190.0, -0.3], [330.0, 0.3], [-370.0, 0.0]]:
 		var z: float = entry[0]
 		out.append(Vector3(center_x(z) + entry[1] * half_width(z), 0.0, z))
+	return out
+
+
+## Rock pillars standing on the canyon floor between the crossings: cover to duck behind.
+func _pillar_spots() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for entry: Array in [[-150.0, -0.3], [-20.0, 0.32], [80.0, -0.35], [230.0, 0.3], [-290.0, 0.25]]:
+		var z: float = entry[0]
+		out.append(floor_point(z, entry[1]))
 	return out
 
 
 func _stations_and_spawns() -> void:
+	for at: Vector3 in _pillar_spots():
+		MapKit.rock(self, "hoodoo_%d" % (absi(int(at.z)) % 3 + 1), at + Vector3.DOWN * 2.0, at.z * 0.1, 1.5,
+			MapKit.SANDSTONE.lerp(MapKit.ROCK, 0.3))
 	for at in _station_spots():
 		MapKit.station(self, at, _ground)
 	for at in _ammo_spots():

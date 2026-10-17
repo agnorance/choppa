@@ -9,10 +9,18 @@ const SIZE := 760.0
 const PLAY_RADIUS := 260.0
 const LAKE := Vector2(150.0, 150.0)
 const WATER_LEVEL := -2.5
-## Ammo-only stations, east and west on the station ring.
-const AMMO_STATIONS: Array[Vector3] = [Vector3(112.0, 0.0, 0.0), Vector3(-112.0, 0.0, 0.0)]
+## Service stations placed for fights (owner: "place them more tactically"). Repair pads
+## are few and exposed or awkward: on top of the mesa (king of the hill), down in the
+## trench, in a clearing inside the hoodoo field. Ammo pads are quick and in cover:
+## inside the arch ring behind an arch, beside the trench bridge, on the lake shore.
+const REPAIR_PADS: Array[Vector3] = [Vector3(150.0, 0.0, -150.0)]  # Plus the mesa top and the trench.
+const AMMO_PADS: Array[Vector3] = [Vector3(28.8, 0.0, 124.7), Vector3(-28.8, 0.0, -124.7), Vector3(150.0, 0.0, 45.0)]
+## Tall rock pillars between the arches: cover in the main fighting ring, and a slalom.
+const PILLAR_ANGLES := [47.0, 107.0, 167.0, 227.0, 287.0, 347.0]
+const PILLAR_RADIUS := 118.0
 
 var terrain: Terrain
+var _mesa: Node3D
 
 var _noise := FastNoiseLite.new()
 var _detail := FastNoiseLite.new()
@@ -44,7 +52,7 @@ func _ready() -> void:
 	MapKit.backdrop(self, 420.0, 7)
 	GameMap.report("basin: backdrop", t0)
 
-	MapKit.rock(self, "mesa", Vector3(0.0, -2.0, 0.0), 0.0, 1.0, Color(0.76, 0.47, 0.31))
+	_mesa = MapKit.rock(self, "mesa", Vector3(0.0, -2.0, 0.0), 0.0, 1.0, Color(0.76, 0.47, 0.31))
 	MapKit.tunnel_lights(self, Vector3.ZERO, 110.0, 12.0)
 
 	# Ring of ruined arches around the mesa.
@@ -66,6 +74,8 @@ func _ready() -> void:
 		var at := Vector3(_rng.randf_range(100.0, 200.0), 0.0, _rng.randf_range(-200.0, -90.0))
 		if Vector2(at.x, at.z).length() > 215.0 or absf(Vector2(at.x, at.z).length() - 150.0) < 16.0:
 			continue
+		if Vector2(at.x - REPAIR_PADS[0].x, at.z - REPAIR_PADS[0].z).length() < 22.0:
+			continue  # The clearing for the repair pad.
 		placed += 1
 		at.y = _ground(at.x, at.z) - 2.0
 		MapKit.rock(self, "hoodoo_%d" % _rng.randi_range(1, 3), at, _rng.randf() * TAU,
@@ -112,14 +122,30 @@ func _ready() -> void:
 
 
 	GameMap.report("basin: grass+boulders", t0)
-	# Service stations on open ground between the mesa and the arches, and one down in the
-	# trench for those who sneak.
-	for k in 4:
-		var angle := TAU * k / 4.0 + PI * 0.25
-		MapKit.station(self, Vector3(cos(angle), 0.0, sin(angle)) * 112.0, _ground)
+	# Pillars between the arches.
+	for degrees: float in PILLAR_ANGLES:
+		var angle := deg_to_rad(degrees)
+		var at := Vector3(cos(angle), 0.0, sin(angle)) * PILLAR_RADIUS
+		at.y = _ground(at.x, at.z) - 2.0
+		MapKit.rock(self, "hoodoo_%d" % (int(degrees) % 3 + 1), at, angle, 1.7,
+			MapKit.SANDSTONE.lerp(MapKit.ROCK, 0.25))
+	# Power lines across the trench: a hazard for whoever sneaks along it.
+	for z: float in [80.0, -60.0]:
+		var c := _trench_center(z)
+		var bases: Array[Vector3] = []
+		for side: float in [-48.0, 48.0]:
+			bases.append(Vector3(c + side, _ground(c + side, z), z))
+		Hazards.power_line(self, bases)
+
+	# Service stations (see REPAIR_PADS).
+	MapKit.station(self, Vector3(0.0, 0.0, 0.0), func(x: float, z: float) -> float: return MapKit.top_of(_mesa, x, z))
 	MapKit.station(self, Vector3(_trench_center(-120.0), 0.0, -120.0), _ground)
-	for at: Vector3 in AMMO_STATIONS:
+	for at: Vector3 in REPAIR_PADS:
+		MapKit.station(self, at, _ground)
+	for at: Vector3 in AMMO_PADS:
 		MapKit.station(self, at, _ground, true)
+	# Beside the trench bridge, half in its shadow.
+	MapKit.station(self, Vector3(_trench_center(10.0), 0.0, 11.0), _ground, true)
 
 	for at: Vector3 in _spawn_spots():
 		at.y = _ground(at.x, at.z)
@@ -153,8 +179,12 @@ func _clear_of_structures(at: Vector3) -> bool:
 	for s: Vector3 in _spawn_spots():
 		if flat.distance_to(Vector2(s.x, s.z)) < 12.0:
 			return false
-	for s: Vector3 in AMMO_STATIONS:
+	for s: Vector3 in REPAIR_PADS + AMMO_PADS:
 		if flat.distance_to(Vector2(s.x, s.z)) < 14.0:
+			return false
+	for degrees: float in PILLAR_ANGLES:
+		var angle := deg_to_rad(degrees)
+		if flat.distance_to(Vector2(cos(angle), sin(angle)) * PILLAR_RADIUS) < 12.0:
 			return false
 	if flat.length() < 85.0:  # Mesa.
 		return false

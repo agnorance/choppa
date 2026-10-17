@@ -8,7 +8,8 @@ const SCOUT := "scout"
 const GUNSHIP := "gunship"
 const HEAVY := "heavy"
 const STRIKER := "striker"
-const ORDER := [SCOUT, GUNSHIP, HEAVY, STRIKER]
+const MULE := "mule"
+const ORDER := [SCOUT, GUNSHIP, HEAVY, STRIKER, MULE]
 
 ## id -> numbers. "rates" scales pitch/roll/yaw rates, "inertia" the angular
 ## acceleration, "speed" level top speed and the afterburner, "climb" climb rate and
@@ -16,8 +17,9 @@ const ORDER := [SCOUT, GUNSHIP, HEAVY, STRIKER]
 ## rounds (gun), rockets/missiles/flares are the loadout, "guns" the machine-gun damage
 ## per round, "fire" the time between rounds, "recoil" its kick, "spool" the engine
 ## start in seconds, "pitch" how high its rotor, engine and gun sound, "coaxial" two
-## counter-rotating rotors and no tail rotor (a tail hit cannot spin it), "rotor" the
-## blade radius, hub height and hub offset back (metres, for rotor strikes).
+## counter-rotating rotors (one mast, or tandem) and no tail rotor (a tail hit cannot
+## spin it), "rotor" the blade radius, hub height and hub offset back (metres, for rotor
+## strikes), "rotor2" the same for a second, tandem rotor.
 ## The classes are meant to feel apart (owner: "the difference should be feelable"):
 ## the scout darts and buzzes, the heavy wallows, booms and takes its time to start.
 const TABLE := {
@@ -48,6 +50,14 @@ const TABLE := {
 		"rounds": 300, "rockets": 10, "missiles": 2, "flares": 3, "guns": 1.5, "fire": 1.2, "recoil": 1.4,
 		"spool": 3.0, "pitch": 0.92, "coaxial": true,
 		"blurb": "Coaxial rotors, no tail rotor to lose: yaws hard, shrugs off tail hits. Twin 30 mm.",
+	},
+	MULE: {
+		"name": "Mule", "model": "mule", "hull": 230.0, "parts": 2.2,
+		"rates": 0.5, "inertia": 0.5, "thrust_lag": 0.6, "speed": 0.86, "climb": 0.85, "size": 1.4, "camera": 1.75,
+		"rotor": [4.3, 1.95, -3.2], "rotor2": [4.3, 2.8, 3.6],
+		"rounds": 700, "rockets": 0, "missiles": 4, "flares": 6, "guns": 0.9, "fire": 0.7, "recoil": 0.6,
+		"spool": 5.5, "pitch": 0.72, "coaxial": true,
+		"blurb": "Tandem rotors, a flying fortress: door miniguns, four missiles, six flares. Slow to turn, hard to kill.",
 	},
 }
 

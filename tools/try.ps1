@@ -28,6 +28,7 @@ $scenes = [ordered]@{
 	"harbor"   = @("--mode=free", "--map=harbor")
 	"harborbattle" = @("--mode=battle", "--map=harbor")
 	"striker"  = @("--mode=free", "--map=harbor", "--airframe=striker")
+	"mule"     = @("--mode=free", "--map=harbor", "--airframe=mule")
 	"flares"   = @("--mode=free", "--map=basin", "--spawn=0,60,120,0", "--autopilot=weapon:flares", "--cam=showcase")
 	"host"     = @("--host", "--map=basin")
 	"join"     = @("--connect=127.0.0.1")

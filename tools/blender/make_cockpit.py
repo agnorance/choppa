@@ -12,8 +12,11 @@ should be individual and way more detailed and realistic"):
   consoles, the gunner's glass nose ahead and below.
 - striker: Ka-52 style, side by side, the pilot on the left. A glass cockpit with four
   displays, a head-up display combiner, a centre console with a keypad, two seats.
+- mule: Chinook style, side by side, the pilot on the right. A wide panel of five
+  displays under a long glare shield, a big overhead console, a flat windscreen of two
+  panes, side windows, a centre console with the levers, the door to the cabin behind.
 
-Run:     python tools/blender/make_cockpit.py [scout] [gunship] [heavy] [striker]
+Run:     python tools/blender/make_cockpit.py [scout] [gunship] [heavy] [striker] [mule]
 Preview: python tools/blender/make_cockpit.py --preview DIR [class...]
 
 Origin = the pilot's eye (the "eye" empty of the class's exterior model). Objects:
@@ -38,7 +41,7 @@ from cockpit_parts import Panel, box, cyl, tube, ball  # noqa: E402
 
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "models", "choppa")
 EYES = {"scout": shared.EYE, "gunship": Vector((0.0, 0.78, 0.82)), "heavy": Vector((0.0, 1.75, 0.68)),
-        "striker": Vector((-0.36, 2.0, 0.62))}  # The exteriors' "eye" empties (make_airframes.py).
+        "striker": Vector((-0.36, 2.0, 0.62)), "mule": Vector((0.42, 3.55, 0.45))}  # The exteriors' "eye" empties.
 
 
 def fresh():
@@ -401,7 +404,83 @@ def finish(shell, frame):
     cp.join(frame, "frame")
 
 
-BUILDS = {"scout": build_scout, "gunship": build_gunship, "heavy": build_heavy, "striker": build_striker}
+# --- mule: tandem-rotor transport, side by side ------------------------------------------
+
+def build_mule():
+    mid = -0.42  # The cockpit's centre line, left of the pilot.
+    co = 2 * mid  # The copilot.
+    shell, frame = [], []
+    panel = Panel((mid, 0.62, -0.32), tilt=-22.0)
+    shell += cp.subpanel(panel, 0, 0, 1.5, 0.34, -0.012)
+    shell += cp.hood(panel, 0, 0.2, 1.52, 0.14, 0.0)
+    pilot = -mid
+    shell += cp.mfd(panel, "flight", pilot - 0.12, 0.02, 0.15)
+    shell += cp.mfd(panel, "radar", pilot + 0.12, 0.02, 0.15)
+    shell += cp.mfd(panel, "systems", 0.0, 0.02, 0.15)
+    shell += cp.mfd(panel, "flight_2", -pilot - 0.12, 0.02, 0.15)
+    shell += cp.mfd(panel, "radar_2", -pilot + 0.12, 0.02, 0.15)
+    for k, name in enumerate(["speed", "altitude", "rpm", "heat"]):
+        shell += cp.gauge(panel, name, -0.09 + k * 0.06, -0.135, 0.024)
+    shell += cp.annunciators(panel, pilot, -0.14, 6, 1, 0.024, 0.012)
+    shell += cp.annunciators(panel, -pilot, -0.14, 6, 1, 0.024, 0.012)
+    shell += lamps_row(panel, pilot - 0.075, 0.215, 0.05, 0.085)
+    panel.mount("beacon", pilot + 0.2, 0.215, 0.095)
+    shell += nixies(Panel(panel.at(0.0, 0.235, 0.05), tilt=-55.0), 0.0, 0.0)
+    shell += ordnance(Panel(panel.at(-0.3, 0.235, 0.05), tilt=-55.0), 0.0, 0.0)
+    cp.empty("mount_sight", (0, 0.9, 0.0))
+    cp.empty("mount_hud", (0, 0.9, 0.0))
+    # The overhead console: switch fields and breakers across the roof.
+    over = Panel((mid, 0.05, 0.47), tilt=74.0)
+    shell += cp.subpanel(over, 0, 0, 0.9, 0.36, -0.012)
+    shell += cp.switch_field(over, -0.25, 0.08, 6, 2, 0.04, 0.07, guards={(0, 0), (0, 5)})
+    shell += cp.switch_field(over, 0.25, 0.08, 6, 2, 0.04, 0.07, guards={(1, 2)})
+    shell += cp.breakers(over, 0, -0.1, 30, 2)
+    for x in (-0.38, 0.38):
+        shell += cp.dummy_gauge(over, x, 0.1, 0.028)
+    shell.append(box((mid, 0.0, 0.56), (1.6, 1.4, 0.04), "paint"))  # Ceiling.
+    # Centre console with the thrust levers and a keypad.
+    console = Panel((mid, 0.25, -0.56), tilt=-70.0)
+    shell.append(box((mid, 0.2, -0.75), (0.28, 0.65, 0.4), "paint", bevel_width=0.015))
+    shell += cp.keypad(console, 0, 0.1)
+    shell += cp.switch_field(console, 0, -0.12, 5, 2, 0.04, 0.06)
+    for side in (-1, 1):
+        shell.append(cyl(console.at(side * 0.07, -0.25, 0.0), console.at(side * 0.07, -0.21, 0.1), 0.009, "metal", 8))
+        shell.append(box(console.at(side * 0.07, -0.21, 0.105), (0.05, 0.03, 0.025), "dark", bevel_width=0.006))
+    # Seats, pedals, walls with side consoles, floor, the bulkhead with a door behind.
+    for x in (0.0, co):
+        shell += cp.seat(x, -0.1, -0.74, 0.5, 0.72)
+        shell += cp.pedals(x, 0.72, -0.96, 0.14)
+    for x, side in ((co - 0.73, -1), (0.73, 1)):
+        shell += wall(x, -0.7, 0.85, -1.05, -0.33, 6)
+        shell.append(box((x - side * 0.09, -0.05, -0.62), (0.14, 0.75, 0.22), "paint", bevel_width=0.012))
+        top = Panel((x - side * 0.09, -0.05, -0.507), tilt=-90.0, roll=-side * 12.0)
+        shell += cp.switch_field(top, 0, 0.2, 2, 2, 0.045, 0.06)
+        shell += cp.breakers(top, 0, -0.08, 3, 5)
+    shell += floor_box(-0.7, 0.85, co - 0.73, 0.73, -1.05)
+    for x0, x1 in ((co - 0.73, mid - 0.32), (mid + 0.32, 0.73)):
+        shell += bulkhead(-0.72, x0, x1, -1.05, 0.55)
+    shell.append(box((mid, -0.72, 0.42), (0.64, 0.03, 0.26), "paint"))  # Over the door.
+    shell += cp.extinguisher(0.62, -0.6, -1.03, (0, 0, 1))
+    shell += cp.wiring([(mid, 0.6, -0.48), (mid + 0.05, 0.45, -0.85), (mid, 0.0, -1.0)], 5)
+    shell += cp.compass((mid, 0.66, 0.36))
+    # The windscreen: two flat panes, three posts, rails top and bottom; side windows.
+    top_y, top_z, low_y, low_z = 0.72, 0.38, 1.06, -0.34
+    for x in (co - 0.45, mid, 0.45):
+        frame.append(tube([(x, low_y, low_z), (x, top_y, top_z)], 0.03 if x == mid else 0.026))
+    for y, z in ((top_y, top_z), (low_y, low_z)):
+        frame.append(tube([(co - 0.46, y, z), (0.46, y, z)], 0.026))
+    for x in (co - 0.71, 0.71):
+        for y0, z0, y1, z1 in ((-0.3, -0.33, 0.7, -0.33), (-0.3, 0.2, 0.7, 0.2), (-0.3, -0.33, -0.3, 0.2),
+                               (0.7, -0.33, 0.7, 0.2)):
+            frame.append(tube([(x, y0, z0), (x, y1, z1)], 0.024))
+    finish(shell, frame)
+    cp.stick((0, 0.2, -1.03))
+    cp.stick((co, 0.2, -1.03), "stick_copilot")
+    cp.collective((0.55, -0.3, -0.66), 0.4)
+
+
+BUILDS = {"scout": build_scout, "gunship": build_gunship, "heavy": build_heavy, "striker": build_striker,
+          "mule": build_mule}
 
 
 def export(name):

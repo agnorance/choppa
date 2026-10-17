@@ -3,7 +3,7 @@
 ![choppa](assets/brand/banner.png)
 
 GET TO THE CHOPPA! An arcade helicopter arena shooter: battle your friends through
-tunnels, trenches and ruins in four classes of helicopter, with rockets, missiles and
+tunnels, trenches and ruins in five classes of helicopter, with rockets, missiles and
 flares, and fight over the service stations that patch you up.
 
 Made with [Godot 4.7](https://godotengine.org). PC only (Windows). Design and

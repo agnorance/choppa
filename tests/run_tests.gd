@@ -98,6 +98,7 @@ func _run() -> void:
 		"test_every_class_has_its_own_cockpit",
 		"test_takeoff_plan_lifts_off_cold",
 		"test_brand_assets",
+		"test_mule_has_two_rotors",
 		"test_spawns_are_on_dry_clear_ground",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
@@ -1881,3 +1882,15 @@ func test_brand_assets() -> void:
 	var logo := UiKit.logo(300.0)
 	_check(logo.texture != null and logo.custom_minimum_size.y > 50.0, "the wordmark fits the menu, %s" % logo.custom_minimum_size)
 	logo.free()
+
+
+## The Mule's tandem rotors: a wall behind it reaches the aft rotor, not the front one,
+## and with no tail rotor a wrecked tail cannot spin it.
+func test_mule_has_two_rotors() -> void:
+	var c := _choppa(Vector3(0.0, 30.0, 0.0))
+	c.set_airframe(Airframe.MULE)
+	_check(c.rotor_hubs.size() == 2 and c.coaxial, "two hubs and no tail rotor: %s" % [c.rotor_hubs])
+	MapKit.block(_world, Vector3(0.0, 30.0, 7.5), Vector3(30.0, 60.0, 2.0), Color.GRAY)  # Behind it, in reach of the aft disc only.
+	await _fly(c, 2)
+	_check(c.parts[Choppa.Part.ROTOR] < c.part_max(Choppa.Part.ROTOR), "the aft rotor struck the wall")
+	_check(c.velocity.z < -1.0, "and shoved it forward, away from the wall, v=%s" % c.velocity)

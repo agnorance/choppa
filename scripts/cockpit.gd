@@ -11,7 +11,7 @@ extends Node3D
 ## Panel paint per class: the teal-green of old control rooms, Apache grey, Soviet
 ## turquoise, a modern blue-grey.
 const PAINTS := {"scout": Color(0.27, 0.38, 0.34), "gunship": Color(0.2, 0.22, 0.22),
-	"heavy": Color(0.24, 0.46, 0.47), "striker": Color(0.22, 0.25, 0.29)}
+	"heavy": Color(0.24, 0.46, 0.47), "striker": Color(0.22, 0.25, 0.29), "mule": Color(0.3, 0.32, 0.27)}
 const SIGHT_DISTANCE := 0.6  ## The reticle is sized for a sight glass this far from the eye.
 const CREAM := Color(0.92, 0.86, 0.7)
 const AMBER := Color(1.0, 0.62, 0.2)

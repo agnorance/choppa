@@ -147,6 +147,7 @@ var _strike_cooldown := 0.0
 var _rollover := 0.0  ## Seconds spent on its side on the ground.
 var rotor_radius := 5.0  ## Blade tip radius, metres (Airframe "rotor").
 var rotor_hub := Vector3(0.0, 1.95, 0.3)  ## Rotor hub in body space.
+var rotor_hubs: Array[Vector3] = [Vector3(0.0, 1.95, 0.3)]  ## Every rotor's hub (two on a tandem).
 var _rotor_shape: CylinderShape3D
 var boost_meter := 1.0  ## Afterburner charge, 0..1.
 var stun := 0.0
@@ -641,6 +642,9 @@ func set_airframe(id: String) -> void:
 	clearance = GROUND_CLEARANCE * spec.size
 	rotor_radius = spec.rotor[0]
 	rotor_hub = Vector3(0.0, spec.rotor[1], spec.rotor[2])
+	rotor_hubs = [rotor_hub]
+	if spec.has("rotor2"):
+		rotor_hubs.append(Vector3(0.0, spec.rotor2[1], spec.rotor2[2]))
 	if _shape:
 		var capsule := _shape.shape as CapsuleShape3D
 		capsule.radius = 1.1 * spec.size
@@ -930,7 +934,7 @@ func _check_wreck_hazards(delta: float) -> void:
 		_rollover = 0.0
 
 
-## Where the rotor disc touches the world (not other choppas), or {} if it is clear.
+## Where a rotor disc touches the world (not other choppas), or {} if they are clear.
 func _rotor_contact() -> Dictionary:
 	if _rotor_shape == null:
 		_rotor_shape = CylinderShape3D.new()
@@ -938,12 +942,16 @@ func _rotor_contact() -> Dictionary:
 	_rotor_shape.radius = rotor_radius * ROTOR_STRIKE_REACH
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = _rotor_shape
-	query.transform = Transform3D(global_transform.basis, global_transform * rotor_hub)
 	var skip: Array[RID] = []
 	for node in get_tree().get_nodes_in_group("choppas"):
 		skip.append((node as CollisionObject3D).get_rid())
 	query.exclude = skip
-	return get_world_3d().direct_space_state.get_rest_info(query)
+	for hub in rotor_hubs:
+		query.transform = Transform3D(global_transform.basis, global_transform * hub)
+		var hit := get_world_3d().direct_space_state.get_rest_info(query)
+		if not hit.is_empty():
+			return hit
+	return {}
 
 
 func _rotor_strike(hit: Dictionary) -> void:

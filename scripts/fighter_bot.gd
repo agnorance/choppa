@@ -284,7 +284,24 @@ func _avoidance() -> Vector3:
 			push += (hit.normal + Vector3.UP * 0.3) * closeness * 2.0
 	# The rotor disc reaches well past the body: feel around it at hub height, sideways
 	# and diagonally ahead, so the blades never touch a wall or a roof.
-	var hub := pos + choppa.global_transform.basis * choppa.rotor_hub
+	for rotor_hub in choppa.rotor_hubs:
+		push += _rotor_clearance(pos + choppa.global_transform.basis * rotor_hub, ahead, reach, space)
+	# Power lines have no collision for the rays to find: keep well clear of the cables,
+	# passing under them rather than over.
+	var look_ahead := pos + choppa.velocity * 0.8
+	for node in choppa.get_tree().get_nodes_in_group("power_lines"):
+		var cable := (node as Hazards.PowerLine).nearest(look_ahead)
+		var away := look_ahead - cable
+		if away.length() < 12.0:
+			var down := Vector3.DOWN if look_ahead.y < cable.y + 3.0 else Vector3.UP
+			push += (away.normalized() * 0.5 + down) * (1.0 - away.length() / 12.0) * 2.5
+	return push
+
+
+## A push away from walls and roofs round one rotor disc, felt at its hub height
+## sideways and diagonally, so the blades never touch.
+func _rotor_clearance(hub: Vector3, ahead: Vector3, reach: float, space: PhysicsDirectSpaceState3D) -> Vector3:
+	var push := Vector3.ZERO
 	var side := choppa.facing() * Vector3.RIGHT
 	var front := choppa.facing() * Vector3.FORWARD
 	var disc := choppa.rotor_radius + 3.0
@@ -298,15 +315,6 @@ func _avoidance() -> Vector3:
 		if hit and not hit.collider is Choppa:
 			var closeness := clampf(1.0 - hub.distance_to(hit.position) / disc, 0.0, 1.0)
 			push += (hit.normal - dir * 0.5) * closeness * 5.0
-	# Power lines have no collision for the rays to find: keep well clear of the cables,
-	# passing under them rather than over.
-	var look_ahead := pos + choppa.velocity * 0.8
-	for node in choppa.get_tree().get_nodes_in_group("power_lines"):
-		var cable := (node as Hazards.PowerLine).nearest(look_ahead)
-		var away := look_ahead - cable
-		if away.length() < 12.0:
-			var down := Vector3.DOWN if look_ahead.y < cable.y + 3.0 else Vector3.UP
-			push += (away.normalized() * 0.5 + down) * (1.0 - away.length() / 12.0) * 2.5
 	return push
 
 

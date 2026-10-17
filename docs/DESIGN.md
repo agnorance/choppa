@@ -39,7 +39,8 @@ twist, heavy atmosphere, strong lighting and post-processing.
   Heavy: a Hind pilot's bubble, a wide panel of three rows of round instruments in
   Soviet turquoise, an overhead panel, the gunner's glazed nose below. Striker: a
   Ka-52 style side-by-side glass cockpit, the pilot on the left, four displays, a HUD
-  combiner, a centre console with a keypad. The panels sit in the bottom of the view
+  combiner, a centre console with a keypad. Mule: Chinook style, the pilot on the
+  right, five displays, an overhead console, a flat two-pane windscreen. The panels sit in the bottom of the view
   at the default FOV; free look (Alt) shows the rest. The 2D HUD steps back.
 - Choppa effects: star muzzle flashes with light from the gun that fired, brass casings,
   heat shimmer behind the exhausts, a downwash ring on the ground (spray over water),
@@ -337,6 +338,14 @@ Overheating takes about 6 s for all of them (heat per round scales with the inte
 Two counter-rotating rotors and no tail rotor, so a wrecked tail only dulls the yaw and
 never spins it. Quick (1.05x turn, 1.04x speed), hull 125, twin 30 mm (1.5 damage,
 0.096 s), 10 rockets, 2 missiles, 3 flares, engine start 3 s, a lower voice.
+
+**Mule** (fifth class, 2026-10-17): a tandem-rotor transport gunship, Chinook in
+spirit. Two big rotors fore and aft turning against each other, no tail rotor; both
+discs count for rotor strikes (Airframe "rotor2"). The slowest to turn (0.5x) but not
+the slowest in a straight line (0.86x), the toughest (hull 230, parts 2.2x), door
+miniguns (700 rounds, quick and light), no rockets but 4 missiles and 6 flares, a 5.5 s
+engine start and the deepest voice. Its cockpit: a Chinook style side-by-side glass
+cockpit, the pilot on the right, five displays, a big overhead console.
 
 ## Maps
 

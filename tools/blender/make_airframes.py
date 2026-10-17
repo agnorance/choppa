@@ -1,5 +1,5 @@
 """Builds the other helicopter classes next to the Little Bird (make_choppa.py):
-assets/models/choppa/gunship.glb, heavy.glb and striker.glb.
+assets/models/choppa/gunship.glb, heavy.glb, striker.glb and mule.glb.
 
 Run:     python tools/blender/make_airframes.py [gunship] [heavy] [striker]
 Preview: python tools/blender/make_airframes.py --preview DIR [gunship|heavy|striker]
@@ -415,7 +415,118 @@ def build_striker():
     empty("exhaust_r", exhausts[1])
 
 
-BUILDS = {"gunship": build_gunship, "heavy": build_heavy, "striker": build_striker}
+def build_mule():
+    """A tandem-rotor transport gunship (a Chinook in spirit): a long box of a fuselage,
+    a low rotor pylon over the cockpit and a tall one at the back, both three-bladed and
+    turning against each other (the game spins "rotor" one way and "rotor_upper" the
+    other), no tail rotor ("tail_rotor" only marks the tail end), engine pods on the aft
+    pylon, fuel sponsons along the belly carrying missile rails, door guns forward, a
+    loading ramp, four wheels. The pilot sits on the right."""
+    fresh()
+    s = 1.4
+    ground = -1.15 * s
+    base.GROUND_Z = ground
+    body = loft("fuselage", [
+        (4.75, 0.35, -0.35, 0.05, -0.75, 2.2, 2.4),
+        (4.45, 0.95, -0.3, 0.55, -1.05, 2.6, 3.0),
+        (3.9, 1.18, -0.2, 0.85, -1.15, 3.2, 3.6),
+        (3.0, 1.25, -0.15, 1.05, -1.2, 3.6, 4.0),
+        (0.0, 1.28, -0.12, 1.1, -1.2, 4.0, 4.0),
+        (-3.2, 1.26, -0.08, 1.12, -1.15, 4.0, 4.0),
+        (-4.3, 1.15, 0.05, 1.12, -0.85, 3.6, 3.2),
+        (-4.9, 0.95, 0.25, 1.1, -0.45, 3.2, 2.6),
+    ], "paint", count=44)
+    base.HULL.append(body)
+    parts = [body]
+    # The cockpit: a flat windscreen, side windows, chin windows, a centre post.
+    tilt = Matrix.Rotation(math.radians(-42), 4, "X")
+    for side in (-1, 1):
+        parts.append(box((side * 0.46, 4.5, 0.42), (0.82, 0.05, 0.62), "glass", rotation=tilt @ Matrix.Rotation(side * 0.2, 4, "Y")))
+        parts.append(box((side * 0.46, 4.49, 0.42), (0.9, 0.035, 0.7), "dark", rotation=tilt @ Matrix.Rotation(side * 0.2, 4, "Y")))
+        parts.append(box((side * 1.27, 3.75, 0.38), (0.05, 1.0, 0.52), "glass"))
+        parts.append(box((side * 1.255, 3.75, 0.38), (0.04, 1.08, 0.6), "dark"))
+        parts.append(box((side * 0.55, 4.66, -0.5), (0.48, 0.3, 0.05), "glass",
+                         rotation=Matrix.Rotation(math.radians(55), 4, "X")))
+    parts.append(box((0, 4.52, 0.42), (0.08, 0.07, 0.7), "paint", rotation=tilt))
+    # Round windows down both sides, the crew doors forward, rivet lines.
+    for side in (-1, 1):
+        for k in range(7):
+            y = 2.3 - k * 0.95
+            parts.append(cyl((side * 1.26, y, 0.25), (side * 1.3, y, 0.25), 0.2, "glass", 20))
+            parts.append(ring((side * 1.29, y, 0.25), (1, 0, 0), 0.21, 0.025, "dark", 20))
+        parts.append(box((side * 1.29, 2.95, -0.25), (0.03, 0.8, 1.25), "dark", bevel_width=0.01))
+        parts += rivets((side * 1.3, 3.9, -0.62), (side * 1.3, -4.0, -0.62), 22)
+        parts += rivets((side * 1.3, 3.9, 0.82), (side * 1.3, -4.0, 0.82), 22)
+    # Forward pylon: a low hump over the cockpit with the front mast.
+    parts.append(loft("front_pylon", [
+        (4.2, 0.2, 0.95, 1.1, 0.95, 2.0, 2.0), (3.6, 0.55, 1.0, 1.55, 1.0, 2.4, 2.0),
+        (2.6, 0.55, 1.0, 1.6, 1.0, 2.4, 2.0), (1.8, 0.3, 1.0, 1.2, 1.0, 2.0, 2.0)], "paint", count=24))
+    parts.append(cyl((0, 3.2, 1.55), (0, 3.2, 1.95), 0.12, "metal", 16))
+    # Aft pylon: tall, with the engines hung on its sides and the rear mast.
+    parts.append(loft("aft_pylon", [
+        (-1.6, 0.25, 1.05, 1.15, 1.05, 2.0, 2.0), (-2.6, 0.55, 1.05, 2.1, 1.05, 2.4, 2.0),
+        (-4.0, 0.55, 1.05, 2.45, 1.05, 2.4, 2.0), (-4.85, 0.35, 1.0, 2.2, 1.0, 2.2, 2.0)], "paint", count=24))
+    parts.append(cyl((0, -3.6, 2.4), (0, -3.6, 2.8), 0.12, "metal", 16))
+    exhausts = []
+    for side in (-1, 1):
+        p, ex = engine_pod(side, 1.05, -2.3, -4.4, 1.35, 0.32)
+        parts += p
+        exhausts.append(ex)
+        parts.append(box((side * 0.8, -3.3, 1.35), (0.5, 0.9, 0.18), "paint", bevel_width=0.03))  # Engine mounts.
+    # Fuel sponsons along the belly; missile rails on their fronts.
+    pods = []
+    for side in (-1, 1):
+        parts.append(loft("sponson", [
+            (2.4, 0.05, -0.75, -0.7, -0.8, 2.0, 2.0), (2.0, 0.32, -0.8, -0.45, -1.1, 2.6, 2.6),
+            (-2.6, 0.32, -0.8, -0.45, -1.1, 2.6, 2.6), (-3.1, 0.05, -0.75, -0.7, -0.8, 2.0, 2.0)], "paint", count=20))
+        parts[-1].location = (side * 1.42, 0, 0)
+        base.activate(parts[-1])
+        bpy.ops.object.transform_apply(location=True)
+        parts += missile_rail((side * 1.78, 0.6, -0.55), 1.4)
+        pods.append(Vector((side * 1.78, 1.4, -0.55)))
+        parts.append(ball((side * 1.75, -0.4, -0.45), 0.05, "light_green" if side > 0 else "light_red", segments=10,
+                          rings=5))
+    # Door guns in the crew doors, pointing forward.
+    tips = []
+    for side in (-1, 1):
+        mount = Vector((side * 1.42, 2.95, -0.15))
+        parts.append(cyl(mount - Vector((side * 0.15, 0, 0)), mount, 0.05, "dark", 10))
+        parts.append(box(mount + Vector((0, 0.15, 0)), (0.16, 0.5, 0.16), "dark", bevel_width=0.02))
+        for k in range(3):
+            a = 2 * math.pi * k / 3
+            off = Vector((math.cos(a) * 0.035, 0, math.sin(a) * 0.035))
+            parts.append(cyl(mount + off + Vector((0, 0.4, 0)), mount + off + Vector((0, 1.2, 0)), 0.018, "metal", 8))
+        tip = mount + Vector((0, 1.22, 0))
+        parts.append(ring(tip, (0, 1, 0), 0.05, 0.012, "dark", 12))
+        tips.append(tip)
+    # The rear ramp, hinged at the belly, and its hinge line.
+    parts.append(box((0, -4.6, -0.75), (2.1, 0.08, 0.95), "paint", rotation=Matrix.Rotation(math.radians(-30), 4, "X"),
+                     bevel_width=0.02))
+    parts.append(cyl((-1.0, -4.15, -1.12), (1.0, -4.15, -1.12), 0.05, "metal", 12))
+    parts.append(ball((0, -4.95, 1.0), 0.05, "light_red", segments=10, rings=5))
+    # Four wheels on short legs.
+    for y, x in ((2.6, 1.0), (-2.9, 1.05)):
+        for side in (-1, 1):
+            hub = Vector((side * x, y, ground + 0.32))
+            parts.append(tube([(side * (x - 0.2), y, -1.0), hub], 0.07, "metal", 12))
+            parts += wheel(hub, 0.32, 0.22)
+    body = join(parts, "body")
+    base.activate(body)
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(35))
+    rear = rotor(3, Vector((0, -3.6, 2.4)), 2.8, 1.05)
+    rear.name = "rotor_upper"
+    rotor(3, Vector((0, 3.2, 1.55)), 1.95, 1.05)
+    empty("tail_rotor", (0, -4.9, 1.0))
+    empty("eye", (0.42, 3.55, 0.45))  # The pilot sits on the right (make_cockpit.py).
+    empty("muzzle_l", tips[0])
+    empty("muzzle_r", tips[1])
+    empty("pod_l", pods[0])
+    empty("pod_r", pods[1])
+    empty("exhaust_l", exhausts[0])
+    empty("exhaust_r", exhausts[1])
+
+
+BUILDS = {"gunship": build_gunship, "heavy": build_heavy, "striker": build_striker, "mule": build_mule}
 
 
 def export(name):

@@ -27,7 +27,7 @@ def find(root, words, exclude):
     hits = []
     for folder, _, files in os.walk(root):
         for name in files:
-            if not name.lower().endswith(".wav"):
+            if not name.lower().endswith(library.EXTENSIONS):
                 continue
             rel = os.path.relpath(os.path.join(folder, name), root)
             text = rel.lower().replace("_", " ").replace("-", " ")
@@ -43,23 +43,38 @@ def main():
     parser.add_argument("sound", help="the game sound these are for (output folder name)")
     parser.add_argument("words", nargs="+", help="words that must all appear in the path")
     parser.add_argument("--exclude", nargs="*", default=[], help="skip paths with these words")
-    parser.add_argument("--library", default=os.environ.get("CHOPPA_SFX", ""))
+    parser.add_argument("--library", default=os.environ.get("CHOPPA_SFX", "") or library.default_library(ROOT))
     parser.add_argument("--count", type=int, default=8)
     parser.add_argument("--length", type=float, default=None, help="seconds to keep (default: all)")
     parser.add_argument("--loop", action="store_true", help="render as a seamless loop")
     parser.add_argument("--loudness", type=float, default=-16.0)
+    parser.add_argument("--split", action="store_true",
+                        help="every shot or hit in the matching files becomes its own candidate")
+    parser.add_argument("--starts", default="", help="comma-separated start times to try in the first match")
+    parser.add_argument("--out", default=os.path.join(ROOT, "build", "audition"), help="where to write")
     args = parser.parse_args()
     if not args.library or not os.path.isdir(args.library):
         sys.exit("Set --library or CHOPPA_SFX to the sound library folder.")
     paths = find(args.library, args.words, args.exclude)
     print("%d matches" % len(paths))
-    out = os.path.join(ROOT, "build", "audition", args.sound)
+    out = os.path.join(args.out, args.sound)
     os.makedirs(out, exist_ok=True)
     for old in os.listdir(out):
         os.remove(os.path.join(out, old))
+    # Candidates: (file, start). Whole files by default, or each hit, or given offsets.
+    candidates = []
+    if args.starts and paths:
+        candidates = [(paths[0], float(t)) for t in args.starts.split(",")]
+    elif args.split:
+        for rel in paths:
+            x, rate = library.read_audio(os.path.join(args.library, rel))
+            candidates += [(rel, round(t, 3)) for t in library.hits(x, rate)]
+    else:
+        candidates = [(rel, 0.0 if args.loop else "auto") for rel in paths]
+    letters = list(string.ascii_lowercase) + [a + b for a in string.ascii_lowercase for b in string.ascii_lowercase]
     lines = []
-    for letter, rel in zip(string.ascii_lowercase, paths[: args.count]):
-        spec = {"takes": [{"file": rel, "start": 0.0 if args.loop else "auto", "length": args.length}],
+    for letter, (rel, start) in zip(letters, candidates[: args.count]):
+        spec = {"takes": [{"file": rel, "start": start, "length": args.length}],
                 "loudness": args.loudness, "loop": args.loop, "crossfade": 0.4}
         try:
             take = library.render(spec, args.library)[0]
@@ -67,8 +82,8 @@ def main():
             print("  skip %s (%s)" % (rel, e))
             continue
         library.write_wav(os.path.join(out, letter + ".wav"), take)
-        lines.append("%s  %s" % (letter, rel))
-        print("  %s  %s" % (letter, rel))
+        lines.append("%s  start %s  %s" % (letter, start, rel))
+        print("  %s  start %s  %s" % (letter, start, rel))
     with open(os.path.join(out, "list.txt"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     print("Listen: %s" % out)

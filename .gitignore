@@ -5,6 +5,7 @@ dist/
 *.log
 .DS_Store
 tmp.txt
+sound/
 
 # Godot
 .godot/

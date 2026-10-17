@@ -39,7 +39,8 @@ RECIPES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recipes.json
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("names", nargs="*", help="only these sounds (default: every recipe)")
-    parser.add_argument("--library", default=os.environ.get("CHOPPA_SFX", ""), help="the sound library folder")
+    parser.add_argument("--library", default=os.environ.get("CHOPPA_SFX", "") or library.default_library(ROOT),
+                        help="the sound library folder (default: CHOPPA_SFX, else sound/ in the repo)")
     parser.add_argument("--recipes", default=RECIPES, help="recipe file (default tools/audio/recipes.json)")
     parser.add_argument("--out", default=OUT, help="output folder (default assets/sounds/library)")
     args = parser.parse_args()

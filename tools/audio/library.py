@@ -1,22 +1,49 @@
 """Shared audio helpers for turning recorded library files into game sounds.
 
-numpy only: read any common WAV (16/24/32-bit PCM, 32/64-bit float, extensible
-headers), resample, filter, match loudness, cut seamless loops, write 16-bit WAV.
+numpy: read any common WAV (16/24/32-bit PCM, 32/64-bit float, extensible headers),
+and MP3 / OGG / FLAC (e.g. from Pixabay) through ffmpeg; resample, filter, match
+loudness, cut seamless loops, write 16-bit WAV.
 Used by import_sounds.py (the recipes) and audition.py (candidates to listen to).
 """
 
 import os
+import shutil
 import struct
+import subprocess
 
 import numpy as np
 
 RATE = 44100
+EXTENSIONS = (".wav", ".mp3", ".ogg", ".flac")
+
+
+def default_library(root):
+    """sound/Z_keep in the repo (the files kept from the bundles), else sound/."""
+    keep = os.path.join(root, "sound", "Z_keep")
+    return keep if os.path.isdir(keep) else os.path.join(root, "sound")
+
+
+def read_audio(path):
+    """Any supported file: WAV directly, the rest decoded by ffmpeg (on the PATH)."""
+    if path.lower().endswith(".wav"):
+        return read_wav(path)
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        raise ValueError("ffmpeg is needed for %s (scoop install ffmpeg)" % path)
+    probe = subprocess.run([ffmpeg, "-v", "error", "-i", path, "-f", "wav", "-acodec", "pcm_f32le", "-"],
+                           capture_output=True, check=False)
+    if probe.returncode != 0 or not probe.stdout:
+        raise ValueError("ffmpeg could not decode %s: %s" % (path, probe.stderr.decode(errors="replace")[:200]))
+    return _parse_wav(probe.stdout, path)
 
 
 def read_wav(path):
     """Returns (samples as float32 array [frames, channels], sample rate)."""
     with open(path, "rb") as f:
-        data = f.read()
+        return _parse_wav(f.read(), path)
+
+
+def _parse_wav(data, path):
     if data[:4] != b"RIFF" or data[8:12] != b"WAVE":
         raise ValueError("not a WAV file: %s" % path)
     pos = 12
@@ -32,7 +59,7 @@ def read_wav(path):
                 tag = struct.unpack("<H", body[24:26])[0]  # The sub-format GUID starts with the tag.
             fmt = (tag, channels, rate, bits)
         elif cid == b"data":
-            pcm = body
+            pcm = data[pos + 8:] if size == 0xFFFFFFFF or pos + 8 + size > len(data) else body
         pos += 8 + size + (size & 1)
     if fmt is None or pcm is None:
         raise ValueError("no fmt or data chunk: %s" % path)
@@ -155,6 +182,30 @@ def onset(x, rate, before=0.01):
     return max(0.0, k * w / rate - before)
 
 
+def hits(x, rate, gap=0.15, floor=0.3, before=0.01):
+    """Start times (seconds) of every distinct shot or impact in a recording: peaks of
+    the envelope above `floor` of the loudest, at least `gap` apart."""
+    mono = np.abs(x if x.ndim == 1 else x.mean(axis=1))
+    w = max(1, int(rate * 0.004))
+    frames = len(mono) // w
+    if frames < 3:
+        return [0.0]
+    env = mono[: frames * w].reshape(frames, w).max(axis=1)
+    # A rise is a frame well above the recent level; that is where a hit starts.
+    recent = np.convolve(env, np.ones(12) / 12.0, mode="full")[: len(env)]
+    threshold = env.max() * floor
+    starts = []
+    spacing = int(gap * rate / w)
+    k = 1
+    while k < len(env):
+        if env[k] > threshold and env[k] > 2.5 * recent[k - 1]:
+            starts.append(max(0.0, k * w / rate - before))
+            k += spacing
+        else:
+            k += 1
+    return starts or [onset(x, rate, before)]
+
+
 def faded(x, rate, fade_in=0.0, fade_out=0.0):
     x = x.copy()
     n_in = min(len(x), int(rate * fade_in))
@@ -190,7 +241,7 @@ def render(spec, library, rate=RATE):
     channels = int(spec.get("channels", 1))
     takes = []
     for take in spec["takes"]:
-        x, src_rate = read_wav(os.path.join(library, take["file"]))
+        x, src_rate = read_audio(os.path.join(library, take["file"]))
         x = to_channels(x, channels) if channels > 1 else to_channels(x, 1)
         start = take.get("start", 0.0)
         if start == "auto":

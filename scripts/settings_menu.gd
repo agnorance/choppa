@@ -1,15 +1,17 @@
 class_name SettingsMenu
 extends Control
 ## The settings screen shared by the title and the pause menu: Video, Graphics,
-## Gameplay, Controls and Audio tabs of SettingRows, with the key bindings beside the
-## Controls tab on desktop. Every change is saved and applied at once; the graphics
+## Gameplay, Flight, Controls and Audio tabs of SettingRows, with the key bindings (click
+## one to change it) beside the Controls tab. Every change is saved and applied at once; the graphics
 ## quality and the grass apply when the next match starts, because the map is built
 ## with them.
 
 signal closed
 signal changed  ## A setting changed (and was saved and applied).
 
-const TABS := ["Video", "Graphics", "Gameplay", "Controls", "Audio"]
+const TABS := ["Video", "Graphics", "Gameplay", "Flight", "Controls", "Audio"]
+const CONTROLS_TAB := 4
+const RAMPS := [0.0, 0.1, 0.15, 0.25, 0.4, 0.6]
 
 var _panel: PanelContainer
 var _box: VBoxContainer
@@ -18,6 +20,8 @@ var _pages: Array[Control] = []
 var _page_holder: Control
 var _keys: Control
 var _current := 0
+var _key_buttons: Array = []  ## [action, slot, Button] for every key in the bindings panel.
+var _capture: Array = []  ## [action, slot, Button] while waiting for a key press.
 
 
 func _ready() -> void:
@@ -112,7 +116,7 @@ func _show_tab(index: int) -> void:
 		_tab_buttons[k].add_theme_stylebox_override("normal",
 			_tab_style(UiKit.ACCENT) if k == index else _tab_style(Color(0, 0, 0, 0)))
 	if _keys:
-		_keys.visible = index == 3
+		_keys.visible = index == CONTROLS_TAB
 	for child in _pages[index].get_children():
 		if child is SettingRow:
 			(child as SettingRow).grab_focus()
@@ -144,8 +148,9 @@ func _build_pages() -> void:
 	_build_video(_pages[0])
 	_build_graphics(_pages[1])
 	_build_gameplay(_pages[2])
-	_build_controls(_pages[3])
-	_build_audio(_pages[4])
+	_build_flight(_pages[3])
+	_build_controls(_pages[4])
+	_build_audio(_pages[5])
 	# Room for the tallest tab, so the panel keeps its height when switching. Counted
 	# by hand: a wrapped note reports a silly minimum height before it has a width.
 	var tallest := 0.0
@@ -198,15 +203,26 @@ func _build_gameplay(page: VBoxContainer) -> void:
 		fovs.append("%d°" % (60 + k * 5))
 	_row(page, "Field of view", fovs, clampi((Settings.choice("fov") - 60) / 5, 0, 8),
 		func(i: int) -> void: Settings.set_value("fov", 60 + i * 5))
+	_pick(page, "Camera distance", ["Near", "Normal", "Far"], "camera_distance")
 	_pick(page, "Camera shake", ["Off", "Half", "Full"], "camera_shake")
 	_row(page, "Default view", ["Chase", "Cockpit"], 1 if Settings.flag("cockpit_view") else 0,
 		func(i: int) -> void: Settings.set_value("cockpit_view", i == 1))
 	_pick(page, "HUD size", ["Small", "Normal", "Large"], "hud_scale")
 	_toggle(page, "Damage flash", "damage_flash")
 	_toggle(page, "Aim assist", "aim_assist")
-	_pick(page, "Flight model", ["Easy", "Realistic"], "flight_model")
-	_toggle(page, "Flight assist", "flight_assist")
 	_toggle(page, "Controls overlay", "show_controls")
+
+
+## The flight model and the assists, each on or off (like Wardogs).
+func _build_flight(page: VBoxContainer) -> void:
+	_pick(page, "Flight model", ["Easy", "Realistic"], "flight_model")
+	_toggle(page, "Auto-level", "assist_level")
+	_toggle(page, "Auto-hover", "assist_hover")
+	_toggle(page, "Altitude hold", "assist_altitude")
+	_toggle(page, "Coordinated turns", "assist_turn")
+	_toggle(page, "Landing assist", "assist_landing")
+	_toggle(page, "Engine auto-start", "assist_start")
+	_note(page, "Auto-level and auto-hover act when you let go of the stick, altitude hold when the collective is centred, coordinated turns when the pedals are. The easy model flies itself; only landing assist and auto-start change it.")
 
 
 func _build_controls(page: VBoxContainer) -> void:
@@ -217,7 +233,19 @@ func _build_controls(page: VBoxContainer) -> void:
 		levels.append(str(k + 1))
 	_row(page, "Mouse sensitivity", levels, Settings.choice("mouse_sensitivity") - 1,
 		func(i: int) -> void: Settings.set_value("mouse_sensitivity", i + 1))
+	_percent(page, "Mouse vertical", "mouse_vertical", 0.5, 1.5, 0.1)
 	_toggle(page, "Invert mouse", "invert_mouse")
+	_percent(page, "Roll rate (keys, pad)", "roll_rate", 0.3, 1.0, 0.1)
+	_percent(page, "Pitch rate (keys, pad)", "pitch_rate", 0.3, 1.0, 0.1)
+	_percent(page, "Yaw rate (keys, pad)", "yaw_rate", 0.3, 1.0, 0.1)
+	var ramp_names := PackedStringArray()
+	for r: float in RAMPS:
+		ramp_names.append("Off" if r == 0.0 else "%.2f s" % r)
+	var ramp := 2
+	for k in RAMPS.size():
+		if is_equal_approx(RAMPS[k], Settings.number("stick_ramp")):
+			ramp = k
+	_row(page, "Key stick ramp", ramp_names, ramp, func(i: int) -> void: Settings.set_value("stick_ramp", RAMPS[i]))
 	var zones := [0.1, 0.15, 0.2, 0.25, 0.3, 0.4]
 	var zone_names := PackedStringArray()
 	for z: float in zones:
@@ -227,7 +255,7 @@ func _build_controls(page: VBoxContainer) -> void:
 		if is_equal_approx(zones[k], Settings.number("deadzone")):
 			zone = k
 	_row(page, "Gamepad deadzone", zone_names, zone, func(i: int) -> void: Settings.set_value("deadzone", zones[i]))
-	_note(page, "Key bindings are listed on the right; a gamepad follows the same actions.")
+	_note(page, "Click a key on the right to change it (Esc cancels, Delete clears). The gamepad keeps its layout.")
 
 
 func _build_audio(page: VBoxContainer) -> void:
@@ -286,46 +314,102 @@ func _apply() -> void:
 
 func _reset() -> void:
 	Settings.reset()
+	Controls.apply_bindings()
 	_apply()
 	_build_pages()
+	_refresh_keys()
 	_show_tab(_current)
 
 
-## Key bindings, read-only, beside the Controls tab on desktop.
+## Key bindings beside the Controls tab: every rebindable action with two keys; click
+## one, then press the new key or mouse button.
 func _bindings() -> Control:
 	var panel := UiKit.panel(true, 28.0)
-	panel.custom_minimum_size = Vector2(320.0, 560.0)
+	panel.custom_minimum_size = Vector2(400.0, 560.0)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
 	panel.add_child(box)
 	box.add_child(UiKit.display("KEYS", 36))
-	box.add_child(_spacer(20))
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 18)
-	grid.add_theme_constant_override("v_separation", 8)
-	box.add_child(grid)
-	for row: Array in Controls.cheat_sheet(true, Settings.choice("mouse_mode") == 1, Settings.choice("flight_model") == 0):
-		var what := UiKit.label(row[0], 16, UiKit.MUTED)
-		what.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		what.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		grid.add_child(what)
-		var keys := HBoxContainer.new()
-		keys.add_theme_constant_override("separation", 4)
-		keys.alignment = BoxContainer.ALIGNMENT_END
-		for key: String in row[1]:
-			if key.begins_with("~"):
-				var text := UiKit.label(key.substr(1), 14, UiKit.MUTED)
-				text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-				keys.add_child(text)
-			else:
-				keys.add_child(UiKit.keycap(key))
-		grid.add_child(keys)
-	box.add_child(_spacer(16))
-	box.add_child(UiKit.rule())
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 3)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+	_key_buttons.clear()
+	for group: Array in Controls.REBINDABLE:
+		list.add_child(_spacer(8))
+		list.add_child(UiKit.caption(group[0]))
+		for entry: Array in group[1]:
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 6)
+			var what := UiKit.label(entry[1], 15, UiKit.MUTED)
+			what.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			what.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			row.add_child(what)
+			for slot in Controls.SLOTS:
+				var key := _key_button()
+				key.pressed.connect(_start_capture.bind(entry[0], slot, key))
+				_key_buttons.append([entry[0], slot, key])
+				row.add_child(key)
+			list.add_child(row)
+	_refresh_keys()
 	box.add_child(_spacer(8))
+	box.add_child(UiKit.rule())
 	box.add_child(UiKit.label("Gamepad: left stick pitch and roll, right stick yaw and\ncollective. RT gun, LT rockets, RB missile, B flares,\nX mine, LB afterburner, Y camera, Start pause.\nIn menus: LB / RB (or Q / E) switch tabs.", 14, UiKit.FAINT))
 	return panel
+
+
+## A key in the bindings panel: looks like a keycap, works like a button.
+func _key_button() -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(92.0, 30.0)
+	b.add_theme_font_size_override("font_size", 14)
+	b.add_theme_font_override("font", UiKit.font("text_medium"))
+	for state in ["normal", "disabled"]:
+		var s := UiKit.style(Color(1, 1, 1, 0.08), Color(1, 1, 1, 0.22), 3)
+		s.set_content_margin_all(3.0)
+		b.add_theme_stylebox_override(state, s)
+	for state in ["hover", "focus", "pressed"]:
+		var s := UiKit.style(UiKit.HOVER, UiKit.ACCENT, 3)
+		s.set_content_margin_all(3.0)
+		b.add_theme_stylebox_override(state, s)
+	return b
+
+
+func _refresh_keys() -> void:
+	for entry: Array in _key_buttons:
+		var keys := Controls.keys_for(entry[0])
+		var button: Button = entry[2]
+		button.text = keys[entry[1]] if entry[1] < keys.size() else "—"
+
+
+func _start_capture(action: String, slot: int, button: Button) -> void:
+	_capture = [action, slot, button]
+	button.text = "PRESS A KEY"
+
+
+## While waiting for a new key, the next key press or click is the binding.
+func _input(event: InputEvent) -> void:
+	if _capture.is_empty() or not event.is_pressed() or event.is_echo():
+		return
+	var binding: Variant = Controls.binding_from(event)
+	if event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_ESCAPE:
+		binding = null
+	elif event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_DELETE:
+		Controls.rebind(_capture[0], _capture[1], null)
+	elif binding != null:
+		Controls.rebind(_capture[0], _capture[1], binding)
+	elif not (event is InputEventKey or event is InputEventMouseButton):
+		return  # A gamepad button or a wheel: keep waiting.
+	get_viewport().set_input_as_handled()
+	var button: Button = _capture[2]
+	_capture = []
+	_refresh_keys()
+	button.grab_focus()
+	changed.emit()
 
 
 func _spacer(height: float) -> Control:

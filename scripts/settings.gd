@@ -7,6 +7,9 @@ extends RefCounted
 ## HUD read their settings directly every frame.
 
 const PATH := "user://settings.cfg"
+## Where settings are read and saved. The tests point it elsewhere: they change and save
+## settings (the radio, the key bindings) and used to wipe the player's own.
+static var path := PATH
 const AUTO := -1  ## For choices: let the quality preset or the platform decide.
 
 const DEFAULTS := {
@@ -41,8 +44,16 @@ const DEFAULTS := {
 	"hud_scale": 1,  ## 0 small, 1 normal, 2 large
 	"damage_flash": true,  ## Red screen edges when hit.
 	"aim_assist": false,
-	"flight_assist": false,  ## Level out and hold height when the stick is centred.
 	"flight_model": 1,  ## 0 easy (drone, hovers by itself), 1 realistic (forces). Also on the title screen.
+	# Flight assists for the realistic model (the easy one flies itself): Choppa.ASSIST_*.
+	# Owner's beginner set: level, landing and start on.
+	"assist_level": true,  ## Levels out when you let go of the stick.
+	"assist_hover": false,  ## Brakes to a hover when you let go of the stick.
+	"assist_altitude": false,  ## Holds the height while the collective is centred.
+	"assist_turn": false,  ## The nose follows a bank: coordinated turns.
+	"assist_landing": true,  ## Cushions the touchdown.
+	"assist_start": true,  ## Asking for power on the ground starts the engine.
+	"camera_distance": 1,  ## Chase camera: 0 near, 1 normal, 2 far.
 	"show_controls": true,  ## Key overlay on the HUD (desktop only).
 	# Controls
 	"mouse_steer": true,  ## The mouse flies the choppa.
@@ -50,6 +61,13 @@ const DEFAULTS := {
 	"mouse_sensitivity": 5,  ## 1..10
 	"invert_mouse": false,  ## Mouse forward pulls the nose up instead of pushing it down.
 	"deadzone": 0.2,  ## Gamepad sticks, 0.1..0.4.
+	"mouse_vertical": 1.0,  ## Mouse pitch against the horizontal sensitivity, 0.5..1.5.
+	# Keys and gamepad: a share of the airframe's full rate (owner: A/D rolled far too fast).
+	"roll_rate": 0.6,
+	"pitch_rate": 0.8,
+	"yaw_rate": 1.0,
+	"stick_ramp": 0.15,  ## Seconds a key takes to push the stick all the way, 0..0.6.
+	"bindings": {},  ## Action -> keyboard and mouse keys, replacing Controls.DEFAULTS.
 	# Audio
 	"volume": 8,  ## Master, 0..10.
 	"effects_volume": 10,  ## Sound effects, 0..10.
@@ -57,6 +75,12 @@ const DEFAULTS := {
 }
 
 const HUD_SCALES := [0.85, 1.0, 1.2]
+const CAMERA_DISTANCES := [0.8, 1.0, 1.3]
+const ASSIST_KEYS := {
+	"assist_level": Choppa.ASSIST_LEVEL, "assist_hover": Choppa.ASSIST_HOVER,
+	"assist_altitude": Choppa.ASSIST_ALTITUDE, "assist_turn": Choppa.ASSIST_TURN,
+	"assist_landing": Choppa.ASSIST_LANDING, "assist_start": Choppa.ASSIST_START,
+}
 const SHAKE_AMOUNTS := [0.0, 0.5, 1.0]
 
 static var _values := {}
@@ -92,6 +116,15 @@ static func reset() -> void:
 	_values.clear()
 
 
+## The flight assists switched on, as Choppa.ASSIST_* bits.
+static func assists() -> int:
+	var bits := 0
+	for key: String in ASSIST_KEYS:
+		if flag(key):
+			bits |= ASSIST_KEYS[key]
+	return bits
+
+
 ## Whether a quality-tier feature is on: the setting, or `by_quality` when it is Auto.
 static func feature(key: String, by_quality: bool) -> bool:
 	var c := choice(key)
@@ -103,7 +136,7 @@ static func load_once(tree: SceneTree) -> void:
 	if _loaded:
 		return
 	_loaded = true
-	read(PATH)
+	read(path)
 	apply(tree)
 
 
@@ -120,11 +153,11 @@ static func read(path: String) -> void:
 			_values[key] = stored
 
 
-static func save(path := PATH) -> void:
+static func save(to := "") -> void:
 	var file := ConfigFile.new()
 	for key: String in DEFAULTS:
 		file.set_value("settings", key, value(key))
-	file.save(path)
+	file.save(to if to != "" else path)
 
 
 ## Pushes the settings into the engine. Headless runs (tests) have no window or audio.

@@ -31,7 +31,24 @@ const GRAVITY := 9.81
 ## something: ROTOR shakes and loses lift, TAIL spins you, ENGINE loses power.
 enum Part { HULL, ROTOR, TAIL, ENGINE }
 const DODGE_ROLL_RATE := 2.2  ## rad/s: rolling this fast throws off bullets and missiles (full stick is 2.8).
-const LEVEL_GAIN := 2.5  ## Flight assist: rate per radian of tilt that brings the body level.
+## Flight assists (Settings "assist_*"), bits in `assists`. They act on the realistic
+## model; the easy one hovers and lands by itself anyway, but keeps the landing cushion
+## and the auto-start.
+const ASSIST_LEVEL := 1  ## Stick centred: back to level.
+const ASSIST_HOVER := 2  ## Stick centred: tilt against the drift until it stops.
+const ASSIST_ALTITUDE := 4  ## Collective centred: hold the height, whatever the tilt.
+const ASSIST_TURN := 8  ## Pedals centred: the nose follows the bank.
+const ASSIST_LANDING := 16  ## Near the ground: the sink rate is held to what the skids take.
+const ASSIST_START := 32  ## Power on the ground starts the engine (without it only the key does).
+const ASSIST_ALL := 63
+const LEVEL_GAIN := 2.5  ## Rate per radian of tilt that brings the body level.
+const HOVER_GAIN := 0.035  ## Auto-hover: radians of tilt per m/s of drift...
+const HOVER_TILT := 0.35  ## ...up to this.
+const ALTITUDE_GAIN := 1.5  ## Altitude hold: thrust (m/s^2) per m/s of climb or sink.
+const TURN_COORDINATION := 1.1  ## Coordinated turns: yaw rate per radian of bank.
+const CUSHION_HEIGHT := 8.0  ## Landing assist works below this altitude...
+const CUSHION_SINK := 2.0  ## ...holding the sink rate to this at the ground...
+const CUSHION_GAIN := 6.0  ## ...braking by this much per m/s too fast.
 const GROUND_EFFECT := 0.08  ## Extra thrust fraction right above the ground...
 const GROUND_EFFECT_HEIGHT := 6.0  ## ...fading out by this altitude.
 ## Translational lift: the rotor works better in clean air, so forward speed adds up to
@@ -119,7 +136,9 @@ var input := PilotInput.new()
 var heading := 0.0  ## Yaw in radians; 0 faces -Z. Derived from the body each tick.
 var turn_rate := 0.0  ## Yaw rate, rad/s (positive turns left).
 var rates := Vector3.ZERO  ## Body rotation rates: x pitch (nose up), y yaw (left), z roll (left).
-var flight_assist := false  ## Level out and hold height when the stick is centred (a setting).
+## Flight assists switched on, ASSIST_* bits. Bots fly without (but start their engine
+## by asking for power); the player's come from the settings and travel to the server.
+var assists := ASSIST_START
 var easy := false  ## The easy flight model (a setting): no gravity, auto-hover, fly where you look.
 var _thrust := GRAVITY  ## Current rotor thrust; follows the collective with `thrust_lag`.
 var _aim := 0.0  ## Easy model: nose-down angle set by the stick, held.
@@ -252,9 +271,16 @@ func step(delta: float) -> void:
 	# Attitude: the stick asks for rotation rates and the body follows with some inertia.
 	# Nothing pulls the nose back by itself unless flight assist is on.
 	var wanted := Vector3(-i.cyclic.y * pitch_rate, -i.yaw * yaw_rate, -i.cyclic.x * roll_rate)
-	if flight_assist and i.cyclic.is_zero_approx():
-		wanted.x += nose_down() * LEVEL_GAIN
-		wanted.z += bank_right() * LEVEL_GAIN
+	if i.cyclic.is_zero_approx() and assists & (ASSIST_LEVEL | ASSIST_HOVER):
+		# Hands off the stick: back to level, or (auto-hover) leaning against the drift.
+		var lean := Vector2.ZERO  # Wanted nose-down and bank-right, radians.
+		if assists & ASSIST_HOVER:
+			var drift := facing().inverse() * Vector3(velocity.x, 0.0, velocity.z)
+			lean = (Vector2(drift.z, -drift.x) * HOVER_GAIN).limit_length(HOVER_TILT)
+		wanted.x += (nose_down() - lean.x) * LEVEL_GAIN
+		wanted.z += (bank_right() - lean.y) * LEVEL_GAIN
+	if assists & ASSIST_TURN and absf(i.yaw) < 0.05:
+		wanted.y -= bank_right() * TURN_COORDINATION  # Bank right, the nose swings right.
 	# Damage: a wrecked tail rotor leaves the main rotor's torque unopposed, so the body
 	# spins and the pedals do little; a chewed-up main rotor shakes the whole machine.
 	var tail := wear(Part.TAIL)
@@ -279,8 +305,11 @@ func step(delta: float) -> void:
 	# Forces: gravity, rotor thrust along the body's up axis, the afterburner along the
 	# nose, and drag that is lower along the body than across it.
 	var wanted_thrust := hover_thrust * (1.0 + i.collective * collective_range)
-	if flight_assist:
-		wanted_thrust /= clampf(b.y.y, 0.5, 1.0)  # Hold height when tilted.
+	if assists & ASSIST_ALTITUDE:
+		if absf(i.collective) < 0.05:  # Hands off the collective: hold the height.
+			wanted_thrust = clampf(hover_thrust - velocity.y * ALTITUDE_GAIN,
+				hover_thrust * (1.0 - collective_range), hover_thrust * (1.0 + collective_range))
+		wanted_thrust /= clampf(b.y.y, 0.5, 1.0)  # Make up for the tilt.
 	wanted_thrust *= 1.0 + GROUND_EFFECT * clampf(1.0 - altitude / GROUND_EFFECT_HEIGHT, 0.0, 1.0)
 	wanted_thrust *= 1.0 + TRANSLATIONAL_LIFT * clampf(Vector2(velocity.x, velocity.z).length() / ETL_SPEED, 0.0, 1.0)
 	wanted_thrust *= (1.0 - 0.15 * rotor) * (1.0 - 0.35 * engine)  # Damaged lift and power.
@@ -288,7 +317,7 @@ func step(delta: float) -> void:
 	wanted_thrust *= lift if engine_on else maxf(lift, 0.55 * spool)
 	_thrust = lerpf(_thrust, wanted_thrust, 1.0 - exp(-delta / thrust_lag))
 	var thrust := _thrust
-	var accel := b.y * thrust + Vector3.DOWN * GRAVITY
+	var accel := b.y * thrust + Vector3.DOWN * GRAVITY + Vector3.UP * _cushion()
 	if is_boosting() and engine < 1.0 and lift > 0.9:
 		boost_meter = maxf(0.0, boost_meter - boost_drain * delta)
 		accel += forward * afterburner_thrust
@@ -348,6 +377,7 @@ func _step_easy(i: PilotInput, delta: float) -> void:
 	# Horizontal and vertical ease separately, so a climb does not wait for the run-on to bleed off.
 	var level := Vector3(velocity.x, 0.0, velocity.z).move_toward(Vector3(wanted.x, 0.0, wanted.z), rate * delta)
 	velocity = level + Vector3.UP * move_toward(velocity.y, wanted.y, climb_accel * delta)
+	velocity.y += _cushion() * delta
 	if global_position.y > max_altitude:
 		velocity.y = minf(velocity.y, 0.0)
 
@@ -368,6 +398,15 @@ func _step_easy(i: PilotInput, delta: float) -> void:
 		model.update_pose(self, delta)
 
 
+## Landing assist: upward acceleration that holds the sink rate near the ground to what
+## the skids take. It works through the rotor, so a stopped one gives none.
+func _cushion() -> float:
+	if not assists & ASSIST_LANDING or altitude > CUSHION_HEIGHT or velocity.y >= 0.0:
+		return 0.0
+	var limit := lerpf(CUSHION_SINK, LANDING_SAFE + 2.0, altitude / CUSHION_HEIGHT)
+	return maxf(0.0, -velocity.y - limit) * CUSHION_GAIN * lift_share()
+
+
 ## How much of its lift the rotor can give at the current rpm, 0..1.
 func lift_share() -> float:
 	return smoothstep(LIFT_FROM_SPOOL, 1.0, spool)
@@ -379,7 +418,7 @@ func _update_engine(i: PilotInput, delta: float) -> void:
 	if i.engine and not _engine_held:
 		engine_on = not engine_on
 	_engine_held = i.engine
-	if not engine_on and altitude < 0.8 and (i.collective > 0.3 or i.boost):
+	if not engine_on and assists & ASSIST_START and altitude < 0.8 and (i.collective > 0.3 or i.boost):
 		engine_on = true
 	var target := 1.0 if engine_on else 0.0
 	spool = move_toward(spool, target, delta / (spool_up_time if target > spool else SPOOL_DOWN_TIME))

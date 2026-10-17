@@ -53,10 +53,13 @@ mouse, Q / E or the shoulder buttons.
 - **Graphics:** quality preset, shadows, global illumination, ambient occlusion,
   reflections, volumetric fog, bloom, grass. "Auto" follows the preset; the preset and
   the grass apply when the next match starts, everything else at once.
-- **Gameplay:** field of view, camera shake, default view (chase or cockpit), HUD size,
-  damage flash, aim assist, flight assist, controls overlay.
+- **Gameplay:** field of view, camera distance, camera shake, default view (chase or
+  cockpit), HUD size, damage flash, aim assist, controls overlay.
+- **Flight:** flight model, and the assists one by one: auto-level, auto-hover, altitude
+  hold, coordinated turns, landing assist, engine auto-start.
 - **Controls:** mouse steering, mouse controls (pitch & roll / pitch & yaw), sensitivity,
-  invert, gamepad deadzone; key bindings beside them.
+  mouse vertical, invert, roll / pitch / yaw rate for keys and gamepad, key stick ramp,
+  gamepad deadzone. Beside them every key: click one and press the new key.
 - **Audio:** master, effects and music volume.
 - **Reset to defaults** at the bottom.
 
@@ -74,6 +77,9 @@ mouse, Q / E or the shoulder buttons.
 | Flares | X | B |
 | Mine / smoke | R / G | X / D-pad down |
 | Camera: chase view / cockpit | V | Y |
+| Free look (hold) | Alt + mouse | |
+| Engine on / off | I | D-pad up |
+| Radio station | N | D-pad right |
 | Respawn (race: at your last gate; not in battle) | Backspace | Back/Select |
 | Pause | Esc | Start |
 | Controls overlay on/off | F1 | |
@@ -83,12 +89,13 @@ the choppa, push forward to put the nose down and accelerate, pull back to climb
 loop, move sideways to bank; nothing levels the nose for you. **Easy**: a drone that
 hovers by itself, WASD moves and strafes, Q/E or the mouse turn, mouse Y aims the nose
 and you fly where it points, Space/C climb and dive. "Mouse controls" in the settings swaps roll for yaw
-on the mouse (then A/D roll), "Flight assist" adds auto-level and height hold, and
+on the mouse (then A/D roll), the Flight tab switches each assist on or off, and
 "Aim assist" (off by default) snaps the guns onto targets. Rolling hard throws off
 bullets and missiles.
 
-The machine gun overheats after about two seconds of continuous fire. Crashing hurts
-(anything over 8 m/s into an obstacle), and where you get hit matters: a wrecked tail
+The machine gun overheats after a few seconds of continuous fire. Crashing hurts like a
+real crash: 25 m/s into a wall nearly kills, rotor blades in a wall or the ground wreck
+the rotor, a hard landing breaks the skids, and a choppa on its side burns. Where you get hit matters: a wrecked tail
 rotor spins you, a chewed main rotor shakes you and loses lift, a dead engine cannot
 hold a hover. Service stations fix all of it.
 

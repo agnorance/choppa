@@ -20,6 +20,11 @@ var _shake_time := 0.0
 var _kick := 0.0  ## Recoil from our own gun: a short punch per round, gone in a blink.
 var _last_shot := -10.0
 var _fov := 70.0  ## The field of view before the recoil punch.
+var look := Vector2.ZERO  ## Free look: yaw (x, left) and pitch (y, up) away from ahead, radians.
+
+const LOOK_GAIN := 0.004  ## Radians per pixel of mouse travel.
+const LOOK_YAW := 2.6  ## About 150 degrees each way.
+const LOOK_PITCH := 1.1
 
 
 func _ready() -> void:
@@ -30,6 +35,15 @@ func _ready() -> void:
 	_shake_noise.frequency = 2.0
 	if target:
 		target.damaged.connect(func(amount: float, _attacker: Choppa) -> void: _trauma += amount * 0.025)
+
+
+## Free look (held key): the mouse turns the view; let go and it swings back ahead.
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
+			and Input.is_action_pressed("free_look"):
+		var rel := (event as InputEventMouseMotion).relative
+		look = Vector2(clampf(look.x - rel.x * LOOK_GAIN, -LOOK_YAW, LOOK_YAW),
+			clampf(look.y - rel.y * LOOK_GAIN, -LOOK_PITCH, LOOK_PITCH))
 
 
 ## An explosion of the given size went off at `at`: shake if it's close.
@@ -72,12 +86,16 @@ func _process(delta: float) -> void:
 	_kick *= exp(-22.0 * delta)
 	fov = _fov + _kick * 1.1 * Settings.SHAKE_AMOUNTS[Settings.choice("camera_shake")]
 
+	if not InputMap.has_action("free_look") or not Input.is_action_pressed("free_look"):
+		look = look.lerp(Vector2.ZERO, 1.0 - exp(-8.0 * delta))
 	if target.model.cockpit_view:
 		target.model.cockpit_view.reticle.visible = first_person
 	if first_person:
-		# Rigidly mounted: you feel every roll and flip.
+		# Rigidly mounted: you feel every roll and flip. Free look turns your head.
 		cull_mask = ~ChoppaModel.OWN_LAYER & 0xFFFFF
 		global_transform = target.model.cockpit.get_global_transform_interpolated()
+		rotate_object_local(Vector3.UP, look.x)
+		rotate_object_local(Vector3.RIGHT, look.y * 0.8)
 		_apply_shake(delta)
 		return
 
@@ -89,8 +107,10 @@ func _process(delta: float) -> void:
 		look_at(body.origin + Vector3.UP * 0.5, Vector3.UP)
 		_apply_shake(delta)
 		return
-	var reach: float = Airframe.spec(target.airframe).camera
-	var back := body.basis * Vector3(0.0, height * reach, distance * reach + 3.0 * speed_ratio)
+	var reach: float = Airframe.spec(target.airframe).camera * Settings.CAMERA_DISTANCES[Settings.choice("camera_distance")]
+	# Free look swings the camera round the choppa.
+	var orbit := body.basis * Basis(Vector3.UP, look.x) * Basis(Vector3.RIGHT, -look.y * 0.8)
+	var back := orbit * Vector3(0.0, height * reach, distance * reach + 3.0 * speed_ratio)
 	var desired := body.origin + back
 	desired = _avoid_walls(body.origin + Vector3.UP, desired)
 	if _ready_to_follow:
@@ -98,7 +118,8 @@ func _process(delta: float) -> void:
 	else:
 		global_position = desired
 		_ready_to_follow = true
-	var focus := body.origin + body.basis * Vector3(0.0, 1.0, -look_ahead)
+	var looking := clampf(look.length() * 2.0, 0.0, 1.0)  # Free look watches the choppa itself.
+	var focus := body.origin + body.basis * Vector3(0.0, 1.0, -look_ahead * (1.0 - looking))
 	if not global_position.is_equal_approx(focus):
 		look_at(focus, Vector3.UP)
 	_apply_shake(delta)

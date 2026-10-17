@@ -85,6 +85,7 @@ func _ready() -> void:
 	_parse_args()
 	Settings.keep_window = _args.has("shot")
 	Settings.load_once(get_tree())
+	Controls.apply_bindings()  # The player's own keys, now that the settings are read.
 	_profile_args()
 	var first_start := not started
 	started = true
@@ -210,8 +211,12 @@ func _player_view() -> void:
 
 func _apply_flight_settings() -> void:
 	choppa.aim_assist = Settings.flag("aim_assist")
-	choppa.flight_assist = Settings.flag("flight_assist")
-	choppa.easy = Settings.choice("flight_model") == 0 or _args.has("easy")
+	choppa.assists = Settings.assists()
+	choppa.easy = _wants_easy()
+
+
+func _wants_easy() -> bool:
+	return Settings.choice("flight_model") == 0 or _args.has("easy")
 
 
 func _add_local_pilot() -> void:
@@ -449,7 +454,8 @@ func _start_client() -> void:
 		port = int(address.get_slice(":", 1))
 		address = address.get_slice(":", 0)
 	var mine := _my_airframe()
-	var hello := {"name": _pilot_name(), "airframe": mine, "camo": Progression.profile().camo_for(mine)}
+	var hello := {"name": _pilot_name(), "airframe": mine, "camo": Progression.profile().camo_for(mine),
+		"flight": {"easy": _wants_easy(), "assists": Settings.assists()}}  # The server flies our seat the same way.
 	if net.join(address, port, hello) != OK:
 		_on_net_lost("Could not start a connection to %s." % Menu.join_address)
 		return

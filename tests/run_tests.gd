@@ -11,6 +11,7 @@ var _world: Node3D
 
 
 func _initialize() -> void:
+	Settings.path = "user://test_settings.cfg"  # Never touch the player's settings.
 	_run.call_deferred()
 
 
@@ -87,6 +88,13 @@ func _run() -> void:
 		"test_cold_start_spools_up_before_lift",
 		"test_engine_key_toggles_and_off_sinks",
 		"test_easy_dive_key_only_dives",
+		"test_assists_level_and_hover",
+		"test_assist_altitude_hold",
+		"test_assist_coordinated_turn",
+		"test_assist_landing_cushions",
+		"test_assist_auto_start_can_be_off",
+		"test_key_rates_and_ramp",
+		"test_rebinding_keys",
 		"test_spawns_are_on_dry_clear_ground",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
@@ -1252,7 +1260,9 @@ func _net_pair(lag_ms := 0.0, loss := 0.0) -> Dictionary:
 	var client: NetGame = sides.client.net
 	var welcome := []
 	client.welcomed.connect(func(info: Dictionary) -> void: welcome.append(info))
-	_check(client.join("127.0.0.1", port, {"name": "Tester", "airframe": Airframe.GUNSHIP}) == OK, "client connects")
+	var flight := {"easy": false, "assists": Choppa.ASSIST_LANDING | Choppa.ASSIST_START}
+	_check(client.join("127.0.0.1", port, {"name": "Tester", "airframe": Airframe.GUNSHIP, "flight": flight}) == OK,
+		"client connects")
 	for t in 240:
 		await physics_frame
 		if not welcome.is_empty():
@@ -1261,6 +1271,7 @@ func _net_pair(lag_ms := 0.0, loss := 0.0) -> Dictionary:
 	if welcome.is_empty():
 		return {}
 	var info: Dictionary = welcome[0]
+	_check(field[info.seat].assists == flight.assists, "the server flies the seat with the client's assists")
 	var mine: Array[Choppa] = []
 	for k in info.roster.size():
 		var r: Dictionary = info.roster[k]
@@ -1268,6 +1279,8 @@ func _net_pair(lag_ms := 0.0, loss := 0.0) -> Dictionary:
 		c.pilot_name = r.name
 		c.airframe = r.airframe
 		c.local_player = k == info.seat
+		if k == info.seat:
+			c.assists = flight.assists
 		sides.client.world.add_child(c)
 		c.respawn(spawns[k])
 		mine.append(c)
@@ -1675,3 +1688,126 @@ func test_rollover_burns_out() -> void:
 	_check(choppa.alive, "not at once")
 	await _fly(choppa, 90)
 	_check(not choppa.alive, "burned out on its side, up=%f" % choppa.global_transform.basis.y.y)
+
+
+## Hands off the stick: auto-level rights a banked choppa; auto-hover also kills the drift.
+func test_assists_level_and_hover() -> void:
+	var leveled := _choppa(Vector3(0.0, 60.0, 0.0))
+	leveled.assists = Choppa.ASSIST_LEVEL
+	leveled.global_transform.basis = Basis(Vector3.FORWARD, 0.5)
+	await _fly(leveled, 120)
+	_check(absf(leveled.bank_right()) < 0.05, "auto-level: level again, bank %.2f" % leveled.bank_right())
+	var bare := _choppa(Vector3(100.0, 60.0, 0.0))
+	bare.assists = 0
+	bare.global_transform.basis = Basis(Vector3.FORWARD, 0.5)
+	await _fly(bare, 120)
+	_check(absf(bare.bank_right()) > 0.4, "without it the bank stays, %.2f" % bare.bank_right())
+	var hover := _choppa(Vector3(200.0, 60.0, 0.0))
+	hover.assists = Choppa.ASSIST_HOVER
+	hover.velocity = Vector3(15.0, 0.0, -15.0)
+	await _fly(hover, 420)
+	var drift := Vector2(hover.velocity.x, hover.velocity.z).length()
+	_check(drift < 2.0, "auto-hover brakes to a stop, %.1f m/s left" % drift)
+
+
+## Collective centred: altitude hold keeps the height even nosed down at speed.
+func test_assist_altitude_hold() -> void:
+	var sinks := {}
+	for bits: int in [0, Choppa.ASSIST_ALTITUDE]:
+		var c := _choppa(Vector3(bits * 30.0, 80.0, 0.0))
+		c.assists = bits
+		await _fly(c, 180, func(i: PilotInput, t: int) -> void: i.cyclic.y = 0.6 if t < 35 else 0.0)
+		sinks[bits] = 80.0 - c.global_position.y
+	_check(sinks[0] > 4.0, "a tilted rotor loses height by itself, %.1f m" % sinks[0])
+	_check(absf(sinks[Choppa.ASSIST_ALTITUDE]) < 1.5, "altitude hold keeps it, %.1f m" % sinks[Choppa.ASSIST_ALTITUDE])
+
+
+## Pedals centred: with coordinated turns a bank swings the nose round.
+func test_assist_coordinated_turn() -> void:
+	var turned := {}
+	for bits: int in [0, Choppa.ASSIST_TURN]:
+		var c := _choppa(Vector3(bits * 20.0, 60.0, 0.0))
+		c.assists = bits
+		c.global_transform.basis = Basis(Vector3.FORWARD, 0.4)  # Banked right.
+		var start := c.heading
+		await _fly(c, 60)
+		turned[bits] = angle_difference(start, c.heading)
+	_check(absf(turned[0]) < 0.05, "no assist, no turn: %.2f" % turned[0])
+	_check(turned[Choppa.ASSIST_TURN] < -0.2, "a right bank turns right: %.2f" % turned[Choppa.ASSIST_TURN])
+
+
+## Landing assist: a dive at the ground with the collective down still sets down whole.
+func test_assist_landing_cushions() -> void:
+	_ground()
+	var left := {}
+	for bits: int in [0, Choppa.ASSIST_LANDING]:
+		var c := _choppa(Vector3(bits * 20.0, 12.0, 0.0))
+		c.assists = bits
+		c.velocity = Vector3(0.0, -11.0, 0.0)
+		await _fly(c, 120, func(i: PilotInput, _t: int) -> void: i.collective = -1.0)
+		left[bits] = c.health if c.alive else 0.0
+	_check(left[0] < Choppa.MAX_HEALTH * 0.5, "without it the skids give, hp %s" % [left])
+	_check(left[Choppa.ASSIST_LANDING] == Choppa.MAX_HEALTH, "with it a clean touchdown, hp %s" % [left])
+
+
+## Engine auto-start off: power on the ground does nothing, the key starts it.
+func test_assist_auto_start_can_be_off() -> void:
+	_ground()
+	var c := Choppa.new()
+	_world.add_child(c)
+	c.set_physics_process(false)
+	c.spawn_on_ground(Transform3D.IDENTITY, true)
+	c.assists = 0
+	await _fly(c, 30, func(i: PilotInput, _t: int) -> void: i.collective = 1.0)
+	_check(not c.engine_on, "power alone does not start it")
+	await _fly(c, 2, func(i: PilotInput, _t: int) -> void: i.engine = true)
+	_check(c.engine_on, "the key does")
+
+
+## Keys: the roll rate setting scales a full key press, and the ramp eases into it.
+func test_key_rates_and_ramp() -> void:
+	var saved := [Settings.value("roll_rate"), Settings.value("stick_ramp"), Settings.value("mouse_mode")]
+	Settings.set_value("roll_rate", 0.5)
+	Settings.set_value("stick_ramp", 0.25)
+	Settings.set_value("mouse_mode", 0)
+	var c := _choppa(Vector3(0.0, 60.0, 0.0))
+	var pilot := LocalPilot.new()
+	pilot.choppa = c
+	_world.add_child(pilot)
+	Input.action_press("roll_right")
+	await physics_frame
+	await physics_frame
+	var early := c.input.cyclic.x
+	for t in 30:
+		await physics_frame
+	var held := c.input.cyclic.x
+	Input.action_release("roll_right")
+	_check(early > 0.0 and early < 0.2, "the stick eases in, %.2f after two ticks" % early)
+	_check(is_equal_approx(held, 0.5), "and stops at the roll rate setting, %.2f" % held)
+	Settings.set_value("roll_rate", saved[0])
+	Settings.set_value("stick_ramp", saved[1])
+	Settings.set_value("mouse_mode", saved[2])
+	pilot.free()
+
+
+## Rebinding: a new key works at once, a clashing key moves, and defaults come back.
+func test_rebinding_keys() -> void:
+	var controls: GDScript = load("res://scripts/controls.gd")
+	var key := func(code: Key) -> InputEventKey:
+		var e := InputEventKey.new()
+		e.physical_keycode = code
+		e.pressed = true
+		return e
+	controls.rebind("fire", 0, KEY_J)
+	_check(InputMap.action_has_event("fire", key.call(KEY_J)), "J fires now")
+	_check(not InputMap.action_has_event("fire", key.call(KEY_CTRL)), "Ctrl no longer does")
+	_check(controls.keys_for("fire")[0] == "J", "the overlay says J: %s" % [controls.keys_for("fire")])
+	var lost: Array = controls.rebind("missile", 0, KEY_X)
+	_check(lost.has("flares") and controls.keys_for("flares").is_empty(), "X moved from flares to the missile: %s" % [lost])
+	controls.rebind("move_forward", 0, KEY_UP)
+	_check(controls.keys_for("pitch_down").has("Up"), "the easy model's keys do not steal the realistic one's")
+	Settings.set_value("bindings", {})
+	controls.apply_bindings()
+	_check(InputMap.action_has_event("fire", key.call(KEY_CTRL)) and not InputMap.action_has_event("fire", key.call(KEY_J)),
+		"defaults back after a reset")
+	_check(InputMap.action_has_event("flares", key.call(KEY_X)), "flares on X again")

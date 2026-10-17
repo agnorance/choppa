@@ -75,10 +75,16 @@ cockpit's), dark translucent panels with 1 px lines, thin bars, no gradients or 
   quality preset, shadows, GI, ambient occlusion, reflections, volumetric fog, bloom,
   grass ("Auto" follows the preset; `Settings.apply_environment` flips the live
   Environment, the preset and the grass wait for the next map). Gameplay: FOV, camera
-  shake, default view, HUD size, damage flash, aim assist, controls overlay. Controls:
-  mouse steering, sensitivity, invert, gamepad deadzone; key bindings
-  beside them on desktop. Audio: master and effects (bus "Effects"). Saved by
-  `Settings` (one dictionary, `DEFAULTS` lists every key) in `user://settings.cfg`.
+  distance, camera shake, default view, HUD size, damage flash, aim assist, controls
+  overlay. Flight: the flight model and six assists, each on or off (owner 2026-10-17,
+  "like Wardogs"): auto-level, auto-hover, altitude hold, coordinated turns, landing
+  assist, engine auto-start; the beginner set (level, landing, start) is on by default.
+  Controls: mouse steering, mouse layout, sensitivity, mouse vertical, invert, roll /
+  pitch / yaw rate for keys and pad (roll 60 % by default: "A and D roll way too fast"),
+  key stick ramp, gamepad deadzone; beside them every keyboard and mouse binding, click
+  to change (`Controls.REBINDABLE`, Settings "bindings"; the gamepad keeps its layout).
+  Audio: master, effects and music. Saved by `Settings` (one dictionary, `DEFAULTS`
+  lists every key) in `user://settings.cfg`; the tests save to their own file.
 - **HUD:** speed and altitude top left, item top right, kills/rank/time top centre,
   hull bottom left, boost (heat as a hairline) bottom centre. Call-outs in amber.
   The controls overlay (key caps) sits bottom right, toggled in settings or with F1.
@@ -92,8 +98,8 @@ cockpit's), dark translucent panels with 1 px lines, thin bars, no gradients or 
 **Easy to pick up, very hard to master.**
 
 - Easy: a level choppa with the collective centred hovers by itself, items are one
-  button, a crash is never instant death. Newcomers can switch on flight assist and
-  aim assist in the settings.
+  button, and the assists (on by default: auto-level, landing assist, engine auto-start)
+  catch beginners. Crashes are real (owner 2026-10-17: "more realistic"): see Collisions.
 - Deep: the flying itself (owner's request after the first build: free controls, no
   help, Wardogs-like): momentum, tilt-to-accelerate, energy in dives and climbs,
   rolls timed against bullets and missiles, item tactics, reading the arena.
@@ -137,19 +143,26 @@ The realistic model:
   at full deflection) and the body follows with inertia (7 rad/s^2). Thrust follows
   the collective with a 0.35 s lag. That inertia and lag, plus low drag across the
   body so it keeps sliding, are the "weight" the owner asked for. Nothing levels the
-  nose by itself. *Flight assist* (setting, off by default) adds auto-level and
-  height hold.
+  nose by itself unless an assist is on (`Choppa.ASSIST_*`, sent to the server with the
+  hello so it flies the seat the same way): auto-level and auto-hover act with the stick
+  centred, altitude hold with the collective centred, coordinated turns with the pedals
+  centred; landing assist holds the sink rate near the ground to what the skids take.
 - **Afterburner:** Shift / RB. About two seconds of charge, back in five when off;
   the HUD bar shows it. The TURBO item is a stronger burst.
 - **Ground effect:** a little extra thrust in the last six metres. **Translational
   lift:** up to 12 % more thrust at airspeed (full at 25 m/s), so a moving choppa needs
   less collective and a hover is the hardest place to hold height.
 - **Ceiling:** no climbing above the map's ceiling.
-- Collisions bounce you off walls, stun you briefly and kill most of the spin. Any
-  impact over 8 m/s costs health (2 per m/s above that), at most once every 0.4 s so
-  scraping along terrain is not instant death. On the ground only the sink rate counts
-  and the skids drag you to a stop, so landings are safe below 8 m/s. A crash soon
-  after being shot credits the shooter.
+- Collisions bounce you off walls, stun you briefly and kill most of the spin. A crash
+  costs a share of the hull whatever the class: nothing below 6 m/s into the obstacle,
+  all of it at 32 (25 m/s nearly kills), at most once every 0.4 s. On the ground the
+  sink rate counts (5 m/s is safe, 13 flattens you) and sliding faster than 14 m/s
+  grinds the hull. **Rotor strikes:** the blade disc (75 % of its radius, per class in
+  `Airframe` "rotor") touching a wall, a roof or the ground costs the rotor 60 % and
+  the hull 12 %, shoves you off and throws the body over; a wrecked rotor that strikes
+  again comes apart. A choppa on its side on the ground burns out after 2 s. Races
+  ignore rotor strikes. A crash soon after being shot credits the shooter. Bots feel
+  around their rotor disc and brake for walls.
 - Rolling hard (over 2.8 rad/s) throws off bullets and shakes a missile's lock, which
   then veers wide. Pilot skill, not a button.
 

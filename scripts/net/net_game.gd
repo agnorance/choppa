@@ -93,7 +93,8 @@ func host(port := PORT, max_clients := 7) -> Error:
 	return OK
 
 
-## Connects to a server; `hello` is {name, airframe, camo}. Listen for `welcomed`.
+## Connects to a server; `hello` is {name, airframe, camo, flight: {easy, assists}}.
+## Listen for `welcomed`.
 func join(address: String, port := PORT, hello := {}) -> Error:
 	var peer := ENetMultiplayerPeer.new()
 	var err := peer.create_client(address, port)
@@ -250,6 +251,11 @@ func _hello_rpc(data: PackedByteArray) -> void:
 	var airframe := str(hello.get("airframe", Airframe.SCOUT))
 	if Airframe.TABLE.has(airframe):
 		seat.set_airframe(airframe)
+	# The client predicts with its own flight model and assists: fly the seat the same way.
+	var flight: Variant = hello.get("flight", {})
+	if flight is Dictionary:
+		seat.easy = bool(flight.get("easy", false))
+		seat.assists = int(flight.get("assists", Choppa.ASSIST_START)) & Choppa.ASSIST_ALL
 	var camo := str(hello.get("camo", "factory"))
 	if Progression.CAMOS.has(camo) and Progression.CAMOS[camo].tier == "level":
 		seat.model.set_camo(camo)  # Packs and Apex need a server-side entitlement check first.

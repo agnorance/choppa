@@ -26,7 +26,6 @@ var _gauges := {}
 var _stick: Node3D
 var _stick_copilot: Node3D
 var _collective: Node3D
-var _hud: Array[Label3D] = []  ## Speed, altitude, heading, loadout on the head-up display.
 var _health_cells: Array[MeshInstance3D] = []
 var _cell_off: StandardMaterial3D
 var _item_label: Label3D
@@ -103,8 +102,6 @@ func _ready() -> void:
 	# Further off, the same symbol has to be bigger to look the same.
 	reticle.scale = Vector3.ONE * maxf(1.0, reticle.position.length() / SIGHT_DISTANCE)
 	_build_reticle(reticle)
-	if _mount(shell, "hud"):
-		_build_hud(reticle)
 
 	# A dim warm light so the panel reads even in the shade.
 	var fill := OmniLight3D.new()
@@ -129,11 +126,6 @@ func _process(delta: float) -> void:
 	}
 	for key: String in _gauges:
 		(_gauges[key] as Gauge).value = readings[key]
-	if not _hud.is_empty():
-		_hud[0].text = "%d" % roundi(readings.speed)
-		_hud[1].text = "%d" % roundi(readings.altitude)
-		_hud[2].text = "%03d" % roundi(readings.heading)
-		_hud[3].text = "G%d  R%d  M%d" % [choppa.ammo.gun, choppa.ammo.rockets, choppa.ammo.missiles]
 
 	if _stick:
 		_stick.rotation = Vector3(-i.cyclic.y * 0.3, 0.0, -i.cyclic.x * 0.3)
@@ -344,15 +336,6 @@ func _build_mfd(mount: Node3D, page: String) -> void:
 
 ## Head-up display numbers round the reticle: speed left, altitude right, heading above,
 ## loadout below. Green like the reticle; they show only from the seat.
-func _build_hud(mount: Node3D) -> void:
-	for spot: Vector3 in [Vector3(-0.11, 0.0, 0.0), Vector3(0.11, 0.0, 0.0), Vector3(0.0, 0.08, 0.0), Vector3(0.0, -0.07, 0.0)]:
-		var label := _label(mount, "", 40, Color(0.45, 1.6, 0.35), spot)
-		label.pixel_size = 0.00035
-		label.no_depth_test = true
-		label.render_priority = 10
-		_hud.append(label)
-
-
 func _build_beacon(mount: Node3D) -> void:
 	_beacon = Node3D.new()
 	mount.add_child(_beacon)

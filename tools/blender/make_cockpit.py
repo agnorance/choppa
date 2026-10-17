@@ -124,6 +124,42 @@ def reflex_sight(top, arm_x):
     return parts
 
 
+def roof_cap(c, r, e_top, material="paint"):
+    """The solid roof of a canopy: the cap of its ellipsoid above elevation e_top, seen
+    from inside, so the frame has something to end in."""
+    import bmesh
+    bm = bmesh.new()
+    sides, rings = 36, 6
+    grid = []
+    for i in range(rings):
+        e = e_top + (math.pi / 2 - e_top) * i / rings
+        grid.append([bm.verts.new(cp.ell(c, r, 2 * math.pi * k / sides, e)) for k in range(sides)])
+    top = bm.verts.new(cp.ell(c, r, 0.0, math.pi / 2))
+    for r0, r1 in zip(grid, grid[1:]):
+        for k in range(sides):
+            j = (k + 1) % sides
+            bm.faces.new((r0[k], r0[j], r1[j], r1[k]))
+    for k in range(sides):
+        bm.faces.new((grid[-1][k], grid[-1][(k + 1) % sides], top))
+    roof = cp.mesh_object(bm, "roof", material)
+    roof.data.flip_normals()  # mesh_object points them out; the pilot looks at it from inside.
+    return roof
+
+
+def cabin(c, r, e_top, posts, sill=-0.38, sill_from=0.25, bar=0.013):
+    """A closed canopy frame on the ellipsoid (c, r): a solid roof above e_top with a rail
+    round its edge, posts at the azimuths `posts` running from the sill up into that rail
+    (none stop in mid-air), and a sill rail down each side from `sill_from` back."""
+    parts = [roof_cap(c, r, e_top)]
+    ring = [cp.ell(c, r, 2 * math.pi * k / 48, e_top) for k in range(49)]
+    parts.append(tube(ring, bar * 1.2))
+    for a in posts:
+        parts.append(cp.frame_member(c, r, a, sill + (0.06 if abs(a) < 1.0 else 0.0), a, e_top, bar, 14))
+    for side in (-1, 1):
+        parts.append(cp.frame_member(c, r, side * sill_from, sill, side * 2.9, sill, bar, 18))
+    return parts
+
+
 def kick_wall(panel, half_w, half_h, floor_z, inset=0.04):
     """Closes the tub under the panel: a wall from the panel's bottom edge down to the
     floor, the panel's width (the exterior is hidden from the seat, so any gap there
@@ -390,8 +426,9 @@ def build_striker():
     shell += cp.gauge(panel, "rpm", 0.03, 0.08, 0.026)
     shell += cp.gauge(panel, "heat", 0.03, 0.01, 0.026)
     shell += ordnance(Panel(panel.at(0, -0.1, 0.0), tilt=-24.0), 0, 0)
-    shell += lamps_row(panel, pilot - 0.075, 0.215, 0.05, 0.08)
-    panel.mount("beacon", pilot + 0.17, 0.215, 0.09)
+    # Warning lamps and the beacon off to the left on the glare shield, clear of the sight.
+    shell += lamps_row(panel, pilot - 0.36, 0.215, 0.045, 0.06)
+    panel.mount("beacon", pilot + 0.32, 0.215, 0.07)
     shell += nixies(Panel(panel.at(-pilot, 0.235, 0.04), tilt=-55.0), 0.0, 0.0)
     shell += cp.annunciators(panel, -0.03, -0.13, 4, 2, 0.022, 0.012)
     shell += reflex_sight(panel.at(pilot, 0.17, 0.0), 0.3)
@@ -419,17 +456,9 @@ def build_striker():
     shell += bulkhead(-0.66, -0.4, 2 * mid + 0.4, -1.05, 0.34)
     shell += cp.extinguisher(-0.33, -0.55, -1.03, (0, 0, 1))
     shell += cp.wiring([(mid, 0.55, -0.5), (mid + 0.05, 0.4, -0.85), (mid, 0.0, -1.0)], 5)
-    # Canopy frame: centre post, windscreen posts, door bows, roof rails, rear ring.
-    frame.append(cp.frame_member(c, r, 0.0, -0.3, 0.0, 1.2, 0.028, 14))
-    for side in (-1, 1):
-        frame.append(cp.frame_member(c, r, side * 1.0, -0.35, side * 0.9, 0.75, 0.026, 12))
-        frame.append(cp.frame_member(c, r, side * 1.45, -0.4, side * 1.4, 0.95, 0.024, 12))
-        frame.append(cp.frame_member(c, r, side * 0.25, -0.38, side * 2.7, -0.38, 0.026, 18))
-        frame.append(cp.frame_member(c, r, side * 0.9, 0.75, side * 2.6, 0.9, 0.02, 14))
-    frame.append(cp.frame_member(c, r, -0.9, 0.75, 0.9, 0.75, 0.022, 12))
-    rear = c + Vector((0, -0.8, 0))
-    frame.append(tube([rear + Vector((math.cos(a) * 0.62, 0, -0.1 + math.sin(a) * 0.42)) for a in
-                       [math.pi * k / 18 for k in range(19)]], 0.035))
+    # The cabin: a solid roof over both seats, thin posts (windscreen centre and corners,
+    # the door bows, the rear posts) each running from the sill into the roof rail.
+    frame += cabin(c, r, 1.0, [0.0, -0.95, 0.95, -1.6, 1.6, -2.45, 2.45])
     finish(shell, frame)
     cp.stick((0, 0.2, -1.03))
     cp.stick((2 * mid, 0.2, -1.03), "stick_copilot")

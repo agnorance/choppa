@@ -99,6 +99,7 @@ func _run() -> void:
 		"test_takeoff_plan_lifts_off_cold",
 		"test_brand_assets",
 		"test_mule_has_two_rotors",
+		"test_class_card_stats",
 		"test_spawns_are_on_dry_clear_ground",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
@@ -1894,3 +1895,22 @@ func test_mule_has_two_rotors() -> void:
 	await _fly(c, 2)
 	_check(c.parts[Choppa.Part.ROTOR] < c.part_max(Choppa.Part.ROTOR), "the aft rotor struck the wall")
 	_check(c.velocity.z < -1.0, "and shoved it forward, away from the wall, v=%s" % c.velocity)
+
+
+## The title screen's class card: every bar between empty and full, the best class at
+## each stat full, and the classes where they should be.
+func test_class_card_stats() -> void:
+	var full := {}
+	for id: String in Airframe.ORDER:
+		var stats := Airframe.stats(id)
+		for stat: String in Airframe.STATS:
+			_check(stats[stat] > 0.0 and stats[stat] <= 1.0, "%s %s in range: %f" % [id, stat, stats[stat]])
+			if is_equal_approx(stats[stat], 1.0):
+				full[stat] = id
+	_check(full.size() == Airframe.STATS.size(), "some class tops every stat: %s" % [full])
+	_check(full.Speed == Airframe.SCOUT and full.Agility == Airframe.SCOUT, "the scout is fastest and quickest: %s" % [full])
+	_check(full.Armour == Airframe.MULE, "the Mule is the toughest: %s" % [full])
+	var card := ClassCard.new()
+	card.show_class(Airframe.MULE)
+	_check(card._name.text == "MULE" and card._values.Ordnance.text == "R0 M4 F6", "the card shows the Mule")
+	card.free()

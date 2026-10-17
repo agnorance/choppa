@@ -71,3 +71,47 @@ static func names() -> PackedStringArray:
 
 static func spec(id: String) -> Dictionary:
 	return TABLE.get(id, TABLE[SCOUT])
+
+
+## The five numbers the class card shows, in order.
+const STATS := ["Speed", "Agility", "Armour", "Gun", "Ordnance"]
+
+
+## A class's raw rating for each of STATS: level top speed, roll rate, how much it soaks
+## (hull plus tough parts), gun damage per second, and its ordnance weighted by punch.
+static func raw_stats(id: String) -> Dictionary:
+	var s := spec(id)
+	return {
+		"Speed": s.speed, "Agility": s.rates * sqrt(s.inertia), "Armour": s.hull * (0.5 + 0.5 * s.parts),
+		"Gun": s.guns / s.fire, "Ordnance": s.rockets * 1.0 + s.missiles * 5.0 + s.flares * 1.5,
+	}
+
+
+## Each of STATS as 0..1 against the best class at it (never quite empty, so a bar shows).
+static func stats(id: String) -> Dictionary:
+	var best := {}
+	for other: String in ORDER:
+		var raw := raw_stats(other)
+		for stat: String in STATS:
+			best[stat] = maxf(best.get(stat, 0.0), raw[stat])
+	var mine := raw_stats(id)
+	var out := {}
+	for stat: String in STATS:
+		out[stat] = clampf(mine[stat] / best[stat], 0.08, 1.0)
+	return out
+
+
+## The real number behind a bar, for its label.
+static func stat_text(id: String, stat: String) -> String:
+	var s := spec(id)
+	match stat:
+		"Speed":
+			return "%d km/h" % roundi(36.0 * s.speed * 3.6)
+		"Agility":
+			return "%d°/s" % roundi(rad_to_deg(2.8 * s.rates))
+		"Armour":
+			return "%d hp" % roundi(s.hull)
+		"Gun":
+			return "%d rnd" % s.rounds
+		_:
+			return "R%d M%d F%d" % [s.rockets, s.missiles, s.flares]

@@ -14,7 +14,7 @@ var _chrome: Array[Control] = []  ## Version and hints, hidden with the title.
 var _settings: SettingsMenu
 var _hangar: Hangar
 var _battle: Button
-var _blurb: Label  ## One line about the chosen helicopter.
+var _card: ClassCard  ## The chosen helicopter at a glance, bottom right.
 var _online: VBoxContainer
 var _name: LineEdit
 var _address: LineEdit
@@ -80,10 +80,21 @@ func _ready() -> void:
 	class_row.changed.connect(func(i: int) -> void:
 		Settings.set_value("airframe", i)
 		Settings.save()
-		_blurb.text = Airframe.spec(Airframe.ORDER[i]).blurb)
+		_card.show_class(Airframe.ORDER[i]))
 	_home.add_child(class_row)
-	_blurb = UiKit.label(Airframe.spec(Airframe.ORDER[Settings.choice("airframe")]).blurb, 14, UiKit.MUTED)
-	_home.add_child(_blurb)
+	_card = ClassCard.new()
+	_card.anchor_left = 1.0
+	_card.anchor_right = 1.0
+	_card.anchor_top = 1.0
+	_card.anchor_bottom = 1.0
+	_card.offset_left = -470.0
+	_card.offset_right = -60.0
+	_card.offset_top = -330.0
+	_card.offset_bottom = -60.0
+	_card.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	root.add_child(_card)
+	_card.show_class(Airframe.ORDER[Settings.choice("airframe")])
+	_home.visibility_changed.connect(func() -> void: _card.visible = _home.visible)
 	var model_row := SettingRow.new("FLIGHT", ["Easy", "Realistic"], Settings.choice("flight_model"))
 	model_row.custom_minimum_size = Vector2(380, 46)
 	model_row.changed.connect(func(i: int) -> void:

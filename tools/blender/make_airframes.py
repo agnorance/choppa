@@ -855,6 +855,183 @@ def build_striker():
                  (c, r, -1.7, 0.6), (c, r, 0.1, 0.75), (c, r, -0.2, 0.4)])
 
 
+MULE_BODY = [
+    (4.75, 0.35, -0.35, 0.05, -0.75, 2.2, 2.4),
+    (4.45, 0.95, -0.3, 0.55, -1.05, 2.6, 3.0),
+    (3.9, 1.18, -0.2, 0.85, -1.15, 3.2, 3.6),
+    (3.0, 1.25, -0.15, 1.05, -1.2, 3.6, 4.0),
+    (0.0, 1.28, -0.12, 1.1, -1.2, 4.0, 4.0),
+    (-3.2, 1.26, -0.08, 1.12, -1.15, 4.0, 4.0),
+    (-4.3, 1.15, 0.05, 1.12, -0.85, 3.6, 3.2),
+    (-4.9, 0.95, 0.25, 1.1, -0.45, 3.2, 2.6),
+]
+MULE_EYE = Vector((0.42, 3.55, 0.45))  # The pilot sits on the right (make_cockpit.py).
+# The windscreen as the cockpit frames it (make_cockpit.py build_mule, MULE_SCREEN): three
+# posts across, the top rail high over the view ahead, the bottom rail low.
+MULE_SCREEN_X = 0.97
+MULE_SCREEN_TOP = (4.19, 0.87)  # (y, z)
+MULE_SCREEN_LOW = (4.55, 0.15)
+
+
+def pane(corners, material, thickness=0.02):
+    """A flat slab through four corners (a window pane or a panel)."""
+    corners = [Vector(c) for c in corners]
+    n = (corners[1] - corners[0]).cross(corners[3] - corners[0]).normalized()
+    bm = bmesh.new()
+    front = [bm.verts.new(c + n * thickness / 2) for c in corners]
+    back = [bm.verts.new(c - n * thickness / 2) for c in corners]
+    bm.faces.new(front)
+    bm.faces.new(list(reversed(back)))
+    for k in range(4):
+        j = (k + 1) % 4
+        bm.faces.new((front[k], back[k], back[j], front[j]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return base.link(bm, "pane", material)
+
+
+def mule_cockpit():
+    """The windscreen (two panes over three posts, matching the frame inside), side
+    windows with frames and sliding vents, chin windows, wipers parked outboard."""
+    parts = []
+    (ty, tz), (ly, lz) = MULE_SCREEN_TOP, MULE_SCREEN_LOW
+    xs = (-MULE_SCREEN_X, 0.0, MULE_SCREEN_X)
+    for x0, x1 in ((xs[0], xs[1]), (xs[1], xs[2])):
+        parts.append(pane([(x0, ly, lz), (x1, ly, lz), (x1, ty, tz), (x0, ty, tz)], "glass"))
+        # The dark of the cab behind the glass (the hull's nose would show through).
+        parts.append(pane([(x0, ly - 0.07, lz), (x1, ly - 0.07, lz), (x1, ty - 0.07, tz), (x0, ty - 0.07, tz)], "dark"))
+    for x in xs:
+        parts.append(tube([(x, ly + 0.02, lz), (x, ty + 0.02, tz)], 0.03 if x == 0.0 else 0.035, "paint", 8))
+    for y, z in ((ly + 0.02, lz), (ty + 0.02, tz)):
+        parts.append(tube([(xs[0] - 0.02, y, z), (xs[2] + 0.02, y, z)], 0.035, "paint", 8))
+    # The cab round the tall windscreen: a roof back to the forward pylon and cheeks down
+    # to the side windows, so the glass sits in the body instead of on top of it.
+    parts.append(pane([(-xs[2] - 0.02, ty + 0.03, tz), (xs[2] + 0.02, ty + 0.03, tz), (1.05, 3.4, 1.02), (-1.05, 3.4, 1.02)],
+                      "paint", 0.03))
+    for side in (-1, 1):
+        parts.append(pane([(side * (xs[2] + 0.02), ly + 0.02, lz - 0.05), (side * (xs[2] + 0.02), ty + 0.03, tz),
+                           (side * 1.25, 3.4, 0.98), (side * 1.25, 4.1, 0.05)], "paint", 0.03))
+    for x in (-0.6, 0.6):  # Wipers, parked at the outer posts.
+        parts.append(cyl((x, ly + 0.03, lz + 0.05), (x + (0.25 if x > 0 else -0.25), ly - 0.06, lz + 0.2), 0.008, "dark", 6))
+    # Side windows: frames, a sliding vent pane, a rain gutter over them.
+    for side in (-1, 1):
+        parts.append(box((side * 1.27, 3.75, 0.38), (0.05, 1.0, 0.52), "glass"))
+        parts.append(box((side * 1.255, 3.75, 0.38), (0.04, 1.08, 0.6), "dark"))
+        parts.append(box((side * 1.3, 3.55, 0.38), (0.03, 0.04, 0.52), "paint"))  # Mullion.
+        parts.append(box((side * 1.31, 3.95, 0.3), (0.02, 0.3, 0.2), "metal", bevel_width=0.005))  # Vent.
+        parts.append(cyl((side * 1.3, 3.2, 0.7), (side * 1.3, 4.3, 0.7), 0.015, "metal", 6))
+        parts.append(box((side * 0.55, 4.66, -0.5), (0.48, 0.3, 0.05), "glass",
+                         rotation=Matrix.Rotation(math.radians(55), 4, "X")))
+        parts.append(box((side * 0.55, 4.655, -0.5), (0.54, 0.34, 0.04), "dark",
+                         rotation=Matrix.Rotation(math.radians(55), 4, "X")))
+    return parts
+
+
+def mule_hull():
+    """Round cabin windows, crew doors with handles and steps, riveted panels and plates,
+    the cargo hook, a hoist over the right door, rescue markings."""
+    parts = []
+    for side in (-1, 1):
+        for k in range(7):
+            y = 2.3 - k * 0.95
+            parts.append(cyl((side * 1.26, y, 0.25), (side * 1.3, y, 0.25), 0.2, "glass", 20))
+            parts.append(ring((side * 1.29, y, 0.25), (1, 0, 0), 0.21, 0.025, "dark", 20))
+            for b in range(6):  # Window bolts.
+                a = 2 * math.pi * b / 6
+                parts.append(ball((side * 1.3, y + 0.25 * math.cos(a), 0.25 + 0.25 * math.sin(a)), 0.012, "metal",
+                                  segments=6, rings=3))
+        parts.append(box((side * 1.29, 2.95, -0.25), (0.03, 0.8, 1.25), "dark", bevel_width=0.01))  # Crew door.
+        parts.append(box((side * 1.31, 2.65, -0.25), (0.03, 0.04, 0.12), "brass", bevel_width=0.005))
+        parts.append(box((side * 1.3, 2.95, 0.12), (0.02, 0.5, 0.3), "glass", bevel_width=0.01))
+        parts.append(box((side * 1.3, 2.95, -1.0), (0.12, 0.6, 0.04), "metal", bevel_width=0.008))  # Step.
+        parts += rivets((side * 1.3, 3.9, -0.62), (side * 1.3, -4.0, -0.62), 22)
+        parts += rivets((side * 1.3, 3.9, 0.82), (side * 1.3, -4.0, 0.82), 22)
+        for y0, y1 in ((1.9, 0.6), (-0.5, -1.8), (-2.6, -3.9)):  # Access panels along the cabin.
+            parts += base.plate(side, y0, y1, -0.5, -0.05, bolt_step=0.14)
+        parts += base.plate(side, 4.3, 3.3, -0.95, -0.55, bolt_step=0.12)  # Nose avionics bay.
+    hook = Vector((0, 0.0, -1.22))  # Cargo hook under the belly.
+    parts.append(box(hook + Vector((0, 0, 0.04)), (0.5, 0.5, 0.04), "dark", bevel_width=0.01))
+    parts.append(tube([hook, hook + Vector((0, 0, -0.18)), hook + Vector((0.06, 0, -0.26))], 0.025, "metal", 8))
+    hoist = Vector((1.35, 2.95, 0.75))  # Rescue hoist over the right crew door.
+    parts.append(box(hoist, (0.25, 0.3, 0.2), "paint", bevel_width=0.03))
+    parts.append(cyl(hoist + Vector((0.15, 0, -0.1)), hoist + Vector((0.15, 0, -0.35)), 0.006, "dark", 4))
+    return parts
+
+
+def mule_pylons():
+    """The forward pylon over the cockpit and the tall aft pylon: grilles, walkways, the
+    spine tunnel between them carrying the synchronising shaft, the engines on the aft
+    pylon with intake screens, antennas and lights."""
+    parts, exhausts = [], []
+    parts.append(loft("front_pylon", [
+        (4.2, 0.2, 0.95, 1.1, 0.95, 2.0, 2.0), (3.6, 0.55, 1.0, 1.55, 1.0, 2.4, 2.0),
+        (2.6, 0.55, 1.0, 1.6, 1.0, 2.4, 2.0), (1.8, 0.3, 1.0, 1.2, 1.0, 2.0, 2.0)], "paint", count=24))
+    parts.append(cyl((0, 3.2, 1.55), (0, 3.2, 1.95), 0.12, "metal", 16))
+    parts.append(loft("aft_pylon", [
+        (-1.6, 0.25, 1.05, 1.15, 1.05, 2.0, 2.0), (-2.6, 0.55, 1.05, 2.1, 1.05, 2.4, 2.0),
+        (-4.0, 0.55, 1.05, 2.45, 1.05, 2.4, 2.0), (-4.85, 0.35, 1.0, 2.2, 1.0, 2.2, 2.0)], "paint", count=24))
+    parts.append(cyl((0, -3.6, 2.4), (0, -3.6, 2.8), 0.12, "metal", 16))
+    # The spine tunnel with its access doors, and the non-slip walkway on it.
+    parts.append(box((0, 0.4, 1.17), (0.5, 3.0, 0.16), "paint", bevel_width=0.05))
+    for k in range(5):
+        y = 1.6 - k * 0.6
+        parts.append(box((0, y, 1.26), (0.42, 0.5, 0.012), "dark", bevel_width=0.004))
+        parts += rivets((-0.22, y - 0.24, 1.255), (-0.22, y + 0.24, 1.255), 3, radius=0.01)
+    for side in (-1, 1):
+        parts.append(box((side * 0.42, 0.4, 1.13), (0.32, 3.0, 0.012), "rubber"))  # Walkways either side.
+        for k in range(4):  # Grilles on both pylons.
+            parts.append(box((side * 0.5, 3.4 - k * 0.18, 1.35), (0.03, 0.08, 0.3), "dark",
+                             rotation=Matrix.Rotation(side * -0.35, 4, "Y"), bevel_width=0.004))
+            parts.append(box((side * 0.52, -2.4 - k * 0.2, 1.7), (0.03, 0.09, 0.45), "dark",
+                             rotation=Matrix.Rotation(side * -0.3, 4, "Y"), bevel_width=0.004))
+        p, ex = engine_pod(side, 1.05, -2.3, -4.4, 1.35, 0.32)
+        parts += p
+        exhausts.append(ex)
+        parts.append(box((side * 0.8, -3.3, 1.35), (0.5, 0.9, 0.18), "paint", bevel_width=0.03))  # Engine mounts.
+        face = Vector((side * 1.05, -2.26, 1.35))
+        parts.append(ring(face, (0, 1, 0), 0.3, 0.02, "metal", 28))
+        for k in range(5):
+            parts.append(cyl(face + Vector((-0.27, 0.01, -0.16 + k * 0.08)), face + Vector((0.27, 0.01, -0.16 + k * 0.08)),
+                             0.007, "metal", 5))
+        parts += rivets((side * 1.37, -2.5, 1.35), (side * 1.37, -4.2, 1.35), 9)
+    parts += blade_antenna((0, 1.6, 1.25), 0.22)
+    parts += blade_antenna((0, -0.6, 1.25), 0.18)
+    parts += beacon((0, -1.2, 1.27))
+    parts += beacon((0, 1.0, -1.22 - 0.0))
+    return parts, exhausts
+
+
+def mule_weapons():
+    pods, parts = [], []
+    for side in (-1, 1):
+        parts.append(loft("sponson", [
+            (2.4, 0.05, -0.75, -0.7, -0.8, 2.0, 2.0), (2.0, 0.32, -0.8, -0.45, -1.1, 2.6, 2.6),
+            (-2.6, 0.32, -0.8, -0.45, -1.1, 2.6, 2.6), (-3.1, 0.05, -0.75, -0.7, -0.8, 2.0, 2.0)], "paint", count=20))
+        parts[-1].location = (side * 1.42, 0, 0)
+        base.activate(parts[-1])
+        bpy.ops.object.transform_apply(location=True)
+        for y in (1.2, -0.3, -1.8):  # Sponson panels and fuel caps.
+            parts.append(box((side * 1.74, y, -0.78), (0.02, 0.9, 0.22), "paint", bevel_width=0.008))
+            parts += rivets((side * 1.755, y - 0.4, -0.68), (side * 1.755, y + 0.4, -0.68), 5, radius=0.011)
+        parts.append(cyl((side * 1.5, -0.9, -0.44), (side * 1.5, -0.9, -0.41), 0.06, "metal", 14))
+        parts += missile_rail((side * 1.78, 0.6, -0.55), 1.4)
+        pods.append(Vector((side * 1.78, 1.4, -0.55)))
+    parts += nav_lights((-1.77, -0.4, -0.45), (1.77, -0.4, -0.45))
+    tips = []
+    for side in (-1, 1):  # Door guns in the crew doors, pointing forward.
+        mount = Vector((side * 1.42, 2.95, -0.15))
+        parts.append(cyl(mount - Vector((side * 0.15, 0, 0)), mount, 0.05, "dark", 10))
+        parts.append(box(mount + Vector((0, 0.15, 0)), (0.16, 0.5, 0.16), "dark", bevel_width=0.02))
+        parts.append(box(mount + Vector((side * 0.12, 0.05, -0.08)), (0.12, 0.25, 0.22), "paint", bevel_width=0.02))  # Ammo can.
+        for k in range(3):
+            a = 2 * math.pi * k / 3
+            off = Vector((math.cos(a) * 0.035, 0, math.sin(a) * 0.035))
+            parts.append(cyl(mount + off + Vector((0, 0.4, 0)), mount + off + Vector((0, 1.2, 0)), 0.018, "metal", 8))
+        tip = mount + Vector((0, 1.22, 0))
+        parts.append(ring(tip, (0, 1, 0), 0.05, 0.012, "dark", 12))
+        tips.append(tip)
+    return parts, pods, tips
+
+
 def build_mule():
     """A tandem-rotor transport gunship (a Chinook in spirit): a long box of a fuselage,
     a low rotor pylon over the cockpit and a tall one at the back, both three-bladed and
@@ -866,91 +1043,40 @@ def build_mule():
     s = 1.4
     ground = -1.15 * s
     base.GROUND_Z = ground
-    body = loft("fuselage", [
-        (4.75, 0.35, -0.35, 0.05, -0.75, 2.2, 2.4),
-        (4.45, 0.95, -0.3, 0.55, -1.05, 2.6, 3.0),
-        (3.9, 1.18, -0.2, 0.85, -1.15, 3.2, 3.6),
-        (3.0, 1.25, -0.15, 1.05, -1.2, 3.6, 4.0),
-        (0.0, 1.28, -0.12, 1.1, -1.2, 4.0, 4.0),
-        (-3.2, 1.26, -0.08, 1.12, -1.15, 4.0, 4.0),
-        (-4.3, 1.15, 0.05, 1.12, -0.85, 3.6, 3.2),
-        (-4.9, 0.95, 0.25, 1.1, -0.45, 3.2, 2.6),
-    ], "paint", count=44)
-    base.HULL.append(body)
+    body = loft("fuselage", MULE_BODY, "paint", count=44)
+    sub = body.modifiers.new("subsurf", "SUBSURF")
+    sub.levels = 1
+    base.apply_all(body)
+    use_hull(body, MULE_BODY)
     parts = [body]
-    # The cockpit: a flat windscreen, side windows, chin windows, a centre post.
-    tilt = Matrix.Rotation(math.radians(-42), 4, "X")
-    for side in (-1, 1):
-        # On the nose slope and inside its outline (the hull narrows toward the top).
-        parts.append(box((side * 0.34, 4.4, 0.47), (0.58, 0.05, 0.56), "glass", rotation=tilt @ Matrix.Rotation(side * 0.15, 4, "Y")))
-        parts.append(box((side * 0.34, 4.39, 0.47), (0.64, 0.035, 0.62), "dark", rotation=tilt @ Matrix.Rotation(side * 0.15, 4, "Y")))
-        parts.append(box((side * 1.27, 3.75, 0.38), (0.05, 1.0, 0.52), "glass"))
-        parts.append(box((side * 1.255, 3.75, 0.38), (0.04, 1.08, 0.6), "dark"))
-        parts.append(box((side * 0.55, 4.66, -0.5), (0.48, 0.3, 0.05), "glass",
-                         rotation=Matrix.Rotation(math.radians(55), 4, "X")))
-    parts.append(box((0, 4.41, 0.47), (0.08, 0.07, 0.62), "paint", rotation=tilt))
-    # Round windows down both sides, the crew doors forward, rivet lines.
-    for side in (-1, 1):
-        for k in range(7):
-            y = 2.3 - k * 0.95
-            parts.append(cyl((side * 1.26, y, 0.25), (side * 1.3, y, 0.25), 0.2, "glass", 20))
-            parts.append(ring((side * 1.29, y, 0.25), (1, 0, 0), 0.21, 0.025, "dark", 20))
-        parts.append(box((side * 1.29, 2.95, -0.25), (0.03, 0.8, 1.25), "dark", bevel_width=0.01))
-        parts += rivets((side * 1.3, 3.9, -0.62), (side * 1.3, -4.0, -0.62), 22)
-        parts += rivets((side * 1.3, 3.9, 0.82), (side * 1.3, -4.0, 0.82), 22)
-    # Forward pylon: a low hump over the cockpit with the front mast.
-    parts.append(loft("front_pylon", [
-        (4.2, 0.2, 0.95, 1.1, 0.95, 2.0, 2.0), (3.6, 0.55, 1.0, 1.55, 1.0, 2.4, 2.0),
-        (2.6, 0.55, 1.0, 1.6, 1.0, 2.4, 2.0), (1.8, 0.3, 1.0, 1.2, 1.0, 2.0, 2.0)], "paint", count=24))
-    parts.append(cyl((0, 3.2, 1.55), (0, 3.2, 1.95), 0.12, "metal", 16))
-    # Aft pylon: tall, with the engines hung on its sides and the rear mast.
-    parts.append(loft("aft_pylon", [
-        (-1.6, 0.25, 1.05, 1.15, 1.05, 2.0, 2.0), (-2.6, 0.55, 1.05, 2.1, 1.05, 2.4, 2.0),
-        (-4.0, 0.55, 1.05, 2.45, 1.05, 2.4, 2.0), (-4.85, 0.35, 1.0, 2.2, 1.0, 2.2, 2.0)], "paint", count=24))
-    parts.append(cyl((0, -3.6, 2.4), (0, -3.6, 2.8), 0.12, "metal", 16))
-    exhausts = []
-    for side in (-1, 1):
-        p, ex = engine_pod(side, 1.05, -2.3, -4.4, 1.35, 0.32)
-        parts += p
-        exhausts.append(ex)
-        parts.append(box((side * 0.8, -3.3, 1.35), (0.5, 0.9, 0.18), "paint", bevel_width=0.03))  # Engine mounts.
-    # Fuel sponsons along the belly; missile rails on their fronts.
-    pods = []
-    for side in (-1, 1):
-        parts.append(loft("sponson", [
-            (2.4, 0.05, -0.75, -0.7, -0.8, 2.0, 2.0), (2.0, 0.32, -0.8, -0.45, -1.1, 2.6, 2.6),
-            (-2.6, 0.32, -0.8, -0.45, -1.1, 2.6, 2.6), (-3.1, 0.05, -0.75, -0.7, -0.8, 2.0, 2.0)], "paint", count=20))
-        parts[-1].location = (side * 1.42, 0, 0)
-        base.activate(parts[-1])
-        bpy.ops.object.transform_apply(location=True)
-        parts += missile_rail((side * 1.78, 0.6, -0.55), 1.4)
-        pods.append(Vector((side * 1.78, 1.4, -0.55)))
-        parts.append(ball((side * 1.75, -0.4, -0.45), 0.05, "light_green" if side > 0 else "light_red", segments=10,
-                          rings=5))
-    # Door guns in the crew doors, pointing forward.
-    tips = []
-    for side in (-1, 1):
-        mount = Vector((side * 1.42, 2.95, -0.15))
-        parts.append(cyl(mount - Vector((side * 0.15, 0, 0)), mount, 0.05, "dark", 10))
-        parts.append(box(mount + Vector((0, 0.15, 0)), (0.16, 0.5, 0.16), "dark", bevel_width=0.02))
-        for k in range(3):
-            a = 2 * math.pi * k / 3
-            off = Vector((math.cos(a) * 0.035, 0, math.sin(a) * 0.035))
-            parts.append(cyl(mount + off + Vector((0, 0.4, 0)), mount + off + Vector((0, 1.2, 0)), 0.018, "metal", 8))
-        tip = mount + Vector((0, 1.22, 0))
-        parts.append(ring(tip, (0, 1, 0), 0.05, 0.012, "dark", 12))
-        tips.append(tip)
-    # The rear ramp, hinged at the belly, and its hinge line.
-    parts.append(box((0, -4.6, -0.75), (2.1, 0.08, 0.95), "paint", rotation=Matrix.Rotation(math.radians(-30), 4, "X"),
-                     bevel_width=0.02))
+    parts += mule_cockpit()
+    parts += mule_hull()
+    pylons, exhausts = mule_pylons()
+    parts += pylons
+    weapons, pods, tips = mule_weapons()
+    parts += weapons
+    # The rear ramp, hinged at the belly: its actuators, the loading lights and stripes.
+    tilt = Matrix.Rotation(math.radians(-30), 4, "X")
+    parts.append(box((0, -4.6, -0.75), (2.1, 0.08, 0.95), "paint", rotation=tilt, bevel_width=0.02))
+    for x in (-0.6, 0.0, 0.6):
+        parts.append(box((x, -4.66, -0.75), (0.12, 0.02, 0.8), "hazard", rotation=tilt))
     parts.append(cyl((-1.0, -4.15, -1.12), (1.0, -4.15, -1.12), 0.05, "metal", 12))
-    parts.append(ball((0, -4.95, 1.0), 0.05, "light_red", segments=10, rings=5))
-    # Four wheels on short legs.
+    for side in (-1, 1):
+        parts.append(cyl((side * 0.95, -4.0, -0.6), (side * 0.95, -4.5, -0.45), 0.04, "metal", 10))
+        p, n = base.surface(side, -4.6, 0.3, 0.02)
+        parts.append(ball(p, 0.045, "lamp", segments=10, rings=5))  # Loading lights.
+    p, n = base.surface(1, -4.85, 1.0, 0.0)
+    parts.append(ball(Vector((0, p.y - 0.02, 1.0)), 0.05, "light_red", segments=10, rings=5))
+    # Four wheels on short legs with oleo struts.
     for y, x in ((2.6, 1.0), (-2.9, 1.05)):
         for side in (-1, 1):
             hub = Vector((side * x, y, ground + 0.32))
             parts.append(tube([(side * (x - 0.2), y, -1.0), hub], 0.07, "metal", 12))
+            parts.append(cyl((side * (x - 0.3), y + 0.2, -0.95), hub + Vector((0, 0.1, 0.2)), 0.04, "metal", 10))
             parts += wheel(hub, 0.32, 0.22)
+    for side in (-1, 1):
+        parts.append(number("77", side, -0.5, 0.75, 0.32, body))
+        parts += roundel(side, -2.9, 0.75, 0.18, body)
     body = join(parts, "body")
     base.activate(body)
     bpy.ops.object.shade_smooth_by_angle(angle=math.radians(35))
@@ -958,19 +1084,31 @@ def build_mule():
     rear.name = "rotor_upper"
     rotor(3, Vector((0, 3.2, 1.55)), 1.95, 1.05)
     empty("tail_rotor", (0, -4.9, 1.0))
-    empty("eye", (0.42, 3.55, 0.45))  # The pilot sits on the right (make_cockpit.py).
+    empty("eye", tuple(MULE_EYE))
     empty("muzzle_l", tips[0])
     empty("muzzle_r", tips[1])
     empty("pod_l", pods[0])
     empty("pod_r", pods[1])
     empty("exhaust_l", exhausts[0])
     empty("exhaust_r", exhausts[1])
+    # Crack spots on the two windscreen panes, normal out of the glass.
+    (ty, tz), (ly, lz) = MULE_SCREEN_TOP, MULE_SCREEN_LOW
+    n = Vector((0, ly - ty, lz - tz)).cross(Vector((1, 0, 0))).normalized()
+    if n.y < 0:
+        n = -n
+    for k, (x, t) in enumerate([(0.5, 0.4), (-0.5, 0.6), (0.2, 0.7), (-0.3, 0.3), (0.75, 0.6), (-0.75, 0.5),
+                                (0.4, 0.15), (-0.15, 0.85)]):
+        p = Vector((x, ly + (ty - ly) * t, lz + (tz - lz) * t)) + n * 0.015
+        m = empty("crack_%d" % k, p)
+        m.rotation_mode = "QUATERNION"
+        m.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(n)
 
 
 # Closer looks for judging the details (scaled for the bigger classes in preview).
 base.VIEWS.update({
     "quarter": ((4.6, 6.0, 1.4), (0, 1.2, 0.1)),
     "rear": ((-5.5, -7.5, 3.2), (0, -1.8, 0.6)),
+    "nose": ((3.2, 8.6, 1.3), (0, 3.2, 0.2)),
 })
 
 BUILDS = {"gunship": build_gunship, "heavy": build_heavy, "striker": build_striker, "mule": build_mule}
@@ -987,7 +1125,7 @@ if __name__ == "__main__":
         directory = args[1]
         for name in args[2:] or list(BUILDS):
             BUILDS[name]()
-            base.preview(os.path.join(directory, name), ["front", "side", "top", "quarter", "rear"])
+            base.preview(os.path.join(directory, name), ["front", "side", "top", "quarter", "rear", "nose"])
     else:
         for name in args or list(BUILDS):
             BUILDS[name]()

@@ -29,11 +29,18 @@ twist, heavy atmosphere, strong lighting and post-processing.
   bench (two machine guns, two rocket pods), riveted access panels and stencils. The
   canopy frame comes from `choppa_shared.py`, which the cockpit uses too, so the view
   from inside matches the outside. Other players see the cockpit through the glass.
-- Cockpit view (`make_cockpit.py` + `scripts/cockpit.gd`): mostly window, a compact
-  panel on a pedestal in the chin glass (all of it on screen at the default FOV):
-  gauges with aged faces, red zones, tapered needles and glass glints in brass bezels,
-  amber radar, nixie kill counter, hull lamp bar, ordnance plate, warning lamps,
-  missile beacon, and a reflector gunsight above the radar. The 2D HUD steps back.
+- Cockpit view (`make_cockpit.py` + `cockpit_parts.py` + `scripts/cockpit.gd`): one
+  interior per class (owner 2026-10-17: "individual and way more detailed and
+  realistic"), each with its canopy frame, seat and harness, pedals, stick and
+  collective, side consoles with switch fields and breakers, wiring, placards. Scout:
+  the Little Bird's compact pedestal panel of aged round gauges, amber radar scope,
+  reflector gunsight. Gunship: an Apache style tandem tub, two multi-function displays
+  (flight and radar pages) under a glare hood, standby gauges, a helmet-style HUD.
+  Heavy: a Hind pilot's bubble, a wide panel of three rows of round instruments in
+  Soviet turquoise, an overhead panel, the gunner's glazed nose below. Striker: a
+  Ka-52 style side-by-side glass cockpit, the pilot on the left, four displays, a HUD
+  combiner, a centre console with a keypad. The panels sit in the bottom of the view
+  at the default FOV; free look (Alt) shows the rest. The 2D HUD steps back.
 - Choppa effects: star muzzle flashes with light from the gun that fired, brass casings,
   heat shimmer behind the exhausts, a downwash ring on the ground (spray over water),
   and canopy cracks that spread as the hull takes damage (seen from inside too).

@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://chnmrxacfs216"
-path="res://.godot/imported/cockpit.glb-3fc78b60741111777e4608f94b8ce1d4.scn"
+uid="uid://csmprcfc88ivh"
+path="res://.godot/imported/cockpit_striker.glb-785f0ca0d0ca761d8f69dbfd8a851b25.scn"
 
 [deps]
 
-source_file="res://assets/models/choppa/cockpit.glb"
-dest_files=["res://.godot/imported/cockpit.glb-3fc78b60741111777e4608f94b8ce1d4.scn"]
+source_file="res://assets/models/choppa/cockpit_striker.glb"
+dest_files=["res://.godot/imported/cockpit_striker.glb-785f0ca0d0ca761d8f69dbfd8a851b25.scn"]
 
 [params]
 

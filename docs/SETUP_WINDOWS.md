@@ -81,7 +81,7 @@ scripts in `tools/blender/` and committed, so you only need this to change them.
    - `python tools/blender/make_choppa.py`: the helicopter (the scout)
    - `python tools/blender/make_airframes.py`: the gunship and the heavy
      (`--preview out_dir` renders Cycles previews instead of exporting)
-   - `python tools/blender/make_cockpit.py`: the cockpit interior
+   - `python tools/blender/make_cockpit.py`: the four cockpit interiors
    - `python tools/blender/make_trees.py`: the pines and their needle texture
      (`--preview out_dir` too)
 4. Sounds don't need Blender: `pip install numpy`, then

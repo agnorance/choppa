@@ -406,7 +406,7 @@ def build_striker():
     upper.name = "rotor_upper"
     rotor(3, Vector((0, -0.3, 1.86)), 1.86, 1.0)
     empty("tail_rotor", (end.x, end.y, end.z))
-    empty("eye", (0, 2.0, 0.62))
+    empty("eye", (-0.36, 2.0, 0.62))  # The pilot sits on the left (make_cockpit.py).
     empty("muzzle_l", tips[0])
     empty("muzzle_r", tips[-1])
     empty("pod_l", pods[0])

@@ -95,6 +95,7 @@ func _run() -> void:
 		"test_assist_auto_start_can_be_off",
 		"test_key_rates_and_ramp",
 		"test_rebinding_keys",
+		"test_every_class_has_its_own_cockpit",
 		"test_spawns_are_on_dry_clear_ground",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
@@ -1811,3 +1812,39 @@ func test_rebinding_keys() -> void:
 	_check(InputMap.action_has_event("fire", key.call(KEY_CTRL)) and not InputMap.action_has_event("fire", key.call(KEY_J)),
 		"defaults back after a reset")
 	_check(InputMap.action_has_event("flares", key.call(KEY_X)), "flares on X again")
+
+
+## Owner: "each helicopter's cockpit should be individual". Every class loads its own
+## interior with a frame, controls, a sight dead ahead and live instruments; the glass
+## cockpits have their displays.
+func test_every_class_has_its_own_cockpit() -> void:
+	var seen := {}
+	for id: String in Airframe.ORDER:
+		var shell := Cockpit.shell(id)
+		var meshes := shell.find_children("*", "MeshInstance3D", true, false)
+		var tris := 0
+		for m: MeshInstance3D in meshes:
+			tris += m.mesh.get_faces().size() / 3
+		seen[tris] = id
+		for part in ["shell", "frame", "stick", "collective", "mount_sight", "mount_speed", "mount_altitude",
+				"mount_health", "mount_item", "mount_kills", "mount_beacon", "mount_lamp_missile", "mount_lamp_lock"]:
+			_check(shell.find_child(part) != null, "%s cockpit has %s" % [id, part])
+		var sight := shell.find_child("mount_sight") as Node3D
+		if sight:
+			_check(absf(sight.position.x) < 0.01 and absf(sight.position.y) < 0.01 and sight.position.z < -0.3,
+				"%s: the sight is dead ahead of the eye, %s" % [id, sight.position])
+		var screens := shell.find_children("mount_mfd_*", "", true, false).size()
+		if id in [Airframe.GUNSHIP, Airframe.STRIKER]:
+			_check(screens >= 2, "%s is a glass cockpit, %d displays" % [id, screens])
+		shell.free()
+	_check(seen.size() == Airframe.ORDER.size(), "four different interiors: %s" % [seen])
+	# The live instruments build on every one, displays included.
+	for id: String in Airframe.ORDER:
+		var c := _choppa(Vector3(0.0, 40.0, 0.0))
+		var cockpit := Cockpit.new()
+		cockpit.choppa = c
+		cockpit.airframe = id
+		_world.add_child(cockpit)
+		await process_frame
+		_check(cockpit.reticle != null and not cockpit._gauges.is_empty(), "%s: instruments built, %s" % [id, cockpit._gauges.keys()])
+		cockpit.free()

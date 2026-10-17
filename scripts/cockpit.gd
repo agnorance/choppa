@@ -1,24 +1,32 @@
 class_name Cockpit
 extends Node3D
-## First-person cockpit: the Blender shell (assets/models/choppa/cockpit.glb, built by
-## tools/blender/make_cockpit.py) plus live instruments mounted at its "mount_*" markers:
-## needle gauges, an amber radar, a nixie kill counter, a health lamp bar, the loadout
-## plate, warning lamps and a rotating missile beacon. Stick and collective follow the
-## controls. Origin = the pilot's eye. Only built for the local player.
+## First-person cockpit: the class's Blender interior (assets/models/choppa/
+## cockpit_<class>.glb, built by tools/blender/make_cockpit.py) plus live instruments at
+## its "mount_*" markers: needle gauges, a radar scope, multi-function displays (flight,
+## radar and systems pages), a head-up display, a nixie kill counter, a health lamp bar,
+## the loadout plate, warning lamps and a rotating missile beacon. A mount the model
+## does not have is simply left out. Stick and collective follow the controls. Origin =
+## the pilot's eye. Only built for the local player.
 
-const PANEL_PAINT := Color(0.27, 0.38, 0.34)  ## The teal-green of old control rooms.
+## Panel paint per class: the teal-green of old control rooms, Apache grey, Soviet
+## turquoise, a modern blue-grey.
+const PAINTS := {"scout": Color(0.27, 0.38, 0.34), "gunship": Color(0.2, 0.22, 0.22),
+	"heavy": Color(0.24, 0.46, 0.47), "striker": Color(0.22, 0.25, 0.29)}
+const SIGHT_DISTANCE := 0.6  ## The reticle is sized for a sight glass this far from the eye.
 const CREAM := Color(0.92, 0.86, 0.7)
 const AMBER := Color(1.0, 0.62, 0.2)
 
 var choppa: Choppa
-var show_frame := true  ## The scout's canopy frame; off for the other classes.
+var airframe := Airframe.SCOUT  ## Which interior to build.
 ## Returns the kill count to show, or -1 for "--" (free flight). Set by the game mode.
 var kills_source: Callable = func() -> int: return -1
 var reticle: Node3D  ## The gunsight glow; only shown from the pilot's seat.
 
 var _gauges := {}
 var _stick: Node3D
+var _stick_copilot: Node3D
 var _collective: Node3D
+var _hud: Array[Label3D] = []  ## Speed, altitude, heading, loadout on the head-up display.
 var _health_cells: Array[MeshInstance3D] = []
 var _cell_off: StandardMaterial3D
 var _item_label: Label3D
@@ -32,15 +40,18 @@ var _clock := 0.0
 var _warning: AudioStreamPlayer
 
 
-## The bare interior (no live instruments), for other choppas seen through their canopy.
-## The cockpit model. `frame`: whether to show the scout's canopy frame (the other
-## classes have their own canopy and would see it poke through).
-static func shell(frame := true) -> Node3D:
-	var model: Node3D = (load("res://assets/models/choppa/cockpit.glb") as PackedScene).instantiate()
-	var frame_node := model.find_child("frame") as Node3D
-	if frame_node:
-		frame_node.visible = frame
-	var materials := ChoppaModel.part_materials(PANEL_PAINT, Vector2(0.32, 0.2))
+## The bare interior of a class (no live instruments), also what other choppas show
+## through their canopy.
+static func shell(id := Airframe.SCOUT) -> Node3D:
+	var path := "res://assets/models/choppa/cockpit_%s.glb" % id
+	if not ResourceLoader.exists(path):
+		path = "res://assets/models/choppa/cockpit_scout.glb"
+	var model: Node3D = (load(path) as PackedScene).instantiate()
+	var materials := ChoppaModel.part_materials(PAINTS.get(id, PAINTS.scout), Vector2(0.32, 0.2))
+	materials.fabric = ChoppaModel._material(Color(0.16, 0.16, 0.13), 0.0, 0.95)
+	materials.screen = ChoppaModel._material(Color(0.02, 0.025, 0.03), 0.3, 0.15)
+	materials.placard = ChoppaModel._material(Color(0.78, 0.75, 0.66), 0.0, 0.7)
+	materials.lamp_off = ChoppaModel._material(Color(0.22, 0.16, 0.08), 0.1, 0.3)
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D"):
 		for k in mesh.mesh.get_surface_count():
 			var source := mesh.mesh.surface_get_material(k)
@@ -50,24 +61,33 @@ static func shell(frame := true) -> Node3D:
 
 
 func _ready() -> void:
-	var shell := Cockpit.shell(show_frame)
+	var shell := Cockpit.shell(airframe)
 	add_child(shell)
 	_stick = shell.find_child("stick")
+	_stick_copilot = shell.find_child("stick_copilot")
 	_collective = shell.find_child("collective")
 
-	_gauges.speed = _add_gauge(shell, "speed", "AIRSPEED", "km/h", 0.0, 300.0, 6)
-	_gauges.altitude = _add_gauge(shell, "altitude", "ALTITUDE", "m", 0.0, 100.0, 5)
-	_gauges.boost = _add_gauge(shell, "boost", "BOOST", "%", 0.0, 100.0, 4)
-	_gauges.heat = _add_gauge(shell, "heat", "GUN TEMP", "", 0.0, 100.0, 4, 0.75)
-	_gauges.rpm = _add_gauge(shell, "rpm", "ROTOR", "rpm", 0.0, 500.0, 5, 0.85)
-	_build_radar(_mount(shell, "radar"))
-	_build_nixies(_mount(shell, "kills"))
-	_build_health(_mount(shell, "health"))
-	_build_item_plate(_mount(shell, "item"))
+	for spec: Array in [["speed", "AIRSPEED", "km/h", 0.0, 300.0, 6, 2.0], ["altitude", "ALTITUDE", "m", 0.0, 100.0, 5, 2.0],
+			["boost", "BOOST", "%", 0.0, 100.0, 4, 2.0], ["heat", "GUN TEMP", "", 0.0, 100.0, 4, 0.75],
+			["rpm", "ROTOR", "rpm", 0.0, 500.0, 5, 0.85], ["vsi", "CLIMB", "m/s", -20.0, 20.0, 4, 2.0],
+			["torque", "TORQUE", "%", 0.0, 150.0, 5, 0.8], ["heading", "HEADING", "", 0.0, 360.0, 4, 2.0]]:
+		if _mount(shell, spec[0]):
+			_gauges[spec[0]] = _add_gauge(shell, spec[0], spec[1], spec[2], spec[3], spec[4], spec[5], spec[6])
+	if _mount(shell, "radar"):
+		_build_radar(_mount(shell, "radar"))
+	for marker in shell.find_children("mount_mfd_*", "", true, false):
+		_build_mfd(marker as Node3D, (marker.name as String).trim_prefix("mount_mfd_").get_slice("_", 0))
+	if _mount(shell, "kills"):
+		_build_nixies(_mount(shell, "kills"))
+	if _mount(shell, "health"):
+		_build_health(_mount(shell, "health"))
+	if _mount(shell, "item"):
+		_build_item_plate(_mount(shell, "item"))
 	for lamp: Array in [["missile", Color(1.0, 0.1, 0.05), "MSL"], ["overheat", Color(1.0, 0.5, 0.05), "HOT"],
 			["service", Color(0.3, 1.0, 0.4), "SVC"], ["lock", Color(0.2, 0.8, 1.0), "LOCK"]]:
-		_lamps[lamp[0]] = _build_lamp(_mount(shell, "lamp_" + lamp[0]), lamp[1], lamp[2])
-	_build_beacon(_mount(shell, "beacon"))
+		if _mount(shell, "lamp_" + lamp[0]):
+			_lamps[lamp[0]] = _build_lamp(_mount(shell, "lamp_" + lamp[0]), lamp[1], lamp[2])
+	_build_beacon(_mount(shell, "beacon") if _mount(shell, "beacon") else self)
 	_warning = AudioStreamPlayer.new()
 	_warning.stream = Sounds.stream("warning_loop")
 	_warning.volume_db = -12.0
@@ -76,7 +96,15 @@ func _ready() -> void:
 	_warning.play()
 	_warning.stream_paused = true
 	reticle = _mount(shell, "sight")
+	if reticle == null:
+		reticle = Node3D.new()
+		reticle.position = Vector3(0.0, 0.0, -SIGHT_DISTANCE)
+		add_child(reticle)
+	# Further off, the same symbol has to be bigger to look the same.
+	reticle.scale = Vector3.ONE * maxf(1.0, reticle.position.length() / SIGHT_DISTANCE)
 	_build_reticle(reticle)
+	if _mount(shell, "hud"):
+		_build_hud(reticle)
 
 	# A dim warm light so the panel reads even in the shade.
 	var fill := OmniLight3D.new()
@@ -91,33 +119,35 @@ func _process(delta: float) -> void:
 	if choppa == null or not visible:
 		return
 	_clock += delta
-	(_gauges.speed as Gauge).value = choppa.velocity.length() * 3.6
-	(_gauges.altitude as Gauge).value = choppa.altitude
-	(_gauges.boost as Gauge).value = choppa.boost_meter * 100.0
-	(_gauges.heat as Gauge).value = choppa.heat * 100.0
-	(_gauges.rpm as Gauge).value = 330.0 + choppa.input.collective * 50.0 + (70.0 if choppa.is_boosting() else 0.0)
-
 	var i := choppa.input
+	var readings := {
+		"speed": choppa.velocity.length() * 3.6, "altitude": choppa.altitude, "boost": choppa.boost_meter * 100.0,
+		"heat": choppa.heat * 100.0, "vsi": choppa.velocity.y,
+		"rpm": choppa.spool * (330.0 + i.collective * 50.0 + (70.0 if choppa.is_boosting() else 0.0)),
+		"torque": choppa.lift_share() * (1.0 + i.collective * choppa.collective_range) * 100.0,
+		"heading": fposmod(-rad_to_deg(choppa.heading), 360.0),
+	}
+	for key: String in _gauges:
+		(_gauges[key] as Gauge).value = readings[key]
+	if not _hud.is_empty():
+		_hud[0].text = "%d" % roundi(readings.speed)
+		_hud[1].text = "%d" % roundi(readings.altitude)
+		_hud[2].text = "%03d" % roundi(readings.heading)
+		_hud[3].text = "G%d  R%d  M%d" % [choppa.ammo.gun, choppa.ammo.rockets, choppa.ammo.missiles]
+
 	if _stick:
 		_stick.rotation = Vector3(-i.cyclic.y * 0.3, 0.0, -i.cyclic.x * 0.3)
+	if _stick_copilot:
+		_stick_copilot.rotation = _stick.rotation
 	if _collective:
 		_collective.rotation.x = i.collective * 0.3
 
 	var kills: int = kills_source.call()
 	var text := "--" if kills < 0 else "%02d" % mini(kills, 99)
-	for k in 2:
+	for k in _nixies.size():
 		_nixies[k].text = text[k]
 
-	var lit := ceili(choppa.health / choppa.max_health * _health_cells.size())
-	for k in _health_cells.size():
-		var on := k < lit
-		var level := float(k) / _health_cells.size()
-		var color := Color(0.9, 0.15, 0.05).lerp(Color(0.25, 1.0, 0.3), smoothstep(0.2, 0.7, level))
-		_health_cells[k].material_override = _cell_material(color) if on else _cell_off
-
-	_item_label.text = "G%d R%d M%d F%d" % [choppa.ammo.gun, choppa.ammo.rockets, choppa.ammo.missiles, choppa.ammo.flares]
-	_item_label.modulate = AMBER * (2.0 if choppa.ammo.rockets + choppa.ammo.missiles > 0 else 0.6)
-
+	_update_plates()
 	var blink := fmod(_clock, 0.5) < 0.3
 	var hunted := _missile_incoming()
 	_set_lamp("missile", hunted and blink)
@@ -134,6 +164,19 @@ func _process(delta: float) -> void:
 		_beacon.rotate_object_local(Vector3.UP, delta * 9.0)
 
 
+func _update_plates() -> void:
+	var lit := ceili(choppa.health / choppa.max_health * _health_cells.size())
+	for k in _health_cells.size():
+		var on := k < lit
+		var level := float(k) / _health_cells.size()
+		var color := Color(0.9, 0.15, 0.05).lerp(Color(0.25, 1.0, 0.3), smoothstep(0.2, 0.7, level))
+		_health_cells[k].material_override = _cell_material(color) if on else _cell_off
+
+	if _item_label:
+		_item_label.text = "G%d R%d M%d F%d" % [choppa.ammo.gun, choppa.ammo.rockets, choppa.ammo.missiles, choppa.ammo.flares]
+		_item_label.modulate = AMBER * (2.0 if choppa.ammo.rockets + choppa.ammo.missiles > 0 else 0.6)
+
+
 func _missile_incoming() -> bool:
 	for node in get_tree().get_nodes_in_group("missiles"):
 		var missile := node as Weapons.Missile
@@ -144,9 +187,9 @@ func _missile_incoming() -> bool:
 
 # --- builders ------------------------------------------------------------------
 
+## The model's marker for an instrument, or null if this cockpit has none.
 func _mount(shell: Node3D, mount_name: String) -> Node3D:
-	var marker: Node3D = shell.find_child("mount_" + mount_name)
-	return marker if marker else self
+	return shell.find_child("mount_" + mount_name) as Node3D
 
 
 func _add_gauge(shell: Node3D, mount_name: String, title: String, unit: String,
@@ -289,7 +332,45 @@ func _build_reticle(mount: Node3D) -> void:
 
 
 func _set_lamp(lamp_name: String, on: bool) -> void:
-	(_lamps[lamp_name] as StandardMaterial3D).emission_energy_multiplier = 5.0 if on else 0.0
+	if _lamps.has(lamp_name):
+		(_lamps[lamp_name] as StandardMaterial3D).emission_energy_multiplier = 5.0 if on else 0.0
+
+
+## A multi-function display: a page drawn into a SubViewport, shown on the screen glass.
+## The mount is sized for a 0.2 m screen.
+func _build_mfd(mount: Node3D, page: String) -> void:
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(320, 320)
+	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	var screen := Mfd.new()
+	screen.cockpit = self
+	screen.page = page
+	screen.size = Vector2(320, 320)
+	viewport.add_child(screen)
+	add_child(viewport)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_texture = viewport.get_texture()
+	m.albedo_color = Color(1.25, 1.25, 1.25)
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.2, 0.2)
+	var glass := MeshInstance3D.new()
+	glass.mesh = quad
+	glass.material_override = m
+	glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mount.add_child(glass)
+	mount.add_child(glass_cover(0.1, 0.002))
+
+
+## Head-up display numbers round the reticle: speed left, altitude right, heading above,
+## loadout below. Green like the reticle; they show only from the seat.
+func _build_hud(mount: Node3D) -> void:
+	for spot: Vector3 in [Vector3(-0.07, 0.0, 0.0), Vector3(0.07, 0.0, 0.0), Vector3(0.0, 0.055, 0.0), Vector3(0.0, -0.055, 0.0)]:
+		var label := _label(mount, "", 40, Color(0.45, 1.6, 0.35), spot)
+		label.pixel_size = 0.00035
+		label.no_depth_test = true
+		label.render_priority = 10
+		_hud.append(label)
 
 
 func _build_beacon(mount: Node3D) -> void:
@@ -541,6 +622,142 @@ class Gauge extends Node3D:
 
 	func _angle(t: float) -> float:
 		return SWEEP * 0.5 - t * SWEEP
+
+
+## A display page for the glass cockpits: "flight" (attitude, speed and altitude tapes,
+## heading), "radar" (the scope in green) or "systems" (hull and parts, engine, gun, loadout).
+class Mfd extends Control:
+	const GREEN := Color(0.4, 1.0, 0.45)
+	const AMBER_LINE := Color(1.0, 0.7, 0.2)
+	var cockpit: Cockpit
+	var page := "flight"
+	var _sweep := 0.0
+
+	func _process(delta: float) -> void:
+		_sweep = fmod(_sweep + delta * 2.2, TAU)
+		queue_redraw()
+
+	func _draw() -> void:
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.01, 0.015, 0.02))
+		if cockpit == null or cockpit.choppa == null:
+			return
+		match page:
+			"radar":
+				_draw_radar()
+			"systems":
+				_draw_systems()
+			_:
+				_draw_flight()
+		draw_rect(Rect2(Vector2.ZERO, size), Color(GREEN, 0.35), false, 3.0)
+
+	func _text(at: Vector2, text: String, font_size := 22, color := GREEN, align := HORIZONTAL_ALIGNMENT_CENTER, width := 120.0) -> void:
+		var font := UiKit.font("condensed")
+		var x := at.x - (width * 0.5 if align == HORIZONTAL_ALIGNMENT_CENTER else (width if align == HORIZONTAL_ALIGNMENT_RIGHT else 0.0))
+		draw_string(font, Vector2(x, at.y), text, align, width, font_size, color)
+
+	func _draw_flight() -> void:
+		var me := cockpit.choppa
+		var c := size * 0.5
+		# Attitude: sky over ground, rolled by the bank, shifted by the pitch.
+		var bank := -me.bank_right()
+		var pitch := me.nose_down()
+		var per_degree := 3.2
+		var shift := Vector2(0.0, -rad_to_deg(pitch) * per_degree).rotated(bank)
+		var across := Vector2(cos(bank), sin(bank))
+		var down := Vector2(-sin(bank), cos(bank))
+		var mid := c + shift
+		var far := 400.0
+		draw_colored_polygon(PackedVector2Array([mid - across * far, mid + across * far, mid + across * far - down * far,
+			mid - across * far - down * far]), Color(0.05, 0.13, 0.28))
+		draw_colored_polygon(PackedVector2Array([mid - across * far, mid + across * far, mid + across * far + down * far,
+			mid - across * far + down * far]), Color(0.22, 0.13, 0.05))
+		draw_line(mid - across * far, mid + across * far, Color.WHITE, 2.0)
+		for k in range(-4, 5):  # Pitch ladder every 10 degrees.
+			if k == 0:
+				continue
+			var p := mid - down * k * 10.0 * per_degree
+			var half := 30.0 if k % 2 == 0 else 18.0
+			draw_line(p - across * half, p + across * half, Color(1, 1, 1, 0.8), 2.0)
+		# The aircraft symbol, fixed in the middle.
+		draw_line(c + Vector2(-50, 0), c + Vector2(-16, 0), AMBER_LINE, 4.0)
+		draw_line(c + Vector2(16, 0), c + Vector2(50, 0), AMBER_LINE, 4.0)
+		draw_circle(c, 4.0, AMBER_LINE)
+		# Speed and altitude boxes, the heading on top, climb rate and rotor at the bottom.
+		draw_rect(Rect2(8, c.y - 18, 70, 36), Color(0, 0, 0, 0.8))
+		draw_rect(Rect2(8, c.y - 18, 70, 36), GREEN, false, 2.0)
+		_text(Vector2(43, c.y + 9), "%d" % roundi(me.velocity.length() * 3.6), 26)
+		draw_rect(Rect2(size.x - 78, c.y - 18, 70, 36), Color(0, 0, 0, 0.8))
+		draw_rect(Rect2(size.x - 78, c.y - 18, 70, 36), GREEN, false, 2.0)
+		_text(Vector2(size.x - 43, c.y + 9), "%d" % roundi(me.altitude), 26)
+		var heading := fposmod(-rad_to_deg(me.heading), 360.0)
+		draw_rect(Rect2(0, 0, size.x, 34), Color(0, 0, 0, 0.75))
+		for k in range(-4, 5):
+			var mark := roundi(heading / 10.0) * 10 + k * 10
+			var x := c.x + (mark - heading) * 3.0
+			draw_line(Vector2(x, 26), Vector2(x, 34), GREEN, 2.0)
+			if mark % 30 == 0:
+				_text(Vector2(x, 22), "%02d" % (posmod(mark, 360) / 10), 18)
+		draw_line(Vector2(c.x, 30), Vector2(c.x, 42), AMBER_LINE, 3.0)
+		_text(Vector2(60, size.y - 12), "VS %+.1f" % me.velocity.y, 20)
+		_text(Vector2(size.x - 60, size.y - 12), "NR %d%%" % roundi(me.spool * 100.0), 20)
+		_text(Vector2(c.x, size.y - 12), "ENG ON" if me.engine_on else "ENG OFF", 20, GREEN if me.engine_on else AMBER_LINE)
+
+	func _draw_radar() -> void:
+		var me := cockpit.choppa
+		var c := size * 0.5
+		var r := size.x * 0.44
+		for k in [0.33, 0.66, 1.0]:
+			draw_arc(c, r * k, 0.0, TAU, 64, Color(GREEN, 0.5), 2.0)
+		for k in 24:
+			var a := _sweep - k * 0.03
+			draw_line(c, c + Vector2(sin(a), -cos(a)) * r, Color(GREEN, 0.6 * (1.0 - k / 24.0)), 3.0)
+		var to_local := me.facing().inverse()
+		for node in me.get_tree().get_nodes_in_group("stations"):
+			var station := node as ServiceStation
+			var p := _project(to_local * (station.global_position - me.global_position), c, r)
+			if p != Vector2.INF and station.is_ready():
+				draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color(0.5, 0.8, 1.0), false, 2.0)
+		for node in me.get_tree().get_nodes_in_group("choppas"):
+			var other := node as Choppa
+			if other == me or not other.alive:
+				continue
+			var p := _project(to_local * (other.global_position - me.global_position), c, r)
+			if p != Vector2.INF:
+				draw_colored_polygon(PackedVector2Array([p + Vector2(0, -9), p + Vector2(8, 7), p + Vector2(-8, 7)]),
+					Color(1.0, 0.35, 0.25))
+		for node in me.get_tree().get_nodes_in_group("missiles"):
+			var p := _project(to_local * ((node as Node3D).global_position - me.global_position), c, r)
+			if p != Vector2.INF:
+				draw_circle(p, 5.0, Color(1.0, 0.9, 0.2))
+		draw_colored_polygon(PackedVector2Array([c + Vector2(0, -10), c + Vector2(7, 8), c + Vector2(-7, 8)]), GREEN)
+		_text(Vector2(50, 26), "TSD", 22)
+		_text(Vector2(size.x - 60, 26), "%d M" % roundi(RadarScreen.RANGE), 20)
+
+	func _project(local: Vector3, c: Vector2, r: float) -> Vector2:
+		var flat := Vector2(local.x, local.z) / RadarScreen.RANGE
+		return Vector2.INF if flat.length() > 1.0 else c + flat * r
+
+	func _draw_systems() -> void:
+		var me := cockpit.choppa
+		_text(Vector2(size.x * 0.5, 28), "SYSTEMS", 24)
+		var rows := [["HULL", me.health / me.max_health], ["ROTOR", 1.0 - me.wear(Choppa.Part.ROTOR)],
+			["TAIL", 1.0 - me.wear(Choppa.Part.TAIL)], ["ENGINE", 1.0 - me.wear(Choppa.Part.ENGINE)],
+			["BOOST", me.boost_meter], ["GUN HEAT", me.heat]]
+		for k in rows.size():
+			var y := 50.0 + k * 38.0
+			var share: float = rows[k][1]
+			_text(Vector2(14, y + 20), rows[k][0], 20, GREEN, HORIZONTAL_ALIGNMENT_LEFT, 100.0)
+			var color := GREEN
+			if k == 5:
+				color = AMBER_LINE if share > 0.7 else GREEN
+			elif share < 0.3:
+				color = Color(1.0, 0.3, 0.2)
+			elif share < 0.6:
+				color = AMBER_LINE
+			draw_rect(Rect2(118, y + 4, 180, 20), Color(GREEN, 0.15))
+			draw_rect(Rect2(118, y + 4, 180 * clampf(share, 0.0, 1.0), 20), color)
+		var ammo: Dictionary = me.ammo
+		_text(Vector2(size.x * 0.5, 292), "GUN %d   RKT %d   MSL %d   FLR %d" % [ammo.gun, ammo.rockets, ammo.missiles, ammo.flares], 20)
 
 
 ## The radar picture, drawn into a SubViewport: amber phosphor rings, a sweeping beam,

@@ -144,11 +144,11 @@ func _build() -> void:
 		# The live instruments, seen through the canopy in chase view too.
 		cockpit_view = Cockpit.new()
 		cockpit_view.choppa = pilot
-		cockpit_view.show_frame = airframe == Airframe.SCOUT
+		cockpit_view.airframe = airframe
 		cockpit_view.position = eye
 		add_child(cockpit_view)
 	else:
-		var shell := Cockpit.shell(airframe == Airframe.SCOUT)
+		var shell := Cockpit.shell(airframe)
 		shell.position = eye
 		_parts.add_child(shell)
 

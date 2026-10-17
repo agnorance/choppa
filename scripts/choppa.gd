@@ -127,6 +127,9 @@ var clearance := GROUND_CLEARANCE  ## Body origin to skid bottom for this airfra
 var engine_on := true
 var spool := 1.0  ## Rotor rpm as a share of flight rpm, 0..1. Lift and control follow it.
 var _engine_held := false
+var spool_up_time := SPOOL_UP_TIME  ## Per class (Airframe "spool").
+var gun_interval := GUN_INTERVAL  ## Seconds between rounds, per class.
+var recoil := GUN_RECOIL  ## Per class.
 var gun_factor := 1.0  ## Machine-gun damage multiplier of the airframe.
 ## Rounds left: rockets, missiles, flares, mines, smoke. Refilled at service stations.
 var ammo := {"gun": 0, "rockets": 0, "missiles": 0, "flares": 0, "mines": 0, "smoke": 0}
@@ -216,7 +219,7 @@ func step(delta: float) -> void:
 	# Recoil, here rather than in _update_gun so a network replay (which skips the gun)
 	# still feels it and the prediction stays right.
 	if i.fire and not overheated and ammo.gun > 0:
-		velocity += global_transform.basis.z * GUN_RECOIL * delta
+		velocity += global_transform.basis.z * recoil * delta
 	_crash_cooldown = maxf(0.0, _crash_cooldown - delta)
 	if easy:
 		_step_easy(i, delta)
@@ -348,7 +351,7 @@ func _update_engine(i: PilotInput, delta: float) -> void:
 	if not engine_on and altitude < 0.8 and (i.collective > 0.3 or i.boost):
 		engine_on = true
 	var target := 1.0 if engine_on else 0.0
-	spool = move_toward(spool, target, delta / (SPOOL_UP_TIME if target > spool else SPOOL_DOWN_TIME))
+	spool = move_toward(spool, target, delta / (spool_up_time if target > spool else SPOOL_DOWN_TIME))
 
 
 ## Pitch of the nose below the horizon, radians (negative: nose up).
@@ -557,6 +560,13 @@ func set_airframe(id: String) -> void:
 	boost_speed = 60.0 * spec.speed
 	afterburner_thrust = 22.0 * spec.speed
 	gun_factor = spec.guns
+	gun_interval = GUN_INTERVAL * spec.fire
+	recoil = GUN_RECOIL * spec.recoil
+	spool_up_time = spec.spool
+	climb_speed = 16.0 * spec.climb
+	collective_range = 0.5 * spec.climb
+	easy_accel = 28.0 * spec.inertia
+	turn_accel = 14.0 * spec.inertia
 	clearance = GROUND_CLEARANCE * spec.size
 	if _shape:
 		var capsule := _shape.shape as CapsuleShape3D
@@ -733,8 +743,8 @@ func _update_gun(i: PilotInput, delta: float) -> void:
 		return
 	ammo.gun -= 1
 	_shoot()
-	_gun_timer = GUN_INTERVAL
-	heat += GUN_HEAT_PER_SHOT
+	_gun_timer = gun_interval
+	heat += GUN_HEAT_PER_SHOT * gun_interval / GUN_INTERVAL
 	if heat >= 1.0:
 		heat = 1.0
 		overheated = true

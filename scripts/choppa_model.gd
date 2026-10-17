@@ -283,8 +283,9 @@ func update_pose(c: Choppa, delta: float) -> void:
 	_tail_sparks.emitting = tail_gone and c.alive and fmod(c.clock, 1.3) < 0.25
 	_fire.emitting = c.alive and c.wear(Choppa.Part.ENGINE) >= 1.0
 	_blur_material.albedo_color.a = clampf((_rotor_speed - 8.0) / 80.0, 0.0, 0.1)
-	_rotor_sound.pitch_scale = clampf(_rotor_speed / 22.0, 0.5, 1.6)
-	_engine_sound.pitch_scale = clampf(0.85 + _rotor_speed / 80.0 + c.input.collective * 0.08, 0.6, 1.5)
+	var voice: float = Airframe.spec(c.airframe).pitch  # The scout buzzes, the heavy drones.
+	_rotor_sound.pitch_scale = clampf(_rotor_speed / 22.0, 0.5, 1.6) * voice
+	_engine_sound.pitch_scale = clampf(0.85 + _rotor_speed / 80.0 + c.input.collective * 0.08, 0.6, 1.5) * voice
 	_rotor_sound.stream_paused = not c.alive
 	_engine_sound.stream_paused = not c.alive
 	_boost_sound.stream_paused = not c.is_boosting() or not c.alive
@@ -304,8 +305,8 @@ func update_pose(c: Choppa, delta: float) -> void:
 		_last_shot = c.last_shot_time
 		_burst += 1
 		var muzzle := global_transform * (_flashes[1 if c.last_shot_side > 0.0 else 0].position)
-		Sounds.play_at(get_tree().current_scene, "gun", muzzle, gun_db, randf_range(0.94, 1.06))
-	elif _burst > 0 and c.clock - c.last_shot_time > Choppa.GUN_INTERVAL * 1.6:
+		Sounds.play_at(get_tree().current_scene, "gun", muzzle, gun_db + (voice - 1.0) * -8.0, randf_range(0.94, 1.06) * voice)
+	elif _burst > 0 and c.clock - c.last_shot_time > c.gun_interval * 1.6:
 		# The burst ended: its sound rolls on over the terrain. Longer bursts, a bigger tail.
 		Sounds.play_at(get_tree().current_scene, "gun_tail", global_position,
 			gun_db - 4.0 + minf(_burst, 12.0) * 0.25, randf_range(0.95, 1.05), 1.5)
@@ -323,9 +324,9 @@ func update_pose(c: Choppa, delta: float) -> void:
 			_flashes[k].scale = Vector3.ONE * randf_range(0.8, 1.25)
 		_flashes[k].visible = on
 		_flash_lights[k].visible = on
-		_casings[k].emitting = c.alive and c.clock - c.last_shot_time < Choppa.GUN_INTERVAL * 1.5
+		_casings[k].emitting = c.alive and c.clock - c.last_shot_time < c.gun_interval * 1.5
 		_barrel_smoke[k].emitting = c.alive and (c.overheated or c.heat > 0.45) \
-			and c.clock - c.last_shot_time > Choppa.GUN_INTERVAL * 2.0
+			and c.clock - c.last_shot_time > c.gun_interval * 2.0
 	for haze in _haze:
 		haze.emitting = c.alive
 	var visible_cracks := clampi(floori((Choppa.MAX_HEALTH - c.health) / 12.0), 0, _cracks.size()) if c.alive else 0

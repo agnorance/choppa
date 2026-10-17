@@ -281,6 +281,21 @@ Pick one on the title screen. Same controls, different numbers; each has its own
 
 Bots pick classes at random (seeded per name), so matches mix them.
 
+### Feel apart (owner, 2026-10-17)
+
+The classes differ in every system, not only the numbers on the hangar card:
+
+| | Scout | Gunship | Heavy |
+|---|---|---|---|
+| Turn / response | 1.2x, snappy | 0.85x | 0.55x, slow to settle |
+| Top speed, climb | 1.12x, 1.2x | 0.92x, 0.95x | 0.76x, 0.7x |
+| Engine start | 2.5 s | 3.5 s | 5 s |
+| Gun | fast light rounds (0.8 dmg, 0.064 s) | 1.2 dmg, 0.08 s | cannon rounds (2.2 dmg, 0.116 s), big kick |
+| Hull | 100 | 140 | 200 |
+| Sound | higher, buzzing | | deeper, droning |
+
+Overheating takes about 6 s for all of them (heat per round scales with the interval).
+
 ## Maps
 
 Enclosed arenas: cliffs or walls all round that rise above the flight ceiling. Plenty of

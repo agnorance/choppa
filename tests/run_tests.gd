@@ -77,6 +77,7 @@ func _run() -> void:
 		"test_wrecking_a_part_tells_the_shooter_and_shows",
 		"test_loops_loop_and_takes_are_counted",
 		"test_music_crossfades_between_tracks",
+		"test_classes_feel_apart",
 		"test_cold_start_spools_up_before_lift",
 		"test_engine_key_toggles_and_off_sinks",
 		"test_easy_dive_key_only_dives",
@@ -1550,3 +1551,28 @@ func test_spawns_are_on_dry_clear_ground() -> void:
 		_check(bad.is_empty(), "%s: every spawn on dry, clear ground; bad: %s" % [entry[1], bad])
 		map.free()
 		await physics_frame
+
+
+## The scout darts, the heavy wallows: turn, climb, engine start and gun all differ
+## clearly between the classes (owner: the difference should be feelable).
+func test_classes_feel_apart() -> void:
+	var turned := {}
+	var climbed := {}
+	for id: String in Airframe.ORDER:
+		var c := _choppa(Vector3(0.0, 40.0, 0.0))
+		c.set_airframe(id)
+		var start_heading := c.heading
+		var start_y := c.global_position.y
+		await _fly(c, 60, func(i: PilotInput, _t: int) -> void:
+			i.yaw = 1.0
+			i.collective = 1.0)
+		turned[id] = absf(angle_difference(start_heading, c.heading))
+		climbed[id] = c.global_position.y - start_y
+		c.free()
+	_check(turned.scout > turned.gunship * 1.15 and turned.gunship > turned.heavy * 1.15,
+		"turn in a second: %s" % [turned])
+	_check(climbed.scout > climbed.heavy * 1.3, "climb in a second: %s" % [climbed])
+	var scout := Airframe.spec(Airframe.SCOUT)
+	var heavy := Airframe.spec(Airframe.HEAVY)
+	_check(scout.spool < heavy.spool and scout.fire < heavy.fire and scout.guns < heavy.guns,
+		"the scout starts and fires faster, the heavy hits harder per round")

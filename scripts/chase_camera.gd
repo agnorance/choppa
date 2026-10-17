@@ -66,7 +66,8 @@ func _process(delta: float) -> void:
 	# the gun feels heavy without blurring your aim. A long burst adds a rumble.
 	if target.last_shot_time > _last_shot:
 		_last_shot = target.last_shot_time
-		_kick = minf(_kick + 1.0, 2.0)
+		# A heavier gun kicks harder.
+		_kick = minf(_kick + target.recoil / Choppa.GUN_RECOIL, 2.5)
 		_trauma = minf(_trauma + 0.05, 0.38)
 	_kick *= exp(-22.0 * delta)
 	fov = _fov + _kick * 1.1 * Settings.SHAKE_AMOUNTS[Settings.choice("camera_shake")]

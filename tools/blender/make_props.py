@@ -80,29 +80,168 @@ def lattice_leg(a, b, width, material="rust", bays=6):
     return parts
 
 
+def windsock(at, height, toward):
+    """A windsock on its own pole: a hoop and a drooping striped cone."""
+    at, toward = Vector(at), Vector(toward).normalized()
+    parts = [cyl(at, at + Vector((0, 0, height)), 0.06, "metal", 10)]
+    top = at + Vector((0, 0, height))
+    parts.append(cyl(top - Vector((0, 0, 0.05)), top + Vector((0, 0, 0.05)), 0.09, "dark", 10))
+    mouth = top + toward * 0.15 + Vector((0, 0, -0.05))
+    parts.append(ring(mouth, toward, 0.32, 0.02, "metal", 18))
+    for k in range(5):  # Bands: hazard and white, narrowing and drooping toward the tail.
+        t0, t1 = k / 5, (k + 1) / 5
+        a = mouth + toward * 1.8 * t0 + Vector((0, 0, -0.35 * t0 * t0))
+        b = mouth + toward * 1.8 * t1 + Vector((0, 0, -0.35 * t1 * t1))
+        parts.append(cyl(a, b, 0.31 * (1 - 0.55 * t0), "hazard" if k % 2 == 0 else "decal", 18,
+                         radius2=0.31 * (1 - 0.55 * t1)))
+    return parts
+
+
+def fuel_bowser(at, yaw):
+    """A small fuel trailer: a tank on a frame with two wheels, a drawbar, a hose reel
+    at the back, placards and a ladder."""
+    parts = []
+    rot = Matrix.Rotation(yaw, 4, "Z")
+    o = Vector(at)
+
+    def p(x, y, z):
+        return o + rot @ Vector((x, y, z))
+
+    parts.append(cyl(p(-1.3, 0, 1.05), p(1.3, 0, 1.05), 0.62, "paint", 24, bevel_width=0.06))  # The tank.
+    for x in (-1.0, 0.0, 1.0):
+        parts.append(cyl(p(x - 0.03, 0, 1.05), p(x + 0.03, 0, 1.05), 0.635, "dark", 24))  # Straps.
+    parts.append(cyl(p(0.2, 0, 1.66), p(0.2, 0, 1.76), 0.18, "metal", 16, bevel_width=0.01))  # Hatch.
+    parts.append(box(p(0, -0.63, 1.05), (1.0, 0.02, 0.32), "hazard"))  # Placard.
+    parts.append(box(p(0, 0.63, 1.05), (1.0, 0.02, 0.32), "hazard"))
+    parts.append(box(p(0, 0, 0.42), (2.6, 0.9, 0.12), "dark", bevel_width=0.02))  # Frame.
+    for side in (-1, 1):
+        parts.append(cyl(p(-0.2, side * 0.62, 0.42), p(-0.2, side * 0.82, 0.42), 0.4, "rubber", 20, bevel_width=0.04))
+        parts.append(cyl(p(-0.2, side * 0.6, 0.42), p(-0.2, side * 0.84, 0.42), 0.2, "metal", 14))
+        parts.append(box(p(-0.2, side * 0.72, 0.85), (0.9, 0.24, 0.06), "dark", bevel_width=0.01))  # Mudguard.
+    parts.append(tube([p(1.3, 0, 0.45), p(1.9, 0, 0.4), p(2.3, 0, 0.3)], 0.05, "dark", 8))  # Drawbar.
+    parts.append(ring(p(2.33, 0, 0.3), (0, 0, 1), 0.08, 0.02, "metal", 12))
+    parts.append(cyl(p(2.1, 0, 0.3), p(2.1, 0, 0.0), 0.04, "metal", 8))  # Prop stand.
+    reel = p(-1.55, 0, 0.9)  # Hose reel at the back.
+    parts.append(cyl(reel + rot @ Vector((0, -0.35, 0)), reel + rot @ Vector((0, 0.35, 0)), 0.3, "metal", 20,
+                     bevel_width=0.02))
+    parts.append(cyl(reel + rot @ Vector((0, -0.3, 0)), reel + rot @ Vector((0, 0.3, 0)), 0.34, "rubber", 20))
+    for side in (-1, 1):
+        parts.append(cyl(reel + rot @ Vector((0, side * 0.36, 0)), reel + rot @ Vector((0, side * 0.38, 0)), 0.42, "dark", 20))
+    for k in range(4):  # Ladder up the side.
+        parts.append(cyl(p(0.9, -0.66, 0.6 + k * 0.28) + rot @ Vector((-0.15, 0, 0)),
+                         p(0.9, -0.66, 0.6 + k * 0.28) + rot @ Vector((0.15, 0, 0)), 0.018, "metal", 6))
+    return parts, reel
+
+
+def ammo_rack(at):
+    """A rack of rocket and missile crates under a tarp frame, by the pad."""
+    at = Vector(at)
+    parts = [box(at + Vector((0, 0, 0.08)), (2.2, 1.1, 0.16), "wood_dark", bevel_width=0.02)]  # Pallet.
+    for k, (x, z) in enumerate([(-0.55, 0.4), (0.55, 0.4), (0.0, 0.88)]):
+        c = at + Vector((x, 0, z))
+        parts.append(box(c, (1.05, 0.95, 0.46), "paint", bevel_width=0.03))
+        parts.append(box(c + Vector((0, 0, 0.0)), (1.07, 0.97, 0.06), "hazard"))
+        for s in (-1, 1):  # Handles.
+            parts.append(box(c + Vector((s * 0.53, 0, 0.05)), (0.04, 0.3, 0.06), "dark", bevel_width=0.01))
+    return parts
+
+
+def sandbag_ring(center, radius, a0, a1, rows=2):
+    """A low curved wall of sandbags."""
+    parts = []
+    c = Vector(center)
+    n = max(2, int(abs(a1 - a0) * radius / 0.62))
+    for row in range(rows):
+        for k in range(n):
+            a = a0 + (a1 - a0) * (k + 0.5 * (row % 2)) / n
+            p = c + Vector((math.cos(a) * radius, math.sin(a) * radius, 0.16 + row * 0.27))
+            parts.append(box(p, (0.6, 0.34, 0.26), "sand", rotation=Matrix.Rotation(a + math.pi / 2, 4, "Z"),
+                             bevel_width=0.1))
+    return parts
+
+
 def station_pad():
+    """A forward refuelling point: a concrete pad of cast slabs with a raised kerb, its
+    markings worn in by skids, light fittings round the rim (the game lights them), the
+    mast (the game puts the status lamp on top) with a ladder and a floodlight, a fuel
+    trailer with its hose run out to the pad, an ammo rack, a windsock, sandbags and a
+    fire point. Keeps clear: the mast at (r + 1.2, 0) and, beside it, where ammo pads
+    stack their crates (x r + 0.8..r + 2.1, y -1.1..-3.1)."""
     r = 6.0
-    parts = [cyl((0, 0, -0.3), (0, 0, 0.3), r, "concrete", 48),
-             cyl((0, 0, -0.35), (0, 0, -0.1), r + 0.35, "concrete", 48)]
-    # Painted ring and H.
-    parts.append(ring((0, 0, 0.3), (0, 0, 1), r - 0.6, 0.12, "hazard", 48))
+    # The slab's top stays at 0.3, where the game's landing check expects it.
+    parts = [cyl((0, 0, -0.3), (0, 0, 0.3), r, "concrete", 64),
+             cyl((0, 0, -0.35), (0, 0, -0.1), r + 0.35, "concrete", 64)]
+    parts.append(ring((0, 0, 0.28), (0, 0, 1), r + 0.1, 0.13, "concrete", 64))  # A rounded kerb round the edge.
+    # Joints between the cast slabs: a grid of dark seams clipped to the circle.
+    for k in range(-4, 5):
+        v = k * 1.4
+        half = math.sqrt(max(0.0, (r - 0.1) ** 2 - v * v))
+        if half > 0.3:
+            parts.append(box((v, 0, 0.302), (0.04, half * 2, 0.01), "dark"))
+            parts.append(box((0, v, 0.302), (half * 2, 0.04, 0.01), "dark"))
+    # Markings: the ring, the H, touchdown dashes, skid marks scuffed across the middle.
+    parts.append(ring((0, 0, 0.305), (0, 0, 1), r - 0.6, 0.12, "hazard", 64))
     for x in (-1.3, 1.3):
-        parts.append(box((x, 0, 0.31), (0.5, 3.6, 0.03), "hazard"))
-    parts.append(box((0, 0, 0.31), (2.1, 0.5, 0.03), "hazard"))
-    # Tie-down rings, a fuel hose drum and a toolbox by the mast.
+        parts.append(box((x, 0, 0.308), (0.5, 3.6, 0.02), "hazard"))
+    parts.append(box((0, 0, 0.308), (2.1, 0.5, 0.02), "hazard"))
+    for k in range(16):
+        a = 2 * math.pi * k / 16
+        parts.append(box((math.cos(a) * (r - 1.2), math.sin(a) * (r - 1.2), 0.306), (0.12, 0.6, 0.015), "decal",
+                         rotation=Matrix.Rotation(a, 4, "Z")))
+    rng = random.Random(7)
+    for k in range(4):
+        a = rng.uniform(0, math.pi)
+        parts.append(box((rng.uniform(-1.8, 1.8), rng.uniform(-1.8, 1.8), 0.307), (1.4, 0.07, 0.01), "rubber",
+                         rotation=Matrix.Rotation(a, 4, "Z")))
+    # Light fittings under the game's rim lights; tie-down rings.
+    for k in range(8):
+        a = 2 * math.pi * k / 8
+        p = Vector((math.cos(a) * (r - 0.3), math.sin(a) * (r - 0.3), 0.3))
+        parts.append(cyl(p, p + Vector((0, 0, 0.08)), 0.2, "dark", 14, bevel_width=0.02))
     for k in range(4):
         a = math.pi / 2 * k + math.pi / 4
         parts.append(ring((math.cos(a) * 3.4, math.sin(a) * 3.4, 0.32), (0, 0, 1), 0.12, 0.025, "metal", 12))
+        parts.append(cyl((math.cos(a) * 3.4, math.sin(a) * 3.4, 0.3), (math.cos(a) * 3.4, math.sin(a) * 3.4, 0.32),
+                         0.07, "dark", 10))
+    # The mast: a footing with bolts, a pole with a ladder, a cable box, a floodlight.
     mast = Vector((r + 1.2, 0, 0))
-    parts.append(cyl(mast + Vector((0, 0, -0.3)), mast + Vector((0, 0, 0.2)), 0.45, "concrete", 16))
-    parts.append(cyl(mast, mast + Vector((0, 0, 6.0)), 0.16, "metal", 12, radius2=0.11))
+    parts.append(cyl(mast + Vector((0, 0, -0.3)), mast + Vector((0, 0, 0.25)), 0.5, "concrete", 18, bevel_width=0.03))
+    for k in range(4):
+        a = math.pi / 2 * k + math.pi / 4
+        parts.append(cyl(mast + Vector((math.cos(a) * 0.3, math.sin(a) * 0.3, 0.25)),
+                         mast + Vector((math.cos(a) * 0.3, math.sin(a) * 0.3, 0.33)), 0.035, "metal", 6))
+    parts.append(cyl(mast + Vector((0, 0, 0.25)), mast + Vector((0, 0, 6.0)), 0.16, "metal", 12, radius2=0.11))
     parts.append(cyl(mast + Vector((0, 0, 5.9)), mast + Vector((0, 0, 6.05)), 0.3, "dark", 16))
     for k in range(3):
         parts.append(ring(mast + Vector((0, 0, 1.0 + k * 1.6)), (0, 0, 1), 0.15, 0.02, "hazard", 12))
-    drum = Vector((r + 1.0, -1.6, 0.6))
-    parts.append(cyl(drum - Vector((0.35, 0, 0)), drum + Vector((0.35, 0, 0)), 0.6, "rust", 20, bevel_width=0.03))
-    parts.append(box((r + 0.9, 1.8, 0.35), (0.9, 0.5, 0.5), "hazard", bevel_width=0.04))
-    parts.append(box((r + 0.9, 1.8, 0.62), (0.95, 0.55, 0.05), "dark"))
+    for k in range(14):  # Ladder rungs up the outside of the pole.
+        z = 0.6 + k * 0.36
+        parts.append(cyl(mast + Vector((0.2, -0.18, z)), mast + Vector((0.2, 0.18, z)), 0.015, "metal", 6))
+    for y in (-0.18, 0.18):
+        parts.append(cyl(mast + Vector((0.2, y, 0.5)), mast + Vector((0.2, y, 5.6)), 0.018, "metal", 6))
+    parts.append(box(mast + Vector((-0.24, 0, 1.3)), (0.18, 0.36, 0.5), "dark", bevel_width=0.02))  # Cable box.
+    flood = mast + Vector((-0.25, 0, 4.8))
+    parts.append(cyl(mast + Vector((0, 0, 4.8)), flood, 0.03, "metal", 6))
+    parts.append(box(flood + Vector((-0.12, 0, -0.05)), (0.22, 0.42, 0.3), "dark",
+                     rotation=Matrix.Rotation(math.radians(35), 4, "Y"), bevel_width=0.02))
+    parts.append(box(flood + Vector((-0.24, 0, -0.13)), (0.02, 0.36, 0.24), "lamp",
+                     rotation=Matrix.Rotation(math.radians(35), 4, "Y")))
+    # Fuel trailer on the far side of the mast, its hose run out to the pad's edge.
+    bowser, reel = fuel_bowser((r + 2.4, 2.8, 0.0), math.radians(-70))
+    parts += bowser
+    parts.append(tube([reel, reel + Vector((-0.3, -0.4, -0.75)), Vector((r + 0.7, 1.6, 0.06)), Vector((r - 0.2, 1.0, 0.4))],
+                      0.05, "rubber", 8))
+    parts.append(cyl((r - 0.2, 1.0, 0.4), (r - 0.55, 0.9, 0.42), 0.07, "metal", 10))  # Nozzle.
+    # Fire point: an extinguisher on a stand with a sign.
+    fire = Vector((r + 0.9, 4.4, 0))
+    parts.append(box(fire + Vector((0, 0, 0.6)), (0.05, 0.4, 1.2), "marking_red", bevel_width=0.01))
+    parts.append(cyl(fire + Vector((0.12, 0, 0.15)), fire + Vector((0.12, 0, 0.75)), 0.1, "marking_red", 14,
+                     bevel_width=0.02))
+    parts.append(box(fire + Vector((0.0, 0, 1.3)), (0.04, 0.45, 0.3), "decal"))
+    # Ammo rack and a windsock behind the pad, sandbags along the back edge.
+    parts += ammo_rack((-r - 1.6, -2.4, 0.0))
+    parts += windsock((-r - 1.4, 3.2, 0.0), 4.2, (0.3, -1.0, 0))
+    parts += sandbag_ring((0, 0, 0), r + 1.2, math.radians(140), math.radians(220))
     return join(parts, "station_pad")
 
 
@@ -778,12 +917,9 @@ if __name__ == "__main__":
         for k, name in enumerate(names):
             if only and name not in only:
                 continue
-            size = {"pylon": 30, "trestle": 34, "headframe": 22, "water_tower": 17, "gantry_crane": 60,
-                    "warehouse": 42, "ship_hulk": 75, "radio_mast": 55, "silo": 32, "conveyor": 42,
-                    "rail_wagon": 15, "straddle_carrier": 17, "lamp_mast": 30, "lighthouse": 30, "tugboat": 24,
-                    "barge": 42, "pipe_rack": 32, "scrap_pile_1": 14, "scrap_pile_2": 14, "wreck_heli": 14,
-                    "radar_station": 20}.get(name, 13)
-            base.VIEWS[name] = ((k * 40.0 + size * 1.1, -size * 1.5, size * 0.75), (k * 40.0, -size * 0.1, size * 0.4))
+            # Framed on the prop itself: its size from its bounding box.
+            size = max(max(bpy.data.objects[name].dimensions), 2.0)
+            base.VIEWS[name] = ((k * 40.0 + size * 0.75, -size * 1.0, size * 0.55), (k * 40.0, 0.0, size * 0.22))
         base.preview(args[1], list(base.VIEWS))
     else:
         base.OUT = OUT

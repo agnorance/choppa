@@ -141,23 +141,35 @@ func _on_kill(killer: Choppa, victim: Choppa) -> void:
 	line.add_theme_constant_override("separation", 8)
 	line.set_meta("age", 0.0)
 	var mine := killer == choppa or victim == choppa
+	var how := how_down(victim.cause)
 	if killer and killer != victim:
 		line.add_child(_feed_name(killer, mine))
-		line.add_child(UiKit.outlined(UiKit.label("shot down", 15, UiKit.MUTED)))
+		line.add_child(UiKit.outlined(UiKit.label(how if how != "" else "shot down", 15, UiKit.MUTED)))
 		line.add_child(_feed_name(victim, mine))
 	else:
 		line.add_child(_feed_name(victim, mine))
-		line.add_child(UiKit.outlined(UiKit.label("crashed", 15, UiKit.MUTED)))
+		line.add_child(UiKit.outlined(UiKit.label(how if how != "" else "crashed", 15, UiKit.MUTED)))
 	_feed.add_child(line)
 	if _feed.get_child_count() > 5:
 		_feed.get_child(0).queue_free()
 
 	if victim == choppa:
-		_killed_by = "SHOT DOWN BY %s" % killer.pilot_name.to_upper() if killer and killer != choppa else "CRASHED"
+		var shout := how.to_upper()
+		if killer and killer != choppa:
+			_killed_by = "SHOT DOWN BY %s%s" % [killer.pilot_name.to_upper(), "  ·  " + shout if shout != "" else ""]
+		else:
+			_killed_by = shout if shout != "" else "CRASHED"
 	elif killer == choppa:
 		var left := battle.kill_limit - battle.kills_of(choppa)
 		_flash_big("SPLASHED %s%s" % [victim.pilot_name.to_upper(),
 			"\n%d TO GO" % left if left > 0 and left <= 3 else ""], 1.6)
+
+
+## How a choppa went down, for the feed ("" when nobody knows, e.g. on a network client).
+static func how_down(cause: String) -> String:
+	return {"gun": "gunned down", "rocket": "rocketed", "missile": "missile", "mine": "mined", "blast": "blasted",
+		"crashed": "crashed", "hard landing": "hard landing", "rotor strike": "rotor strike", "burned out": "burned out",
+		"power line": "power line"}.get(cause, "")
 
 
 func _feed_name(pilot: Choppa, highlight: bool) -> Label:

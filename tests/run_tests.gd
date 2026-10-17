@@ -101,6 +101,7 @@ func _run() -> void:
 		"test_mule_has_two_rotors",
 		"test_class_card_stats",
 		"test_new_camos_are_earned",
+		"test_death_causes",
 		"test_spawns_are_on_dry_clear_ground",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
@@ -1926,3 +1927,22 @@ func test_new_camos_are_earned() -> void:
 	for id: String in Airframe.ORDER:
 		var nose: Array = Airframe.spec(id).nose
 		_check(nose.size() == 3 and nose[0] < -2.0 and nose[2] > 0.5, "%s has its nose for nose art: %s" % [id, nose])
+
+
+## The kill feed says how a choppa went down: the weapon, or which kind of crash.
+func test_death_causes() -> void:
+	var shot := _choppa(Vector3(0.0, 40.0, 0.0))
+	shot.take_hit(Vector3.ZERO, null, 5.0)
+	_check(shot.cause == "gun" and BattleHud.how_down(shot.cause) == "gunned down", "a bullet: %s" % shot.cause)
+	shot.blast_damage(5.0, null, shot.global_position, "missile")
+	_check(BattleHud.how_down(shot.cause) == "missile", "a missile: %s" % shot.cause)
+	_ground()
+	var dropped := _choppa(Vector3(30.0, 4.0, 0.0))
+	dropped.velocity = Vector3(0.0, -15.0, 0.0)
+	await _fly(dropped, 30, func(i: PilotInput, _t: int) -> void: i.collective = -1.0)
+	_check(dropped.cause == "hard landing", "dropped onto the ground: %s" % dropped.cause)
+	MapKit.block(_world, Vector3(64.0, 30.0, 0.0), Vector3(2.0, 60.0, 40.0), Color.GRAY)
+	var striker := _choppa(Vector3(60.0, 30.0, 0.0))
+	await _fly(striker, 2)
+	_check(striker.cause == "rotor strike", "blades in a wall: %s" % striker.cause)
+	_check(BattleHud.how_down("") == "", "unknown stays unknown (network clients)")

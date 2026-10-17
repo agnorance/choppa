@@ -4,7 +4,7 @@ extends RefCounted
 
 
 ## Damages and shoves every choppa within `radius` of `at`, less at the edge.
-static func blast(world: Node, at: Vector3, radius: float, amount: float, owner: Choppa, size := 1.0) -> void:
+static func blast(world: Node, at: Vector3, radius: float, amount: float, owner: Choppa, size := 1.0, how := "blast") -> void:
 	var boom := Effects.Explosion.new()
 	boom.size = size
 	world.add_child(boom)
@@ -20,7 +20,7 @@ static func blast(world: Node, at: Vector3, radius: float, amount: float, owner:
 		var falloff := 1.0 - 0.5 * distance / radius
 		var away := offset.normalized() if distance > 0.1 else Vector3.UP
 		c.velocity += (away + Vector3.UP * 0.4) * 22.0 * falloff
-		c.blast_damage(amount * falloff, owner, at)
+		c.blast_damage(amount * falloff, owner, at, how)
 
 
 ## Seeks the target it locked at launch. Flares, or rolling hard as it closes in, shake it off.
@@ -112,7 +112,7 @@ class Missile extends Node3D:
 			basis = Basis.looking_at(direction)
 
 	func _explode(at: Vector3) -> void:
-		Weapons.blast(get_parent(), at, RADIUS, DAMAGE, shooter if is_instance_valid(shooter) else null)
+		Weapons.blast(get_parent(), at, RADIUS, DAMAGE, shooter if is_instance_valid(shooter) else null, 1.0, "missile")
 		queue_free()
 
 
@@ -186,7 +186,8 @@ class Mine extends Area3D:
 			return
 		if body == owner_choppa and _age < OWNER_SAFE_TIME:
 			return
-		Weapons.blast(get_parent(), global_position, RADIUS, DAMAGE, owner_choppa if is_instance_valid(owner_choppa) else null)
+		Weapons.blast(get_parent(), global_position, RADIUS, DAMAGE, owner_choppa if is_instance_valid(owner_choppa) else null,
+			1.0, "mine")
 		queue_free()
 
 
@@ -240,9 +241,9 @@ class Rocket extends Node3D:
 		if hit:
 			var owner_choppa := shooter if is_instance_valid(shooter) else null
 			var target := hit.collider as Choppa
-			if target and target.take_hit(direction * 3.0, owner_choppa, DAMAGE, hit.position) and owner_choppa:
+			if target and target.take_hit(direction * 3.0, owner_choppa, DAMAGE, hit.position, "rocket") and owner_choppa:
 				owner_choppa.scored_hit.emit(target)
-			Weapons.blast(get_parent(), hit.position, SPLASH_RADIUS, SPLASH, owner_choppa, 0.5)
+			Weapons.blast(get_parent(), hit.position, SPLASH_RADIUS, SPLASH, owner_choppa, 0.5, "rocket")
 			queue_free()
 			return
 		global_position = to

@@ -144,6 +144,9 @@ var _thrust := GRAVITY  ## Current rotor thrust; follows the collective with `th
 var _aim := 0.0  ## Easy model: nose-down angle set by the stick, held.
 var _crash_cooldown := 0.0  ## Grinding along terrain hurts once per window, not every tick.
 var _strike_cooldown := 0.0
+## What hurt it last, for the kill feed: gun, rocket, missile, mine, blast, crashed, hard
+## landing, rotor strike, burned out, power line. Set just before the damage it names.
+var cause := ""
 var _rollover := 0.0  ## Seconds spent on its side on the ground.
 var rotor_radius := 5.0  ## Blade tip radius, metres (Airframe "rotor").
 var rotor_hub := Vector3(0.0, 1.95, 0.3)  ## Rotor hub in body space.
@@ -483,9 +486,10 @@ func _target_in_cone(cone: float, reach: float) -> Choppa:
 
 ## Called by a bullet. `at` is where it struck (world space); a hit on the tail rotor,
 ## main rotor or engine wrecks that part and costs less hull. Returns false when dodged.
-func take_hit(impulse: Vector3, shooter: Choppa, amount := 0.0, at := Vector3.INF) -> bool:
+func take_hit(impulse: Vector3, shooter: Choppa, amount := 0.0, at := Vector3.INF, how := "gun") -> bool:
 	if not alive or is_rolling_hard():
 		return false
+	cause = how
 	velocity += impulse
 	hit_taken.emit(impulse, shooter)
 	var part := part_at(at) if at.is_finite() else Part.HULL
@@ -498,7 +502,8 @@ func take_hit(impulse: Vector3, shooter: Choppa, amount := 0.0, at := Vector3.IN
 
 
 ## A blast centred at `from`: full hull damage, and the part nearest the blast suffers.
-func blast_damage(amount: float, attacker: Choppa, from: Vector3) -> void:
+func blast_damage(amount: float, attacker: Choppa, from: Vector3, how := "blast") -> void:
+	cause = how
 	var part := part_at(from)
 	if part != Part.HULL:
 		damage_part(part, amount * 0.8, attacker)
@@ -900,6 +905,7 @@ func _handle_collisions(before: Vector3) -> void:
 	if share <= 0.0:
 		return
 	_crash_cooldown = CRASH_WINDOW
+	cause = "hard landing" if is_ground and impact > LANDING_SAFE else "crashed"
 	var credit := _credit()
 	# Whatever struck first takes the brunt: tail strikes wreck the tail rotor, and a
 	# body tilted this far has its blades in the obstacle too.
@@ -929,6 +935,7 @@ func _check_wreck_hazards(delta: float) -> void:
 	if altitude < 1.5 and global_transform.basis.y.y < ROLLOVER_UP:
 		_rollover += delta
 		if _rollover > ROLLOVER_TIME:
+			cause = "burned out"
 			damage(max_health * 2.0, _credit())
 	else:
 		_rollover = 0.0
@@ -956,6 +963,7 @@ func _rotor_contact() -> Dictionary:
 
 func _rotor_strike(hit: Dictionary) -> void:
 	_strike_cooldown = ROTOR_STRIKE_WINDOW
+	cause = "rotor strike"
 	var credit := _credit()
 	var shattered: bool = parts[Part.ROTOR] <= 0.0
 	damage_part(Part.ROTOR, part_max(Part.ROTOR) * ROTOR_STRIKE_DAMAGE * spool, credit)

@@ -70,6 +70,7 @@ class PowerLine extends Node3D:
 			c.velocity = c.velocity * 0.3 + push * 8.0
 			if local.y > 0.9:
 				c.damage_part(Choppa.Part.ROTOR, ROTOR_DAMAGE)
+			c.cause = "power line"
 			c.damage(DAMAGE, null)
 			var sparks := Effects.Impact.new()
 			sparks.kind = Effects.Impact.Kind.METAL

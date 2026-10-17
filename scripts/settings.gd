@@ -44,6 +44,8 @@ const DEFAULTS := {
 	"cockpit_view": false,  ## Start matches in the cockpit.
 	"hud_scale": 1,  ## 0 small, 1 normal, 2 large
 	"damage_flash": true,  ## Red screen edges when hit.
+	"hud_flight": true,  ## Heading, speed and altitude tapes and the pitch ladder in the chase view.
+	"hud_radar": true,  ## The radar bottom left in the chase view.
 	"aim_assist": false,
 	"flight_model": 1,  ## 0 easy (drone, hovers by itself), 1 realistic (forces). Also on the title screen.
 	# Flight assists for the realistic model (the easy one flies itself): Choppa.ASSIST_*.

@@ -120,10 +120,16 @@ cockpit's), dark translucent panels with 1 px lines, thin bars, no gradients or 
   to change (`Controls.REBINDABLE`, Settings "bindings"; the gamepad keeps its layout).
   Audio: master, effects and music. Saved by `Settings` (one dictionary, `DEFAULTS`
   lists every key) in `user://settings.cfg`; the tests save to their own file.
-- **HUD:** speed and altitude top left, item top right, kills/rank/time top centre,
-  hull bottom left, boost (heat as a hairline) bottom centre. Call-outs in amber.
-  The controls overlay (key caps) sits bottom right, toggled in settings or with F1.
-  The cockpit view hides the flight readouts.
+- **HUD:** a head-up flight display framed round the middle (owner 2026-10-17, from
+  a reference shot): heading tape over the top, speed tape left with the climb rate,
+  altitude tape right, a pitch ladder that banks; thin near-white lines, the small
+  gunsight and target brackets in amber (red with LOCK). Radar bottom left over the
+  hull (heading up, 300 m), ammo panel bottom right (rounds and heat, one icon per
+  missile, rocket tubes, pips for flares, mines, smoke). Both the flight display and
+  the radar are settings. Kills/rank/time top centre, class and effects top right,
+  boost bottom centre. Call-outs in amber. The controls overlay (key caps) sits over
+  the ammo panel, toggled in settings or with F1. The cockpit view hides it all but
+  the sight, which is drawn to fit the cockpit's reflex sight glass.
 - **Pause** (Esc / Start): resume, settings, restart, main menu, quit; the match stops.
 - **Mouse flying:** pitch and roll (or pitch and yaw, a setting), captured while
   flying and released in menus and on the results screen.

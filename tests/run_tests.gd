@@ -107,6 +107,7 @@ func _run() -> void:
 		"test_time_of_day",
 		"test_kill_cam_watches_the_killer",
 		"test_gunsight_brackets_the_target",
+		"test_flight_display_and_radar",
 		"test_spawns_are_on_dry_clear_ground",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
@@ -284,6 +285,42 @@ func test_gunsight_brackets_the_target() -> void:
 		for k in 4:
 			await process_frame
 		_check(hud.get("_bracketed") == target, "brackets on the target (first person %s)" % first_person)
+	hud.free()
+	camera.free()
+
+
+## Owner: the chase view should frame the flight like a head-up display, with a radar
+## and what ammo is left. Attitude for the ladder, radar placement, and the toggle.
+func test_flight_display_and_radar() -> void:
+	var hud_script: GDScript = load("res://scripts/hud.gd")
+	var me := _choppa(Vector3(0.0, 40.0, 0.0))
+	me.global_transform.basis = Basis.from_euler(Vector3(deg_to_rad(10.0), 0.0, 0.0))
+	var att: Vector2 = hud_script.attitude(me)
+	_check(absf(rad_to_deg(att.x) - 10.0) < 0.1 and absf(att.y) < 0.01, "nose up 10 degrees: %s" % att)
+	me.global_transform.basis = Basis.from_euler(Vector3(0.0, 0.0, deg_to_rad(-20.0)))
+	att = hud_script.attitude(me)
+	_check(absf(rad_to_deg(att.y) - 20.0) < 0.1, "right side down 20 degrees is a right bank: %s" % att)
+	me.global_transform.basis = Basis.IDENTITY
+	me.heading = PI * 0.5  # Turned left a quarter: facing -x.
+	var c := Vector2(100, 100)
+	var ahead := HudRadar.project(me, me.global_position + Vector3(-100.0, 0.0, 0.0), c, 90.0)
+	_check(ahead.inside and ahead.at.y < c.y - 20.0 and absf(ahead.at.x - c.x) < 0.5, "ahead shows up the scope: %s" % ahead)
+	var right := HudRadar.project(me, me.global_position + Vector3(0.0, 0.0, -100.0), c, 90.0)
+	_check(right.at.x > c.x + 20.0, "north is on our right when facing west: %s" % right)
+	var far := HudRadar.project(me, me.global_position + Vector3(-900.0, 0.0, 0.0), c, 90.0)
+	_check(not far.inside and absf(far.at.distance_to(c) - 90.0) < 0.5, "out of range sits on the rim: %s" % far)
+	var camera := ChaseCamera.new()
+	camera.target = me
+	_world.add_child(camera)
+	var hud: Node = hud_script.new(me)
+	hud.set("camera", camera)
+	_world.add_child(hud)
+	await process_frame
+	_check((hud.get("_radar") as Control).visible, "radar on by default")
+	Settings.set_value("hud_radar", false)
+	await process_frame
+	_check(not (hud.get("_radar") as Control).visible, "radar off in the settings")
+	Settings.reset()
 	hud.free()
 	camera.free()
 

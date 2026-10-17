@@ -1,25 +1,25 @@
 class_name Hud
 extends CanvasLayer
-## Speed, altitude, afterburner, heat, hull, loadout and call-outs for one choppa, the controls
-## overlay (settings or F1). Flat text and thin bars;
-## the cockpit view hides most of it because the instruments show the same.
+## The chase view's flight display for one choppa: a heading tape, speed and altitude
+## tapes and a pitch ladder round the middle (Settings "hud_flight"), the gunsight, the
+## radar (HudRadar, "hud_radar") over the hull bottom left, the afterburner bottom
+## centre, what's left to shoot (HudAmmo) bottom right, call-outs and the controls
+## overlay (settings or F1). The cockpit view hides most of it: the instruments show the same.
 
 const CALLOUT_TIME := 1.2
+const CONTROLS_AT := Vector2(1, 1)
+const CONTROLS_OFFSET := Vector2(-28, -26 - HudAmmo.SIZE.y - 14)  ## Over the ammo panel.
 const PART_NAMES := {Choppa.Part.ROTOR: "ROTOR", Choppa.Part.TAIL: "TAIL ROTOR", Choppa.Part.ENGINE: "ENGINE"}
 
 var choppa: Choppa
 var camera: Camera3D
 
 var _root: Control
-var _speed: Label
-var _altitude: Label
 var _fps: Label
-var _gun: Label
-var _loadout: Label
-var _loadout_extra: Label
 var _effects: Label
 var _boost: UiKit.Bar
-var _heat: UiKit.Bar
+var _radar: HudRadar
+var _ammo: HudAmmo
 var _health: UiKit.Bar
 var _health_text: Label
 var _parts := {}  ## Choppa.Part -> Label, lit as the part wears.
@@ -31,6 +31,7 @@ var _callout: Label
 var _callout_time := 0.0
 var _hit_flash := 0.0
 const HUD_GREEN := Color(0.5, 1.0, 0.45, 0.95)  ## The cockpit sight's phosphor.
+const HUD_LINE := Color(0.94, 0.95, 0.97, 0.78)  ## The flight display's lines (UiKit.TEXT, a touch see-through).
 const SIGHT_ANGLE := 0.075  ## Half the sight glass's width as seen from the eye, radians.
 var _bracketed: Choppa  ## The target the brackets are on, and since when.
 var _bracket_time := 0.0
@@ -76,48 +77,22 @@ func _ready() -> void:
 	_vignette.modulate.a = 0.0
 	_root.add_child(_vignette)
 
-	# Top left: speed and altitude.
-	var flight := _column(Vector2(0, 0), Vector2(28, 14), BoxContainer.ALIGNMENT_BEGIN)
-	var speed_row := HBoxContainer.new()
-	speed_row.add_theme_constant_override("separation", 6)
-	flight.add_child(speed_row)
-	_speed = UiKit.outlined(UiKit.display("0", 54))
-	speed_row.add_child(_speed)
-	var unit := UiKit.outlined(UiKit.caption("km/h", 14))
-	unit.size_flags_vertical = Control.SIZE_SHRINK_END
-	speed_row.add_child(unit)
-	var altitude_row := HBoxContainer.new()
-	altitude_row.add_theme_constant_override("separation", 8)
-	flight.add_child(altitude_row)
-	var alt := UiKit.outlined(UiKit.caption("ALT", 14))
-	alt.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	altitude_row.add_child(alt)
-	_altitude = UiKit.outlined(UiKit.display("0 m", 24))
-	altitude_row.add_child(_altitude)
+	# Top left: the frame rate, when asked for. Speed and altitude are the tapes in the middle.
+	var corner := _column(Vector2(0, 0), Vector2(28, 14), BoxContainer.ALIGNMENT_BEGIN)
 	_fps = UiKit.outlined(UiKit.caption("", 13, UiKit.FAINT))
-	flight.add_child(_fps)
-	_flight.append(flight)
+	corner.add_child(_fps)
 
-	# Top right: the loadout, then station status and running effects.
+	# Top right: the class, then station status and running effects.
 	var item_column := _column(Vector2(1, 0), Vector2(-28, 18), BoxContainer.ALIGNMENT_BEGIN)
 	var item_caption := UiKit.outlined(UiKit.caption(Airframe.spec(choppa.airframe).name, 14))
 	item_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	item_column.add_child(item_caption)
-	_gun = UiKit.outlined(UiKit.display("", 26))
-	_gun.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	item_column.add_child(_gun)
-	_loadout = UiKit.outlined(UiKit.display("", 26))
-	_loadout.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	item_column.add_child(_loadout)
-	_loadout_extra = UiKit.outlined(UiKit.label("", 16, UiKit.MUTED, "condensed"))
-	_loadout_extra.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	item_column.add_child(_loadout_extra)
 	_effects = UiKit.outlined(UiKit.label("", 18, UiKit.MUTED, "condensed"))
 	_effects.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	item_column.add_child(_effects)
 	_flight.append(item_column)
 
-	# Bottom centre: afterburner charge, with the gun heat as a hairline under it.
+	# Bottom centre: afterburner charge (the gun's heat is in the ammo panel).
 	var boost_column := _column(Vector2(0.5, 1), Vector2(0, -26), BoxContainer.ALIGNMENT_END)
 	boost_column.add_theme_constant_override("separation", 6)
 	var boost_caption := UiKit.outlined(UiKit.caption("Afterburner", 13))
@@ -125,11 +100,16 @@ func _ready() -> void:
 	boost_column.add_child(boost_caption)
 	_boost = UiKit.Bar.new(300.0, 5.0)
 	boost_column.add_child(_boost)
-	_heat = UiKit.Bar.new(300.0, 2.0)
-	_heat.color = Color(UiKit.TEXT, 0.7)
-	_heat.track = Color(1, 1, 1, 0.06)
-	boost_column.add_child(_heat)
 	_flight.append(boost_column)
+
+	# Bottom right: what's left to shoot. Bottom left, over the hull: the radar.
+	_ammo = HudAmmo.new(choppa)
+	_place(_ammo, Vector2(1, 1), Vector2(-28, -26))
+	_root.add_child(_ammo)
+	_flight.append(_ammo)
+	_radar = HudRadar.new(choppa)
+	_place(_radar, Vector2(0, 1), Vector2(28, -112))
+	_root.add_child(_radar)
 
 	# Bottom left: hull.
 	var hull_column := _column(Vector2(0, 1), Vector2(28, -26), BoxContainer.ALIGNMENT_END)
@@ -170,7 +150,7 @@ func _ready() -> void:
 	_root.add_child(_crosshair)
 
 	_controls = _controls_sheet()
-	_place(_controls, Vector2(1, 1), Vector2(-28, -26))
+	_place(_controls, CONTROLS_AT, CONTROLS_OFFSET)
 	_root.add_child(_controls)
 
 	refresh_settings()
@@ -206,7 +186,7 @@ func toggle_help() -> void:
 func refresh_settings() -> void:
 	_controls.queue_free()  # Rebuilt: the mouse notes follow the mouse steering setting.
 	_controls = _controls_sheet()
-	_place(_controls, Vector2(1, 1), Vector2(-28, -26))
+	_place(_controls, CONTROLS_AT, CONTROLS_OFFSET)
 	_root.add_child(_controls)
 	_controls.visible = Settings.flag("show_controls")
 	_fps.visible = Settings.flag("show_fps")
@@ -217,12 +197,10 @@ func _process(delta: float) -> void:
 	var cockpit := camera is ChaseCamera and (camera as ChaseCamera).first_person
 	for control in _flight:
 		control.visible = not cockpit
-	_speed.text = str(roundi(choppa.velocity.length() * 3.6))
-	_altitude.text = "%d m" % roundi(maxf(choppa.altitude, 0.0))
+	_radar.visible = not cockpit and Settings.flag("hud_radar")
 	if _fps.visible:
 		_fps.text = "%d FPS" % Engine.get_frames_per_second()
 	_boost.set_value(choppa.boost_meter)
-	_heat.set_value(choppa.heat, UiKit.DANGER if choppa.overheated else Color(UiKit.TEXT, 0.7))
 	_hit_flash = maxf(0.0, _hit_flash - delta)
 	var hp := choppa.health / choppa.max_health
 	_health.set_value(hp, UiKit.DANGER.lerp(UiKit.GOOD, smoothstep(0.2, 0.6, hp)))
@@ -236,11 +214,6 @@ func _process(delta: float) -> void:
 	_smoke.color.a = move_toward(_smoke.color.a, 0.82 if choppa.in_smoke() else 0.0, delta * 3.0)
 	_warning.text = "MISSILE  -  FLARES!" if choppa.ammo.flares > 0 and _missile_hunting() and fmod(choppa.clock, 0.4) < 0.25 else "MISSILE  -  ROLL!" if _missile_hunting() and fmod(choppa.clock, 0.4) < 0.25 else ""
 	var a := choppa.ammo
-	_gun.text = "GUN %d" % a.gun if a.gun > 0 else "GUN EMPTY"
-	_gun.add_theme_color_override("font_color", UiKit.DANGER if a.gun < choppa.full_ammo("gun") * 0.2 else UiKit.TEXT)
-	_loadout.text = "RKT %d   MSL %d   FLR %d" % [a.rockets, a.missiles, a.flares]
-	_loadout_extra.text = "MINE %d   SMOKE %d" % [a.mines, a.smoke]
-	_loadout.add_theme_color_override("font_color", UiKit.DANGER if a.rockets + a.missiles == 0 else UiKit.TEXT)
 	var effects := PackedStringArray()
 	if not choppa.engine_on and choppa.alive:
 		effects.append("ENGINE OFF  ·  I or throttle up")
@@ -277,6 +250,8 @@ func _draw_crosshair() -> void:
 	if boxed and not camera.is_position_behind(boxed.global_position):
 		_draw_brackets(camera.unproject_position(boxed.global_position), boxed, lock == boxed)
 	var cockpit := camera is ChaseCamera and (camera as ChaseCamera).first_person
+	if not cockpit and Settings.flag("hud_flight"):
+		_draw_flight()
 	var ahead := choppa.global_position - choppa.global_transform.basis.z * 80.0
 	if cockpit:
 		# The sight is collimated: its picture sits at infinity along the boresight, so it
@@ -330,55 +305,181 @@ func _glow_arc(c: Vector2, radius: float, from: float, to: float, color: Color, 
 func _draw_pipper(c: Vector2, white: Color) -> void:
 	var hit := _hit_flash > 0.0
 	var color := UiKit.DANGER if hit else white
-	var r := 10.0 + choppa.heat * 16.0  # The bloom, roughly as wide as the spread.
-	_dot(c, 1.8, color)
+	var r := 6.0 + choppa.heat * 10.0  # The bloom, roughly as wide as the spread.
+	_dot(c, 1.4, color)
 	for k in 4:  # Four arcs on the diagonals, open at the cardinal points.
 		var mid := PI * 0.25 + k * PI * 0.5
-		_arc(c, r, mid - 0.45, mid + 0.45, color, 1.6)
+		_arc(c, r, mid - 0.45, mid + 0.45, color, 1.3)
 	for d: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.DOWN]:
-		_line(c + d * (r + 5.0), c + d * (r + 12.0), color, 1.6)
+		_line(c + d * (r + 3.0), c + d * (r + 8.0), color, 1.3)
 	# Heat on the left, rounds on the right: thin arcs on a faint track.
 	var track := Color(1, 1, 1, 0.16)
-	var gauge := 34.0
+	var gauge := 22.0
 	var heat_color := white.lerp(UiKit.ACCENT, smoothstep(0.3, 0.7, choppa.heat))
 	if choppa.overheated or choppa.heat > 0.85:
 		heat_color = UiKit.DANGER if fmod(choppa.clock, 0.3) < 0.18 else UiKit.ACCENT
-	_crosshair.draw_arc(c, gauge, PI * 0.72, PI * 1.28, 24, track, 2.0, true)
+	_crosshair.draw_arc(c, gauge, PI * 0.72, PI * 1.28, 24, track, 1.5, true)
 	if choppa.heat > 0.01:
-		_arc(c, gauge, PI * 1.28 - PI * 0.56 * choppa.heat, PI * 1.28, heat_color, 2.4)
+		_arc(c, gauge, PI * 1.28 - PI * 0.56 * choppa.heat, PI * 1.28, heat_color, 1.8)
 	var rounds := float(choppa.ammo.gun) / maxf(1.0, choppa.full_ammo("gun"))
-	_crosshair.draw_arc(c, gauge, -PI * 0.28, PI * 0.28, 24, track, 2.0, true)
+	_crosshair.draw_arc(c, gauge, -PI * 0.28, PI * 0.28, 24, track, 1.5, true)
 	if rounds > 0.0:
-		_arc(c, gauge, PI * 0.28 - PI * 0.56 * rounds, PI * 0.28, UiKit.ACCENT if rounds < 0.2 else Color(white, 0.7), 2.4)
+		_arc(c, gauge, PI * 0.28 - PI * 0.56 * rounds, PI * 0.28, UiKit.ACCENT if rounds < 0.2 else Color(white, 0.7), 1.8)
 	if hit:  # Hit marker: crisp diagonal ticks just outside the bloom.
 		for d: Vector2 in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
 			var n := d.normalized()
-			_line(c + n * (r + 4.0), c + n * (r + 12.0), Color.WHITE, 2.2)
+			_line(c + n * (r + 3.0), c + n * (r + 9.0), Color.WHITE, 1.8)
 
 
 func _draw_brackets(at: Vector2, target: Choppa, locked: bool) -> void:
 	_bracket_time += get_process_delta_time()
-	var size := lerpf(64.0, 34.0, smoothstep(0.0, 0.25, _bracket_time))  # Closing in.
+	var size := lerpf(48.0, 24.0, smoothstep(0.0, 0.25, _bracket_time))  # Closing in.
 	var color := UiKit.DANGER if locked else UiKit.ACCENT
 	var leg := size * 0.45
 	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
 		var p := at + corner * size
-		_line(p, p - Vector2(corner.x, 0.0) * leg, color, 2.0)
-		_line(p, p - Vector2(0.0, corner.y) * leg, color, 2.0)
+		_line(p, p - Vector2(corner.x, 0.0) * leg, color, 1.6)
+		_line(p, p - Vector2(0.0, corner.y) * leg, color, 1.6)
 	if locked:  # A turning diamond and the word.
 		var a := choppa.clock * 2.5
 		var pts := PackedVector2Array()
 		for k in 5:
 			pts.append(at + Vector2.from_angle(a + k * PI * 0.5) * (size * 0.62))
-		_crosshair.draw_polyline(pts, Color(0, 0, 0, 0.5), 4.0, true)
-		_crosshair.draw_polyline(pts, color, 2.0, true)
-	var font := UiKit.font("condensed")
+		_crosshair.draw_polyline(pts, Color(0, 0, 0, 0.5), 3.4, true)
+		_crosshair.draw_polyline(pts, color, 1.6, true)
 	var label := "%s  %d m%s" % [target.pilot_name.to_upper(), roundi(choppa.global_position.distance_to(target.global_position)),
 		"  ·  LOCK" if locked else ""]
-	var width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-	var spot := at + Vector2(-width * 0.5, size + 20.0)
-	_crosshair.draw_string_outline(font, spot, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 4, Color(0, 0, 0, 0.6))
-	_crosshair.draw_string(font, spot, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, color)
+	_text(at + Vector2(0.0, size + 17.0), label, 14, color, HORIZONTAL_ALIGNMENT_CENTER)
+
+
+## Text on the sight layer with a dark outline, aligned left of, centred on or right of `at`.
+func _text(at: Vector2, text: String, font_size: int, color: Color, align := HORIZONTAL_ALIGNMENT_LEFT,
+		kind := "condensed") -> void:
+	var font := UiKit.font(kind)
+	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var shift := 0.0
+	if align == HORIZONTAL_ALIGNMENT_CENTER:
+		shift = width * 0.5
+	elif align == HORIZONTAL_ALIGNMENT_RIGHT:
+		shift = width
+	var spot := at - Vector2(shift, 0.0)
+	_crosshair.draw_string_outline(font, spot, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, 4, Color(0, 0, 0, 0.55))
+	_crosshair.draw_string(font, spot, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+
+
+## Pitch and bank of the airframe, in radians: nose up and right side down are positive.
+static func attitude(on: Choppa) -> Vector2:
+	var b := on.global_transform.basis
+	var forward := -b.z
+	return Vector2(asin(clampf(forward.y, -1.0, 1.0)), atan2(-b.x.y, b.y.y))
+
+
+## The flight display round the middle of the chase view, the way a head-up display
+## frames it: a heading tape over the top, the speed tape (km/h) left with the climb rate
+## under it, the altitude tape (m above the ground) right, and between them a pitch
+## ladder that tilts with the bank. Thin lines with a dark edge, nothing filled.
+func _draw_flight() -> void:
+	var view := _crosshair.size
+	var h := view.y
+	var c := Vector2(view.x * 0.5, h * 0.47)
+	var w := h * 0.3  # Half the frame's width, and half its height.
+	var half := h * 0.16
+	var faint := Color(HUD_LINE, 0.4)
+	# The pitch ladder: every 5 degrees, numbered every 10, the horizon long.
+	var att := attitude(choppa)
+	var pitch := rad_to_deg(att.x)
+	var per_degree := half / 14.0
+	var across := Vector2(1, 0).rotated(-att.y)
+	for step in range(-18, 19):
+		var deg := step * 5
+		var offset := (pitch - deg) * per_degree
+		if absf(offset) > half:
+			continue
+		var mid := c + Vector2(0, offset).rotated(-att.y)
+		if deg == 0:
+			_line(mid - across * w * 0.78, mid - across * w * 0.12, faint, 1.2)
+			_line(mid + across * w * 0.12, mid + across * w * 0.78, faint, 1.2)
+			continue
+		var long := w * (0.42 if deg % 10 == 0 else 0.3)
+		var gap := w * 0.14
+		var tip := Vector2(0, 7 if deg > 0 else -7).rotated(-att.y)  # The ends turn toward the horizon.
+		for side: float in [-1.0, 1.0]:
+			var inner := mid + across * side * gap
+			var outer := mid + across * side * long
+			if deg > 0:
+				_line(inner, outer, faint, 1.0)
+			else:
+				for k in 3:  # Below the horizon: dashed.
+					_line(inner.lerp(outer, k / 3.0), inner.lerp(outer, k / 3.0 + 0.2), faint, 1.0)
+			_line(outer, outer + tip, faint, 1.0)
+			if deg % 10 == 0:
+				_text(outer + across * side * 16.0 + Vector2(0, 5), str(absi(deg)), 12, faint, HORIZONTAL_ALIGNMENT_CENTER)
+	# The waterline: the reference the ladder moves against.
+	_line(c + Vector2(-16, 0), c + Vector2(-6, 0), HUD_LINE, 1.4)
+	_line(c + Vector2(-6, 0), c + Vector2(-3, 4), HUD_LINE, 1.4)
+	_line(c + Vector2(3, 4), c + Vector2(6, 0), HUD_LINE, 1.4)
+	_line(c + Vector2(6, 0), c + Vector2(16, 0), HUD_LINE, 1.4)
+	# Speed, left: a tape scrolling past a readout, the climb rate under it.
+	var speed := choppa.velocity.length() * 3.6
+	_tape(Vector2(c.x - w, c.y), half, speed, 10.0, half / 60.0, -1.0)
+	_readout(Vector2(c.x - w - 10.0, c.y), str(roundi(speed)), -1.0)
+	_text(Vector2(c.x - w - 12.0, c.y - 22.0), "KM/H", 11, faint, HORIZONTAL_ALIGNMENT_RIGHT)
+	var climb := choppa.velocity.y
+	_text(Vector2(c.x - w - 12.0, c.y + 36.0), "%+.1f m/s" % climb if absf(climb) >= 0.05 else "0.0 m/s", 14,
+		UiKit.ACCENT if climb < -8.0 else HUD_LINE, HORIZONTAL_ALIGNMENT_RIGHT)
+	# Altitude, right.
+	var altitude := maxf(choppa.altitude, 0.0)
+	_tape(Vector2(c.x + w, c.y), half, altitude, 5.0, half / 40.0, 1.0)
+	_readout(Vector2(c.x + w + 10.0, c.y), str(roundi(altitude)), 1.0)
+	_text(Vector2(c.x + w + 12.0, c.y - 22.0), "ALT M", 11, faint)
+	# Heading, over the top: ticks every 5 degrees, numbers every 15, the cardinal points.
+	var heading := fposmod(-rad_to_deg(choppa.heading), 360.0)
+	var top := c.y - half - 30.0
+	var span := 40.0
+	var per := w * 0.8 / span
+	for d in range(int(heading - span) - 5, int(heading + span) + 6):
+		if d % 5 != 0:
+			continue
+		var x := c.x + (d - heading) * per
+		if absf(x - c.x) > w * 0.8:
+			continue
+		var long := d % 15 == 0
+		_line(Vector2(x, top), Vector2(x, top + (8.0 if long else 4.0)), HUD_LINE if long else faint, 1.0)
+		if long:
+			var name: String = {0: "N", 90: "E", 180: "S", 270: "W"}.get(posmod(d, 360), str(posmod(d, 360)))
+			var color := UiKit.ACCENT if name == "N" else (HUD_LINE if name.length() == 1 else faint)
+			_text(Vector2(x, top - 5.0), name, 13 if name.length() == 1 else 12, color, HORIZONTAL_ALIGNMENT_CENTER)
+	_line(Vector2(c.x, top + 12.0), Vector2(c.x - 5.0, top + 18.0), HUD_LINE, 1.4)  # The caret.
+	_line(Vector2(c.x, top + 12.0), Vector2(c.x + 5.0, top + 18.0), HUD_LINE, 1.4)
+	_text(Vector2(c.x, top + 34.0), "%03d" % (roundi(heading) % 360), 15, HUD_LINE, HORIZONTAL_ALIGNMENT_CENTER)
+
+
+## A vertical tape with its middle at `at`, `half` tall each way, showing `value`:
+## ticks every `step` (long ones every five), `scale` pixels per unit, on the side
+## facing the middle (`side` -1 for the left tape, 1 for the right).
+func _tape(at: Vector2, half: float, value: float, step: float, scale: float, side: float) -> void:
+	var faint := Color(HUD_LINE, 0.4)
+	_line(at + Vector2(0, -half), at + Vector2(0, half), faint, 1.0)
+	var mark := floorf((value - half / scale) / step) * step
+	while mark <= value + half / scale:
+		var y := at.y + (value - mark) * scale
+		if mark >= 0.0 and absf(y - at.y) <= half:
+			var long := is_zero_approx(fmod(mark, step * 5.0))
+			_line(Vector2(at.x, y), Vector2(at.x - side * (10.0 if long else 5.0), y), HUD_LINE if long else faint, 1.0)
+		mark += step
+
+
+## A readout box pointing at its tape: the number in a frame with an arrow tip at `tip`.
+func _readout(tip: Vector2, text: String, side: float) -> void:
+	var w := 64.0
+	var hh := 14.0
+	var back := tip + Vector2(side * (w + 8.0), 0)
+	var points := PackedVector2Array([tip, tip + Vector2(side * 8.0, -hh), back + Vector2(0, -hh), back + Vector2(0, hh),
+		tip + Vector2(side * 8.0, hh), tip])
+	_crosshair.draw_colored_polygon(points.slice(0, 5), Color(0, 0, 0, 0.28))
+	_crosshair.draw_polyline(points, Color(0, 0, 0, 0.45), 3.0, true)
+	_crosshair.draw_polyline(points, HUD_LINE, 1.2, true)
+	_text(tip + Vector2(side * (8.0 + w * 0.5), 8.0), text, 22, UiKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER, "display")
 
 
 # Sight primitives with a dark edge under them.

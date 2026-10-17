@@ -209,6 +209,8 @@ func _build_gameplay(page: VBoxContainer) -> void:
 	_row(page, "Default view", ["Chase", "Cockpit"], 1 if Settings.flag("cockpit_view") else 0,
 		func(i: int) -> void: Settings.set_value("cockpit_view", i == 1))
 	_pick(page, "HUD size", ["Small", "Normal", "Large"], "hud_scale")
+	_toggle(page, "Flight display", "hud_flight")
+	_toggle(page, "Radar", "hud_radar")
 	_toggle(page, "Damage flash", "damage_flash")
 	_toggle(page, "Aim assist", "aim_assist")
 	_toggle(page, "Controls overlay", "show_controls")

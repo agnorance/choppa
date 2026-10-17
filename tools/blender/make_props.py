@@ -760,85 +760,207 @@ def burnt(parts, rng, count, center, spread, size=(0.6, 0.6, 0.05)):
                                     "dark"), Matrix.Translation(p) @ Matrix.Rotation(rng.uniform(0, 6.3), 4, "Z")))
 
 
+def drum(at, lying=False, material="rust"):
+    """A 200 litre oil drum, standing or knocked over."""
+    at = Vector(at)
+    axis = Vector((1, 0, 0)) if lying else Vector((0, 0, 1))
+    c = at + (Vector((0, 0, 0.3)) if lying else Vector((0, 0, 0.0)))
+    a, b = (c - axis * 0.45, c + axis * 0.45) if lying else (c, c + axis * 0.9)
+    parts = [cyl(a, b, 0.3, material, 18, bevel_width=0.02)]
+    for t in (0.33, 0.66):
+        parts.append(ring(a.lerp(b, t), axis, 0.305, 0.015, "dark", 18))
+    return parts
+
+
+def jerry_can(at, yaw):
+    at = Vector(at)
+    rot = Matrix.Rotation(yaw, 4, "Z")
+    return [base.place(box((0, 0, 0.24), (0.17, 0.36, 0.48), "paint", bevel_width=0.025), Matrix.Translation(at) @ rot),
+            base.place(cyl((0, 0.1, 0.48), (0, 0.1, 0.54), 0.03, "metal", 8), Matrix.Translation(at) @ rot),
+            base.place(box((0, -0.06, 0.52), (0.04, 0.16, 0.04), "dark"), Matrix.Translation(at) @ rot)]
+
+
+def scorch(parts, rng, center, radius):
+    """A burnt patch: a dark disc of ground with flakes and debris strewn round it."""
+    # The maps sink wrecks 0.25 m into the ground (Props.place callers), so the patch
+    # stands that high to show: a thin dark disc just over the grass.
+    lift = Vector((0, 0, 0.27))
+    parts.append(cyl(Vector(center) + Vector((0, 0, -0.1)), Vector(center) + lift, radius, "dark", 24))
+    burnt(parts, rng, 16, Vector(center) + lift, radius * 1.3)
+    for _ in range(6):  # Bent panels and bits of the airframe.
+        p = Vector(center) + lift + Vector((rng.uniform(-radius, radius), rng.uniform(-radius, radius), 0.03))
+        parts.append(base.place(box((0, 0, 0), (rng.uniform(0.3, 0.9), rng.uniform(0.2, 0.6), 0.03), "rust"),
+                                Matrix.Translation(p) @ Matrix.Rotation(rng.uniform(0, 6.3), 4, "Z") @
+                                Matrix.Rotation(rng.uniform(-0.4, 0.4), 4, "X")))
+
+
 def wreck_heli():
-    """A crashed helicopter lying on its side: the cabin, the boom broken off and lying
-    beside it, blades bent into the ground, burnt patches."""
+    """A crashed Little Bird on its side: the egg cabin with its glass gone and the frame
+    bent, a seat hanging in it, the mast and hub with five blades bent into the dirt,
+    the boom snapped off with the driveshaft showing, the fin and stabiliser still on
+    it, skids torn loose, spent cases spilled, a scorched patch round it all."""
     rng = random.Random(5)
     parts = []
-    tilt = Matrix.Rotation(math.radians(70), 4, "Y")  # Rolled onto its right side.
-    body = cyl((0, 1.6, 0), (0, -1.4, 0), 1.0, "rust", 18, radius2=0.8)
-    nose = ball((0, 1.6, 0), 1.0, "rust", scale=(1, 0.9, 1), segments=16, rings=8)
-    for o in (body, nose):
-        parts.append(base.place(o, Matrix.Translation((0, 0, 0.95)) @ tilt))
-    parts.append(base.place(ball((0, 2.0, 0.4), 0.7, "dark", scale=(0.9, 0.7, 0.6), segments=12, rings=6),
-                            Matrix.Translation((0, 0, 0.95)) @ tilt))  # The burnt-out canopy hole.
-    parts.append(cyl((0.4, -1.6, 0.6), (1.9, -5.8, 0.4), 0.28, "rust", 12, radius2=0.18))  # Broken boom.
-    parts.append(fin_plate((2.0, -5.9, 0.4)))
-    for k, (a, b) in enumerate((((0.6, 0.0, 1.9), (4.6, 2.5, 0.05)), ((0.6, 0.0, 1.9), (-1.0, -3.8, 0.05)),
-                                ((0.6, 0.0, 1.9), (3.2, -2.6, 1.2)))):
-        parts.append(beam(a, b, 0.12 if k else 0.14, "dark"))  # Bent blades, two in the dirt.
-    parts.append(cyl((0.3, 0.0, 1.6), (0.7, 0.0, 2.1), 0.15, "metal", 10))
-    for side in (-1, 1):  # Skids torn loose.
-        parts.append(beam((side * 1.4 + 0.6, 2.2, 0.08), (side * 1.2 + 0.4, -1.5, 0.08), 0.09, "metal"))
-    burnt(parts, rng, 14, (0.5, 0.0, 0), 4.0)
+    at = Matrix.Translation((0, 0, 0.95)) @ Matrix.Rotation(math.radians(70), 4, "Y")  # Rolled onto its right side.
+    cabin = [ball((0, 0.6, 0), 1.0, "rust", scale=(0.88, 1.5, 1.05), segments=24, rings=12),
+             ball((0, 1.5, 0.3), 1.0, "dark", scale=(0.75, 0.75, 0.62), segments=16, rings=8)]  # The empty glass hole.
+    # What is left of the canopy frame, bent: the sill, a pillar and the roof ring.
+    cabin.append(tube([(-0.75, 1.6, -0.1), (0, 2.08, -0.25), (0.75, 1.6, -0.1)], 0.04, "rust", 8))
+    cabin.append(tube([(0.55, 1.75, -0.05), (0.62, 1.45, 0.55), (0.45, 1.05, 0.9)], 0.035, "rust", 8))
+    cabin.append(tube([(-0.6, 1.0, 0.8), (0, 1.25, 0.98), (0.55, 0.95, 0.85)], 0.035, "rust", 8))
+    cabin.append(box((0, 0.55, -0.15), (0.48, 0.1, 0.75), "dark", bevel_width=0.03))  # The seat back.
+    cabin.append(box((0, 0.85, -0.5), (0.48, 0.45, 0.1), "dark", bevel_width=0.03))
+    # Engine deck: the crankcase and three cylinders torn open behind the cabin.
+    cabin.append(cyl((0, -0.6, 0.9), (0, -0.6, 1.15), 0.3, "metal", 18, bevel_width=0.02))
+    for k in range(3):
+        a = k * 2.1
+        d = Vector((math.cos(a), math.sin(a), 0))
+        cabin.append(cyl(Vector((0, -0.6, 1.0)) + d * 0.28, Vector((0, -0.6, 1.0)) + d * 0.6, 0.08, "dark", 12))
+    # The mast with the hub, the blades bent where they hit.
+    cabin.append(cyl((0, -0.45, 1.15), (0, -0.45, 1.9), 0.07, "metal", 12))
+    cabin.append(cyl((0, -0.45, 1.85), (0, -0.45, 2.0), 0.2, "metal", 18, bevel_width=0.02))
+    for o in cabin:
+        parts.append(base.place(o, at))
+    hub = at @ Vector((0, -0.45, 1.95))
+    for k in range(5):
+        a = 2 * math.pi * k / 5 + 0.4
+        d = Vector((math.cos(a), math.sin(a), 0))
+        mid = hub + d * 1.4 + Vector((0, 0, -0.15))
+        tip = hub + d * 3.6 + Vector((0, 0, -0.9 - 0.3 * (k % 2)))
+        tip.z = max(tip.z, 0.05)
+        parts.append(tube([hub, hub + d * 0.5, mid, tip], 0.06, "dark", 6))
+        parts.append(base.place(box((0, 0, 0), (0.32, 0.03, 0.02), "hazard"), Matrix.Translation(tip) @ Matrix.Rotation(a, 4, "Z")))
+    # The boom, snapped: its front stub on the cabin and the rest lying beside it.
+    parts.append(cyl((0.5, -1.7, 0.8), (0.9, -2.6, 0.6), 0.16, "rust", 16, radius2=0.15))
+    boom_a, boom_b = Vector((1.6, -3.0, 0.2)), Vector((2.6, -6.0, 0.15))
+    parts.append(cyl(boom_a, boom_b, 0.15, "rust", 16, radius2=0.09))
+    for t in (0.2, 0.5, 0.8):
+        parts.append(ring(boom_a.lerp(boom_b, t), boom_b - boom_a, 0.15 - 0.06 * t, 0.012, "rust", 16))
+    parts.append(cyl(boom_a + Vector((0, 0.25, 0.0)), boom_a, 0.03, "metal", 8))  # Driveshaft sticking out.
+    parts.append(base.place(box((0, 0, 0.55), (0.06, 0.9, 1.1), "rust", bevel_width=0.02),
+                            Matrix.Translation(boom_b) @ Matrix.Rotation(math.radians(-80), 4, "Y")))  # Fin, flat.
+    for s in (-1, 1):
+        parts.append(base.place(box((0, 0, 0), (0.9, 0.4, 0.05), "rust", bevel_width=0.01),
+                                Matrix.Translation(boom_b + Vector((s * 0.1, 0.9, s * 0.45 + 0.4))) @
+                                Matrix.Rotation(math.radians(80), 4, "Y")))
+    for side in (-1, 1):  # Skids torn loose, one cross tube still on.
+        parts.append(tube([(side * 1.5 + 0.8, 2.3, 0.06), (side * 1.45 + 0.7, 0.0, 0.06), (side * 1.3 + 0.5, -1.4, 0.1)],
+                          0.05, "metal", 10))
+    parts.append(tube([(-0.2, 1.3, 0.1), (0.5, 1.4, 0.7), (1.0, 1.5, 0.9)], 0.04, "metal", 8))
+    for _ in range(25):  # Spent cases from the gun.
+        p = Vector((rng.uniform(-2.5, 0.5), rng.uniform(0.5, 3.0), 0.02))
+        parts.append(base.place(cyl((0, 0, 0), (0.07, 0, 0), 0.012, "brass", 6),
+                                Matrix.Translation(p) @ Matrix.Rotation(rng.uniform(0, 6.3), 4, "Z")))
+    scorch(parts, rng, (0.4, -0.5, 0), 3.4)
     return join(parts, "wreck_heli")
 
 
-def fin_plate(at):
-    return box(at, (0.08, 1.0, 1.1), "rust")
-
-
 def wreck_truck():
-    """A burnt-out army truck along X (cab at +X): cab, flat bed with a torn canvas frame,
-    six wheels, one gone."""
+    """A burnt-out army truck along X (cab at +X): bonnet and cab with the door hanging
+    open, a grille, bumper and empty headlights, the flat bed with burnt slats and the
+    canvas frame, six wheels (one blown off, lying by), a spare, jerry cans, a scorch."""
     rng = random.Random(9)
-    parts = [box((2.7, 0, 1.55), (1.9, 2.4, 1.7), "rust", bevel_width=0.06),
-             box((3.62, 0, 1.25), (0.15, 2.3, 0.9), "dark"),  # Grille.
-             box((2.95, 0, 2.05), (0.9, 2.2, 0.7), "dark"),  # Empty windows.
-             box((-0.9, 0, 1.15), (5.4, 2.5, 0.25), "rust"),
-             box((0.0, 0, 0.75), (7.6, 0.9, 0.35), "dark")]
+    parts = [box((3.9, 0, 1.2), (1.3, 2.1, 0.95), "rust", bevel_width=0.12),  # Bonnet.
+             box((2.65, 0, 1.6), (1.3, 2.35, 1.75), "rust", bevel_width=0.08),  # Cab.
+             box((4.58, 0, 1.15), (0.06, 1.7, 0.75), "dark"),  # Grille.
+             box((4.7, 0, 0.62), (0.18, 2.4, 0.22), "metal", bevel_width=0.03),  # Bumper.
+             box((3.1, 0, 2.05), (0.05, 2.1, 0.7), "dark"),  # Windscreen, gone.
+             box((-0.9, 0, 1.15), (5.4, 2.5, 0.2), "rust"),  # Bed.
+             box((0.0, 0, 0.75), (8.6, 0.9, 0.3), "dark")]  # Chassis.
     for side in (-1, 1):
-        parts.append(box((-0.9, side * 1.22, 1.6), (5.4, 0.08, 0.7), "rust"))
-        for k in range(4):
+        parts.append(cyl((4.6, side * 0.75, 1.25), (4.65, side * 0.75, 1.25), 0.14, "dark", 14))  # Headlight bowls.
+        parts.append(ring((4.64, side * 0.75, 1.25), (1, 0, 0), 0.15, 0.02, "rust", 14))
+        parts.append(box((2.65, side * 1.18, 2.1), (0.9, 0.05, 0.55), "dark"))  # Side window holes.
+        parts.append(box((3.9, side * 1.0, 0.9), (1.2, 0.3, 0.06), "rust", rotation=Matrix.Rotation(side * 0.3, 4, "X")))  # Wings.
+        for k in range(9):  # What is left of the bed's slats.
+            if rng.random() < 0.3:
+                continue
+            parts.append(box((-3.4 + k * 0.62, side * 1.22, 1.45), (0.5, 0.06, 0.4 + rng.uniform(-0.2, 0.15)),
+                             "wood_dark" if rng.random() < 0.6 else "dark"))
+        for k in range(4):  # Canvas frame hoops, bent.
             x = -3.4 + k * 1.6
             parts.append(beam((x, side * 1.2, 1.3), (x + 0.2, side * 1.1, 2.9), 0.06, "metal"))
         parts.append(beam((-3.4, side * 1.2, 2.9), (1.6, side * 1.1, 2.6), 0.06, "metal"))
-    for x in (2.6, -1.6, -3.0):
+    door = Matrix.Translation((3.2, -1.2, 1.55)) @ Matrix.Rotation(math.radians(-55), 4, "Z")  # Hanging open.
+    parts.append(base.place(box((-0.55, 0, 0), (1.1, 0.06, 1.3), "rust", bevel_width=0.02), door))
+    parts.append(base.place(box((-0.55, -0.04, 0.35), (0.7, 0.03, 0.4), "dark"), door))
+    for x in (3.6, -1.6, -3.0):
         for side in (-1, 1):
             if x == -3.0 and side == 1:
                 continue  # Blown off.
-            parts.append(cyl((x, side * 1.05, 0.55), (x, side * 1.4, 0.55), 0.55, "rubber" if rng.random() < 0.5 else "dark", 16))
-    burnt(parts, rng, 10, (0, 0, 0), 4.5)
+            parts.append(cyl((x, side * 1.05, 0.55), (x, side * 1.4, 0.55), 0.55, "rubber" if rng.random() < 0.6 else "dark", 18,
+                             bevel_width=0.05))
+            parts.append(cyl((x, side * 1.38, 0.55), (x, side * 1.42, 0.55), 0.25, "metal", 12))
+    parts.append(cyl((-3.6, 3.0, 0.15), (-3.6, 3.35, 0.15), 0.55, "rubber", 18, bevel_width=0.05))  # The lost wheel...
+    parts.append(base.place(cyl((0, 0, 0), (0, 0, 0.35), 0.55, "rubber", 18), Matrix.Translation((-4.2, 2.6, 0.0))))
+    parts.append(cyl((1.6, 0, 1.75), (1.6, 0, 1.4), 0.5, "rubber", 18))  # ...and the spare behind the cab.
+    for k, (x, y) in enumerate([(0.9, 2.0), (1.2, 2.2), (-2.0, -2.1)]):
+        parts += jerry_can((x, y, 0), rng.uniform(0, 3))
+    parts.append(cyl((3.0, 1.3, 2.4), (3.0, 1.3, 1.0), 0.05, "dark", 8))  # Exhaust stack.
+    scorch(parts, rng, (0, 0, 0), 4.0)
     return join(parts, "wreck_truck")
 
 
 def wreck_tank():
-    """A tank hull with its tracks, the turret knocked askew and the gun pointing down."""
+    """A tank knocked out: the hull with skirts over its tracks, road wheels, the turret
+    blown askew with its hatches open and the gun down, smoke dischargers, the engine
+    deck's grilles, tow cables, a broken run of track and a road wheel lying off it."""
     rng = random.Random(13)
     parts = [box((0, 0, 1.05), (6.6, 2.6, 1.1), "rust", bevel_width=0.12),
              box((2.9, 0, 0.9), (1.0, 2.4, 0.9), "rust", rotation=Matrix.Rotation(math.radians(-25), 4, "Y"))]
     for side in (-1, 1):
-        parts.append(box((0, side * 1.55, 0.6), (6.9, 0.6, 1.0), "dark", bevel_width=0.2))
+        parts.append(box((0, side * 1.55, 0.6), (6.9, 0.6, 1.0), "dark", bevel_width=0.2))  # Track run.
+        for k in range(28):  # Track links over the top run.
+            parts.append(box((-3.3 + k * 0.245, side * 1.55, 1.11), (0.16, 0.62, 0.05), "metal"))
         for k in range(6):
-            parts.append(cyl((-2.6 + k * 1.05, side * 1.25, 0.5), (-2.6 + k * 1.05, side * 1.85, 0.5), 0.42, "metal", 14))
-    turret = [cyl((0, 0, 0), (0, 0, 0.8), 1.35, "rust", 20, radius2=1.1), box((-1.2, 0, 0.4), (1.2, 1.8, 0.7), "rust"),
-              cyl((1.2, 0, 0.4), (4.8, 0, 0.4), 0.13, "rust", 10)]
+            parts.append(cyl((-2.6 + k * 1.05, side * 1.25, 0.5), (-2.6 + k * 1.05, side * 1.85, 0.5), 0.42, "metal", 16))
+            parts.append(cyl((-2.6 + k * 1.05, side * 1.86, 0.5), (-2.6 + k * 1.05, side * 1.9, 0.5), 0.16, "dark", 12))
+        if side > 0:  # One skirt torn away, the other still on.
+            parts.append(box((0.5, side * 1.9, 0.95), (4.5, 0.05, 0.6), "rust", bevel_width=0.01))
+        parts.append(tube([(-3.1, side * 0.9, 1.62), (-1.0, side * 1.0, 1.64), (1.0, side * 0.95, 1.63)], 0.03, "metal", 6))  # Tow cable.
+    for k in range(6):  # Engine deck grilles.
+        parts.append(box((-2.2 + k * 0.28, 0, 1.61), (0.06, 1.8, 0.04), "dark"))
+    for x in (-3.3, -3.4):  # Exhausts at the back.
+        parts.append(box((x, 0.8 if x < -3.35 else -0.8, 1.2), (0.12, 0.5, 0.3), "exhaust", bevel_width=0.02))
+    turret = [cyl((0, 0, 0), (0, 0, 0.8), 1.35, "rust", 24, radius2=1.1, bevel_width=0.04),
+              box((-1.2, 0, 0.4), (1.2, 1.8, 0.7), "rust", bevel_width=0.05),
+              cyl((1.2, 0, 0.4), (4.8, 0, 0.4), 0.13, "rust", 12),
+              cyl((1.1, 0, 0.4), (1.6, 0, 0.4), 0.3, "rust", 16),  # Mantlet.
+              cyl((4.4, 0, 0.4), (4.85, 0, 0.4), 0.17, "rust", 12),  # Muzzle brake.
+              cyl((0.3, 0.45, 0.8), (0.3, 0.45, 1.05), 0.33, "rust", 18),  # Commander's cupola.
+              base.place(cyl((0, 0, 0), (0, 0, 0.06), 0.3, "rust", 16), Matrix.Translation((0.0, 0.45, 1.1)) @
+                         Matrix.Rotation(math.radians(70), 4, "X")),  # Its hatch, flung open.
+              base.place(cyl((0, 0, 0), (0, 0, 0.05), 0.25, "rust", 14), Matrix.Translation((0.2, -0.5, 0.95)) @
+                         Matrix.Rotation(math.radians(-60), 4, "X"))]
+    for s in (-1, 1):  # Smoke dischargers on the turret cheeks.
+        for k in range(3):
+            turret.append(cyl((0.6, s * (0.95 + k * 0.08), 0.6), (0.85, s * (1.0 + k * 0.1), 0.75), 0.05, "dark", 8))
     m = Matrix.Translation((-0.3, 0.4, 1.55)) @ Matrix.Rotation(0.7, 4, "Z") @ Matrix.Rotation(math.radians(14), 4, "Y")
     for o in turret:
         parts.append(base.place(o, m))
-    burnt(parts, rng, 12, (0, 0, 0), 4.5)
+    for k in range(9):  # A run of track thrown off, and a road wheel lying in the dirt.
+        parts.append(box((-2.0 + k * 0.32, -3.0 - k * 0.04, 0.04), (0.2, 0.62, 0.06), "metal",
+                         rotation=Matrix.Rotation(0.12, 4, "Z")))
+    parts.append(cyl((2.4, -3.2, 0.0), (2.4, -3.2, 0.3), 0.42, "metal", 16))
+    scorch(parts, rng, (0, 0, 0), 4.2)
     return join(parts, "wreck_tank")
 
 
 def radar_station():
-    """An old early-warning radar: a lattice tower with a mesh dish and a feed horn, a
-    cabin at its foot with an aerial and a stair."""
+    """An old early-warning radar: a lattice tower with a caged ladder and a railed
+    platform, a mesh dish and its feed horn, the obstruction lamp's fitting on top; at
+    its foot the operators' cabin with a door, window and air conditioner, a cable tray
+    up to the tower, a generator and fuel drums."""
     parts = []
     parts += lattice_leg((0, 0, 0), (0, 0, 12), 1.6, "metal", bays=6)
     parts.append(box((0, 0, 12.1), (3.8, 3.8, 0.25), "metal"))
-    for side in (-1, 1):
-        parts.append(beam((side * 1.9, -1.9, 12.25), (side * 1.9, 1.9, 12.25), 0.05, "metal"))
+    for side in (-1, 1):  # Railing round the platform.
+        for y in (-1.9, 1.9):
+            parts.append(beam((side * 1.9, y, 12.2), (side * 1.9, y, 13.25), 0.05, "metal"))
         parts.append(beam((side * 1.9, -1.9, 13.2), (side * 1.9, 1.9, 13.2), 0.04, "metal"))
+        parts.append(beam((side * 1.9, -1.9, 12.7), (side * 1.9, 1.9, 12.7), 0.03, "metal"))
+        parts.append(beam((-1.9, side * 1.9, 13.2), (1.9, side * 1.9, 13.2), 0.04, "metal"))
+        parts.append(beam((-1.9, side * 1.9, 12.7), (1.9, side * 1.9, 12.7), 0.03, "metal"))
     # The dish: a curved mesh of ribs on a pedestal, tilted up toward the horizon.
     dish = []
     focal = 1.6  # A parabolic dish facing +Y: depth = r^2 / (4 f).
@@ -854,18 +976,46 @@ def radar_station():
     for o in dish:
         parts.append(base.place(o, Matrix.Translation((0, 0, 14.4)) @ Matrix.Rotation(math.radians(-12), 4, "X")))
     parts.append(cyl((0, 0, 12.2), (0, 0, 14.2), 0.35, "dark", 14))
+    parts.append(cyl((0, -0.6, 14.2), (0, -0.6, 14.95), 0.04, "metal", 6))  # Lamp fitting (the game lights it).
+    parts.append(cyl((0, -0.6, 14.9), (0, -0.6, 15.0), 0.12, "dark", 12))
+    # Caged ladder up one leg.
+    for k in range(22):
+        z = 0.5 + k * 0.52
+        parts.append(beam((1.75, -0.35, z), (1.75, 0.35, z), 0.03, "metal"))
+    for y in (-0.35, 0.35):
+        parts.append(beam((1.75, y, 0.3), (1.75, y, 12.1), 0.04, "metal"))
+    for k in range(9):
+        z = 3.0 + k * 1.1
+        parts.append(tube([(1.75, -0.35, z), (2.25, -0.3, z), (2.4, 0.0, z), (2.25, 0.3, z), (1.75, 0.35, z)], 0.02,
+                          "metal", 5))
+    # The cabin: corrugated walls, a roof, the door and window, the air conditioner.
     parts.append(box((6.0, 1.0, 1.4), (5.0, 3.2, 2.8), "corrugated", bevel_width=0.04))
     parts.append(box((6.0, 1.0, 2.9), (5.4, 3.6, 0.2), "rust"))
     parts.append(box((3.48, 1.0, 1.1), (0.05, 0.9, 1.9), "dark"))
-    parts.append(cyl((7.6, 1.8, 3.0), (7.6, 1.8, 8.0), 0.04, "metal", 6))
+    parts.append(box((3.47, 1.25, 1.1), (0.03, 0.08, 0.08), "brass"))
+    parts.append(box((6.4, -0.62, 1.7), (1.2, 0.05, 0.7), "glass"))
+    parts.append(box((6.4, -0.63, 1.7), (1.3, 0.04, 0.8), "dark"))
+    parts.append(box((7.8, -0.75, 1.0), (0.9, 0.45, 0.6), "metal", bevel_width=0.03))  # Air conditioner.
+    parts.append(cyl((7.8, -0.99, 1.0), (7.8, -1.0, 1.0), 0.22, "dark", 16))
+    parts.append(cyl((7.6, 1.8, 3.0), (7.6, 1.8, 8.0), 0.04, "metal", 6))  # Aerial.
+    parts.append(beam((3.5, 0.0, 2.6), (1.2, 0.0, 6.0), 0.25, "metal"))  # Cable tray to the tower.
     for k in range(10):  # Stair up the tower.
         z = 0.6 + k * 1.15
         parts.append(box((1.3, -1.0 + (k % 2) * 2.0, z), (0.9, 0.5, 0.06), "metal"))
+    # Generator on a skid, its exhaust, the fuel drums by it.
+    gen = Vector((6.2, 4.0, 0.0))
+    parts.append(box(gen + Vector((0, 0, 0.1)), (2.0, 1.0, 0.2), "dark"))
+    parts.append(box(gen + Vector((0, 0, 0.75)), (1.8, 0.9, 1.1), "paint", bevel_width=0.06))
+    for k in range(5):
+        parts.append(box(gen + Vector((-0.5 + k * 0.22, -0.46, 0.85)), (0.08, 0.02, 0.6), "dark"))
+    parts.append(cyl(gen + Vector((0.7, 0.2, 1.3)), gen + Vector((0.7, 0.2, 2.0)), 0.06, "exhaust", 10))
+    for k, (x, y, lying) in enumerate([(8.0, 3.6, False), (8.0, 4.4, False), (8.7, 4.0, True)]):
+        parts += drum((x, y, 0.0), lying)
     return join(parts, "radar_station")
 
 
 def sandbags():
-    """A 6 m curved wall of sandbags, three courses high, staggered."""
+    """A 6 m curved wall of sandbags, three courses high, staggered, no two bags alike."""
     rng = random.Random(21)
     parts = []
     for course in range(3):
@@ -873,9 +1023,11 @@ def sandbags():
         for k in range(n):
             a = math.radians(-35 + (k + 0.5 * (course % 2)) * 70 / 10)
             x, y = math.sin(a) * 5.0, math.cos(a) * 5.0 - 5.0
-            bag = box((0, 0, 0), (0.62, 0.36, 0.24), "sand", bevel_width=0.1)
+            bag = box((0, 0, 0), (0.62 * rng.uniform(0.92, 1.06), 0.36 * rng.uniform(0.9, 1.1), 0.24 * rng.uniform(0.85, 1.05)),
+                      "sand", bevel_width=0.1)
             parts.append(base.place(bag, Matrix.Translation((x, y, 0.13 + course * 0.23)) @
-                                    Matrix.Rotation(-a + rng.uniform(-0.08, 0.08), 4, "Z")))
+                                    Matrix.Rotation(-a + rng.uniform(-0.08, 0.08), 4, "Z") @
+                                    Matrix.Rotation(rng.uniform(-0.06, 0.06), 4, "X")))
     return join(parts, "sandbags")
 
 

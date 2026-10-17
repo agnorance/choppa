@@ -94,7 +94,8 @@ def wall(x, y0, y1, z0, z1, ribs=4):
 
 def reflex_sight(top, arm_x):
     """The gunsight every class flies with: a round glass in a hood ring dead ahead of the
-    eye, on a squat lamp housing, held by a bracket arm bolted to the coaming at arm_x.
+    eye, on a squat lamp housing, on one post down to the coaming (no bracket arm across
+    the view; `arm_x` is kept for the callers).
     It stands just beyond the coaming's top edge `top` and is sized by its distance so it
     looks the same from every seat: the HUD draws the reticle to fit its glass (Hud.SIGHT_ANGLE).
     Places mount_sight at the glass."""
@@ -115,11 +116,6 @@ def reflex_sight(top, arm_x):
     for side in (-1, 1):  # The hood's feet on the housing.
         parts.append(box((side * 0.03 * k, dist, (house_z - ring) / 2 + 0.006), (0.008 * k, 0.02 * k, ring - house_z - 0.03 * k),
                          "dark", rotation=(0, side * -0.6, 0)))
-    side = 1 if arm_x > 0 else -1
-    parts.append(box((arm_x / 2 + side * 0.02, dist, house_z), (abs(arm_x), 0.018, 0.014), "metal", bevel_width=0.003))
-    parts.append(box((arm_x, dist, (house_z + top.z) / 2), (0.03, 0.03, house_z - top.z + 0.03), "dark", bevel_width=0.004))
-    for f in (0.25, 0.6, 0.95):  # Bolts along the arm.
-        parts.append(cyl((arm_x * f, dist - 0.012, house_z), (arm_x * f, dist - 0.018, house_z), 0.006, "metal", 8))
     cp.empty("mount_sight", (0, dist, 0.0))
     return parts
 
@@ -146,18 +142,48 @@ def roof_cap(c, r, e_top, material="paint"):
     return roof
 
 
-def cabin(c, r, e_top, posts, sill=-0.38, sill_from=0.25, bar=0.013, screen=None):
+def eye_post(c, r, bearing, e_low, e_top, origin=Vector((0, 0, 0)), steps=24):
+    """Points of a canopy post laid out from the eye: where the rays from `origin` at a
+    constant bearing (degrees, + right) meet the ellipsoid (c, r), between its elevations
+    e_low and e_top. From the seat it stands upright at that bearing, however the canopy
+    is centred, so it never leans into the view ahead."""
+    c, r = Vector(c), Vector(r)
+    points = []
+    a = math.radians(bearing)
+    for k in range(steps * 4 + 1):
+        el = math.radians(-60 + 150 * k / (steps * 4))
+        d = Vector((math.cos(el) * math.sin(a), math.cos(el) * math.cos(a), math.sin(el)))
+        o = (origin - c)
+        o = Vector((o.x / r.x, o.y / r.y, o.z / r.z))
+        dd = Vector((d.x / r.x, d.y / r.y, d.z / r.z))
+        qa, qb, qc = dd.dot(dd), 2 * o.dot(dd), o.dot(o) - 1
+        disc = qb * qb - 4 * qa * qc
+        if disc < 0:
+            continue
+        t = (-qb + math.sqrt(disc)) / (2 * qa)
+        p = origin + d * t
+        e = math.asin(max(-1.0, min(1.0, (p.z - c.z) / r.z)))
+        if e_low <= e <= e_top:
+            points.append(p)
+    return points
+
+
+def cabin(c, r, e_top, posts, sill=-0.38, sill_from=0.25, bar=0.013, screen=None, eye_posts=()):
     """A closed canopy frame on the ellipsoid (c, r): a solid roof above e_top with a rail
     round its edge, posts at the azimuths `posts` running from the sill up into that rail
     (none stop in mid-air), and a sill rail down each side from `sill_from` back. With
     `screen`, the windscreen has its own bottom rail at that elevation (just over the
     glare shield) across the front, and the front posts stand on it rather than diving
-    into the instrument panel."""
+    into the instrument panel. `eye_posts` are bearings from the eye (eye_post)."""
     parts = [roof_cap(c, r, e_top)]
     ring = [cp.ell(c, r, 2 * math.pi * k / 48, e_top) for k in range(49)]
     parts.append(tube(ring, bar * 1.2))
     if screen is not None:
         parts.append(cp.frame_member(c, r, -sill_from, screen, sill_from, screen, bar, 20))
+    for bearing in eye_posts:
+        points = eye_post(c, r, bearing, sill, e_top)
+        if len(points) > 1:
+            parts.append(tube(points, bar))
     for a in posts:
         foot = sill + (0.06 if abs(a) < 1.0 else 0.0)
         if screen is not None and abs(a) < sill_from:
@@ -194,7 +220,7 @@ def bulkhead(y, x0, x1, z0, z1):
 def build_scout():
     eye = EYES["scout"]
     shell, frame = [], []
-    panel = Panel((0.0, 0.64, -0.26), tilt=-30.0)
+    panel = Panel((0.0, 0.64, -0.31), tilt=-30.0)  # Low: the instruments stay in the bottom third.
     hw, hh = 0.44, 0.12
     shell.append(panel.box(0, 0, -0.012, (hw * 2, 0.024, hh * 2), "paint", bevel_width=0.008))
     shell += cp.screws(panel, 0, 0, 0.012, hw - 0.015, hh - 0.012, 0.07)
@@ -282,7 +308,7 @@ def build_gunship():
     shell, frame = [], []
     # Instrument panel under the glare hood: two MFDs, standby gauges below. Set low, so
     # the view goes over it and over the gunner's head, Apache style.
-    panel = Panel((0.0, 0.46, -0.33), tilt=-30.0)
+    panel = Panel((0.0, 0.46, -0.4), tilt=-30.0)
     shell += cp.subpanel(panel, 0, 0, 0.6, 0.36, -0.012)
     shell += kick_wall(panel, 0.3, 0.18, -1.05)
     shell += cp.hood(panel, 0, 0.19, 0.62, 0.12, 0.0)
@@ -331,12 +357,16 @@ def build_gunship():
 
 # --- heavy: the Hind pilot's bubble ------------------------------------------------------
 
+# Windscreen corners, door bows, rear posts: wide of the view ahead (the outside matches).
+HEAVY_POSTS = [-0.78, 0.78, -1.45, 1.45, -2.1, 2.1]
+
+
 def build_heavy():
     eye = EYES["heavy"]
     c_pilot, r = Vector((0, 1.75, 0.65)) - eye, (0.6 - 0.03, 0.85 - 0.03, 0.5 - 0.03)
     c_gunner, rg = Vector((0, 2.85, 0.05)) - eye, (0.55 - 0.03, 0.85 - 0.03, 0.5 - 0.03)
     shell, frame = [], []
-    panel = Panel((0.0, 0.62, -0.33), tilt=-18.0)
+    panel = Panel((0.0, 0.62, -0.41), tilt=-18.0)  # Low: the instruments stay in the bottom third.
     shell += cp.subpanel(panel, 0, 0, 1.0, 0.42, -0.012)
     shell += kick_wall(panel, 0.5, 0.21, -1.05)
     shell += cp.hood(panel, 0, 0.22, 1.02, 0.1, 0.0)
@@ -386,7 +416,8 @@ def build_heavy():
     shell += cp.wiring([(-0.45, 0.6, -0.5), (-0.5, 0.2, -0.32), (-0.55, -0.6, -0.32)], 5)
     shell += cp.compass((-0.44, 0.6, -0.06), hanging=False)  # On the coaming, clear of the view.
     # A crew's lucky charm on a string from the windscreen frame.
-    knot = cp.ell(c_pilot, r, -0.62, 0.6) + Vector((0.01, -0.02, 0))  # On the left windscreen post.
+    post = cp.ell(c_pilot, r, HEAVY_POSTS[0], 0.6)
+    knot = post - post.normalized() * 0.02  # Tied round the left windscreen post, on its inside.
     shell.append(cyl(knot, knot + Vector((0, -0.01, -0.15)), 0.003, "rubber", 4))
     shell.append(box(knot + Vector((0, -0.01, -0.18)), (0.05, 0.012, 0.07), "brass", bevel_width=0.008))
     shell.append(ball(knot + Vector((0, -0.01, -0.13)), 0.012, "hazard", segments=8, rings=4))
@@ -398,10 +429,8 @@ def build_heavy():
     # A closed cabin: a solid roof, every post running from the sill into its rail.
     # No centre post: it would stand right in front of the sight. The windscreen sits on
     # its own rail over the glare shield; the side sills start behind the panel.
-    frame += cabin(c_pilot, r, 0.95, [-0.62, 0.62, -1.35, 1.35, -2.1, 2.1], sill=-0.38, sill_from=1.0, bar=0.013,
-                   screen=-0.15)
+    frame += cabin(c_pilot, r, 0.95, HEAVY_POSTS, sill=-0.38, sill_from=1.0, bar=0.013, screen=-0.32)
     for side in (-1, 1):
-        frame.append(cp.frame_member(c_pilot, r, side * 0.18, -0.15, side * 0.32, 0.05, 0.006, 4))  # Wipers.
         frame.append(cp.frame_member(c_gunner, rg, side * 0.5, -0.2, side * 0.4, 1.3, 0.011, 10))
     frame.append(cp.frame_member(c_gunner, rg, 0.0, 0.0, 0.0, 1.4, 0.011, 10))
     frame.append(cp.frame_member(c_gunner, rg, -1.3, 0.1, 1.3, 0.1, 0.011, 16))
@@ -412,12 +441,19 @@ def build_heavy():
 
 # --- striker: side by side, glass cockpit -------------------------------------------------
 
+# The canopy is centred between the seats, right of the pilot, so its posts are laid out
+# from the pilot's eye (bearings in degrees): windscreen corners, door bows, rear posts,
+# none within 38 degrees of ahead and no centre post. make_airframes.py frames the outside
+# with the same bearings from the same eye.
+STRIKER_POSTS = [-40.0, 42.0, -80.0, 80.0, -130.0, 130.0]
+
+
 def build_striker():
     eye = EYES["striker"]
     c, r = Vector((0, 2.15, 0.42)) - eye, (0.7 - 0.03, 1.05 - 0.03, 0.5 - 0.03)
     mid = c.x  # The cockpit's centre line, right of the pilot.
     shell, frame = [], []
-    panel = Panel((mid, 0.6, -0.3), tilt=-24.0)
+    panel = Panel((mid, 0.6, -0.38), tilt=-24.0)  # Low: the instruments stay in the bottom third.
     shell += cp.subpanel(panel, 0, 0, 1.24, 0.34, -0.012)
     shell += kick_wall(panel, 0.62, 0.17, -1.05)
     shell += cp.hood(panel, 0, 0.2, 1.26, 0.13, 0.0)
@@ -463,7 +499,7 @@ def build_striker():
     shell += cp.wiring([(mid, 0.55, -0.5), (mid + 0.05, 0.4, -0.85), (mid, 0.0, -1.0)], 5)
     # The cabin: a solid roof over both seats, thin posts (windscreen centre and corners,
     # the door bows, the rear posts) each running from the sill into the roof rail.
-    frame += cabin(c, r, 1.0, [0.0, -0.95, 0.95, -1.6, 1.6, -2.45, 2.45])
+    frame += cabin(c, r, 1.2, [], eye_posts=STRIKER_POSTS)
     finish(shell, frame)
     cp.stick((0, 0.2, -1.03))
     cp.stick((2 * mid, 0.2, -1.03), "stick_copilot")
@@ -477,11 +513,14 @@ def finish(shell, frame):
 
 # --- mule: tandem-rotor transport, side by side ------------------------------------------
 
+MULE_SCREEN = 0.55  # The windscreen's outer posts, out from each pilot: about 40 degrees off ahead.
+
+
 def build_mule():
     mid = -0.42  # The cockpit's centre line, left of the pilot.
     co = 2 * mid  # The copilot.
     shell, frame = [], []
-    panel = Panel((mid, 0.62, -0.32), tilt=-22.0)
+    panel = Panel((mid, 0.62, -0.46), tilt=-22.0)  # Low: the instruments stay in the bottom third.
     shell += cp.subpanel(panel, 0, 0, 1.5, 0.34, -0.012)
     shell += kick_wall(panel, 0.75, 0.17, -1.05)
     shell += cp.hood(panel, 0, 0.2, 1.52, 0.14, 0.0)
@@ -541,11 +580,14 @@ def build_mule():
     shell += cp.compass((mid, 0.62, 0.3))  # Hung from the windscreen header.
     # The windscreen: two flat panes, three posts, rails top and bottom (on the edges of
     # the exterior's panes, so nothing pokes out of the nose); side windows.
-    top_y, top_z, low_y, low_z = 0.64, 0.2, 1.0, -0.19
-    for x in (co - 0.21, mid, 0.21):
-        frame.append(tube([(x, low_y, low_z), (x, top_y, top_z)], 0.018 if x == mid else 0.015))
+    # The windscreen reaches high (its top rail above the view ahead); the centre post
+    # stands upright at the edge of the pilot's view, the outer ones far to the sides.
+    top_y, top_z, low_y, low_z = 0.64, 0.42, 1.0, -0.3
+    for x in (co - MULE_SCREEN, mid, MULE_SCREEN):
+        foot_y = top_y if x == mid else low_y
+        frame.append(tube([(x, foot_y, low_z), (x, top_y, top_z)], 0.018 if x == mid else 0.015))
     for y, z in ((top_y, top_z), (low_y, low_z)):
-        frame.append(tube([(co - 0.22, y, z), (0.22, y, z)], 0.015))
+        frame.append(tube([(co - MULE_SCREEN - 0.01, y, z), (MULE_SCREEN + 0.01, y, z)], 0.015))
     for x in (co - 0.71, 0.71):
         for y0, z0, y1, z1 in ((-0.3, -0.33, 0.7, -0.33), (-0.3, 0.2, 0.7, 0.2), (-0.3, -0.33, -0.3, 0.2),
                                (0.7, -0.33, 0.7, 0.2)):
@@ -571,7 +613,7 @@ BUILDS = {"scout": build_scout, "gunship": build_gunship, "heavy": build_heavy, 
 # right in front"): degrees left/right and down/up from the eye. Only the sight may sit
 # in it, inside SIGHT_GAP of dead ahead and below it on its post.
 VIEW_AZIMUTH = 30.0
-VIEW_DOWN, VIEW_UP = -6.0, 22.0
+VIEW_DOWN, VIEW_UP = -12.0, 22.0  # Instruments in the bottom third only.
 SIGHT_GAP = 7.0
 
 
@@ -593,7 +635,11 @@ def blocked_view(name):
             hit = scene.ray_cast(depsgraph, Vector((0, 0, 0)), d, distance=3.0)[0]
             if hit:
                 hits.append((az, el))
-    return len(hits) / max(1, total), hits[:12]
+    spans = {}  # Azimuth -> (lowest, highest) blocked elevation, for a compact report.
+    for az, el in hits:
+        lo, hi = spans.get(az, (el, el))
+        spans[az] = (min(lo, el), max(hi, el))
+    return len(hits) / max(1, total), ["%d:%d..%d" % (az, lo, hi) for az, (lo, hi) in sorted(spans.items())]
 
 
 def export(name):

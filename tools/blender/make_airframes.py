@@ -486,55 +486,114 @@ def build_gunship():
 
 # --- the heavy ---------------------------------------------------------------------
 
-def build_heavy():
-    fresh()
-    s = 1.3
-    ground = -1.15 * s
-    base.GROUND_Z = ground  # The preview floor.
-    body = loft("fuselage", [
-        (3.9, 0.1, -0.3, -0.2, -0.4, 2.0, 2.0),
-        (3.5, 0.55, -0.35, 0.25, -0.9, 2.2, 2.6),
-        (2.7, 0.8, -0.3, 0.6, -1.05, 2.6, 3.2),
-        (1.4, 0.95, -0.2, 0.95, -1.1, 3.0, 3.5),
-        (-0.4, 1.0, -0.1, 1.1, -1.05, 3.0, 3.5),
-        (-1.9, 0.92, 0.0, 1.05, -0.9, 2.8, 3.2),
-        (-2.9, 0.6, 0.25, 0.92, -0.35, 2.4, 2.6),
-        (-3.6, 0.32, 0.45, 0.8, 0.1, 2.2, 2.2),
-    ], "paint", count=44)
-    base.HULL.append(body)
-    parts = [body]
-    # Two framed canopies, the gunner in the nose and the pilot above and behind: glass
-    # panes between a sill and a solid roof, like the Little Bird's cabin. The pilot's
-    # posts, sill and roof are where the cockpit shows them from inside (make_cockpit.py).
-    parts += framed_canopy((0, 2.85, 0.05), (0.55, 0.85, 0.5), -0.25, 1.3, 1.6, [0.0, -0.5, 0.5, -1.1, 1.1], [0.55])
-    # The pilot's shell outside stands a little prouder than the one the seat sees, so it
-    # reads over the shoulders of the body.
-    parts += framed_canopy((0, 1.8, 0.72), (0.66, 0.95, 0.58), -0.38, 0.95, 2.1, [-0.62, 0.62, -1.35, 1.35])
-    # Bolted armour: big plates over the flanks and belly, rivet rows.
+HEAVY_BODY = [
+    (3.9, 0.1, -0.3, -0.2, -0.4, 2.0, 2.0),
+    (3.5, 0.55, -0.35, 0.25, -0.9, 2.2, 2.6),
+    (2.7, 0.8, -0.3, 0.6, -1.05, 2.6, 3.2),
+    (1.4, 0.95, -0.2, 0.95, -1.1, 3.0, 3.5),
+    (-0.4, 1.0, -0.1, 1.1, -1.05, 3.0, 3.5),
+    (-1.9, 0.92, 0.0, 1.05, -0.9, 2.8, 3.2),
+    (-2.9, 0.6, 0.25, 0.92, -0.35, 2.4, 2.6),
+    (-3.6, 0.32, 0.45, 0.8, 0.1, 2.2, 2.2),
+]
+HEAVY_GUNNER = ((0, 2.85, 0.05), (0.55, 0.85, 0.5))
+HEAVY_PILOT = ((0, 1.8, 0.72), (0.66, 0.95, 0.58))  # Prouder than the shell the seat sees.
+
+
+def heavy_nose():
+    """The gunner's nose: a long air-data boom off the right, sensor domes and a missile
+    guidance pod under the chin, wire cutters."""
+    parts = []
+    root = Vector((0.32, 3.55, -0.3))
+    parts.append(cyl(root, root + Vector((0.1, 1.3, 0.05)), 0.03, "metal", 8, radius2=0.015))
+    for k in range(3):  # Vanes along the boom.
+        p = root + Vector((0.1, 1.3, 0.05)) * (0.55 + k * 0.15)
+        parts.append(box(p, (0.004, 0.08, 0.06), "dark"))
+    parts.append(cyl(root - Vector((0.04, 0.08, 0)), root, 0.06, "paint", 12))
+    pod = Vector((-0.38, 3.2, -0.82))  # Guidance pod on the left cheek.
+    parts.append(cyl(pod + Vector((0, -0.35, 0)), pod + Vector((0, 0.25, 0)), 0.12, "paint", 18, bevel_width=0.02))
+    parts.append(ball(pod + Vector((0, 0.25, 0)), 0.12, "glass", scale=(1, 0.6, 1), segments=16, rings=8))
+    parts.append(box(pod + Vector((0, -0.05, 0.12)), (0.05, 0.3, 0.1), "dark", bevel_width=0.01))
+    for x in (-0.12, 0.12):  # Sensor domes under the gunner.
+        parts.append(ball((x, 3.45, -0.62), 0.07, "dark", segments=14, rings=7))
+    parts += wire_cutter((0, 3.0, 0.5), (0, 0.4, 1), 0.3)
+    parts += wire_cutter((0, 3.45, -0.9), (0, 0.4, -1), 0.2)
+    return parts
+
+
+def heavy_cabin():
+    """The troop cabin behind the cockpit: armour plates, a row of square windows, the
+    sliding door with its rail and two windows, steps, the hull's riveted panels."""
+    parts = []
     for side in (-1, 1):
-        for y0, y1, z, h in ((2.3, 0.4, -0.35, 0.8), (0.3, -1.6, -0.25, 1.0)):
+        for y0, y1, z, h in ((2.3, 0.4, -0.35, 0.8), (0.3, -1.6, -0.25, 1.0)):  # Bolted armour.
             parts.append(box((side * 1.0, (y0 + y1) / 2, z), (0.06, abs(y0 - y1), h), "paint", bevel_width=0.02))
             parts += rivets((side * 1.04, y0 - 0.1, z + h / 2 - 0.06), (side * 1.04, y1 + 0.1, z + h / 2 - 0.06), 9)
             parts += rivets((side * 1.04, y0 - 0.1, z - h / 2 + 0.06), (side * 1.04, y1 + 0.1, z - h / 2 + 0.06), 9)
-        # Troop door: frame and window.
+        # Sliding door: frame, two windows, the rail it runs on, a handle.
         parts.append(box((side * 1.06, -0.65, -0.05), (0.03, 0.9, 0.85), "dark", bevel_width=0.01))
-        parts.append(box((side * 1.08, -0.65, 0.18), (0.02, 0.45, 0.25), "glass"))
-        parts.append(box((side * 1.08, -0.3, -0.1), (0.04, 0.1, 0.04), "brass"))
-    parts.append(box((0, 0.6, -1.12), (1.3, 3.0, 0.08), "paint", bevel_width=0.02))
-    # Engines on top with a big intake each and an exhaust turned out.
-    exhausts = []
+        for y in (-0.45, -0.85):
+            parts.append(box((side * 1.08, y, 0.2), (0.02, 0.26, 0.22), "glass", bevel_width=0.01))
+            parts.append(box((side * 1.075, y, 0.2), (0.02, 0.3, 0.26), "metal", bevel_width=0.01))
+        parts.append(cyl((side * 1.08, 0.1, 0.42), (side * 1.08, -1.4, 0.42), 0.018, "metal", 8))
+        parts.append(box((side * 1.1, -0.28, -0.1), (0.04, 0.1, 0.04), "brass", bevel_width=0.008))
+        for y in (-1.75, -2.25):  # Cabin windows behind the door.
+            p, n = base.surface(side, y, 0.3, 0.01)
+            parts.append(cyl(p - n * 0.02, p + n * 0.012, 0.13, "glass", 18))
+            parts.append(ring(p + n * 0.01, n, 0.14, 0.02, "metal", 18))
+        parts += base.plate(side, 3.3, 2.5, -0.75, -0.35)  # Nose bay.
+        parts += base.plate(side, -1.75, -2.75, -0.55, -0.15, bolt_step=0.1)  # Cabin rear.
+        parts += base.plate(side, -2.95, -3.5, 0.3, 0.65, bolt_step=0.09)  # Tail cone.
+        parts += handholds(side, [(1.5, -0.75), (1.3, -0.35), (1.0, 0.1)])
+        parts.append(box((side * 0.98, -0.65, -0.95), (0.08, 0.7, 0.05), "metal", bevel_width=0.01))  # Door step.
+    parts.append(box((0, 0.6, -1.12), (1.3, 3.0, 0.08), "paint", bevel_width=0.02))  # Belly armour.
+    parts += rivets((-0.6, 2.0, -1.17), (0.6, 2.0, -1.17), 7)
+    parts += rivets((-0.6, -0.8, -1.17), (0.6, -0.8, -1.17), 7)
+    return parts
+
+
+def heavy_engines():
+    """Two big engines on the roof: dust filters over the intakes, cowlings with louvres,
+    exhaust suppressors bent outboard, the main gearbox and its oil cooler fan between."""
+    parts, exhausts = [], []
     for side in (-1, 1):
         p, ex = engine_pod(side, 0.62, 1.0, -1.6, 1.25, 0.36)
         parts += p
         exhausts.append(ex)
-        parts.append(ball((side * 0.62, 1.05, 1.25), 0.2, "metal", scale=(1, 0.5, 1), segments=16, rings=8))
+        # The intake's dust filter: a domed mesh basket.
+        parts.append(ball((side * 0.62, 1.08, 1.25), 0.3, "metal", scale=(1, 0.55, 1), segments=20, rings=10))
+        for k in range(6):
+            a = math.pi * k / 6
+            parts.append(ring((side * 0.62, 1.08 + 0.01 * k, 1.25), (math.cos(a), 0, math.sin(a)), 0.3, 0.008, "dark", 20))
+        for k in range(8):  # Cowling louvres.
+            y = 0.6 - k * 0.2
+            parts.append(box((side * (0.62 + 0.36 * 0.75), y, 1.42), (0.03, 0.04, 0.16), "dark",
+                             rotation=Matrix.Rotation(side * -0.8, 4, "Y"), bevel_width=0.004))
+        sup = Vector((side * 0.9, -1.75, 1.3))  # Suppressor.
+        parts.append(box(sup, (0.32, 0.55, 0.3), "dark", rotation=Matrix.Rotation(side * -0.3, 4, "Z"), bevel_width=0.05))
+        parts.append(box(sup + Vector((side * 0.15, -0.05, 0)), (0.04, 0.42, 0.22), "exhaust",
+                         rotation=Matrix.Rotation(side * -0.3, 4, "Z"), bevel_width=0.01))
     parts.append(box((0, -0.3, 1.2), (0.7, 2.4, 0.35), "paint", bevel_width=0.05))
     parts.append(cyl((0, -0.4, 1.35), (0, -0.4, 1.78), 0.3, "paint", 24, radius2=0.18, bevel_width=0.02))
     parts.append(cyl((0, -0.4, 1.78), (0, -0.4, 2.05), 0.12, "metal", 16))
-    # Long stub wings, drooping, with two pods and rails each.
-    pods = []
+    fan = Vector((0, -1.35, 1.42))  # Oil cooler fan behind the gearbox.
+    parts.append(cyl(fan + Vector((0, -0.12, 0)), fan + Vector((0, 0.12, 0)), 0.22, "paint", 24, bevel_width=0.02))
+    parts.append(cyl(fan + Vector((0, -0.13, 0)), fan + Vector((0, -0.12, 0)), 0.18, "dark", 24))
+    for k in range(5):
+        parts.append(cyl(fan + Vector((-0.17, -0.135, -0.12 + k * 0.06)), fan + Vector((0.17, -0.135, -0.12 + k * 0.06)),
+                         0.006, "metal", 5))
+    parts += blade_antenna((0, 0.6, 1.38), 0.2)
+    parts += blade_antenna((0, -2.6, 0.92), 0.16)
+    parts += beacon((0, -2.2, 1.0))
+    return parts, exhausts
+
+
+def heavy_weapons():
+    """Long stub wings with a pod and a rail each side, end-plate pylons, the chin turret."""
+    parts, pods = [], []
     for side in (-1, 1):
         parts.append(stub_wing(side, (0.95, -0.4, 0.2), (2.6, -0.5, -0.05), 1.1, 0.75))
+        parts += rivets((side * 1.1, -0.15, 0.24), (side * 2.5, -0.25, 0.0), 9)
         for x, kind in ((1.6, "pod"), (2.4, "rail")):
             parts.append(box((side * x, -0.45, -0.03), (0.07, 0.5, 0.3), "dark", bevel_width=0.015))
             if kind == "pod":
@@ -543,21 +602,61 @@ def build_heavy():
                 pods.append(pod + Vector((0, 0.8, 0)))
             else:
                 parts += missile_rail((side * x, -0.45, -0.32), 1.5)
-        parts.append(ball((side * 2.62, -0.5, -0.02), 0.05, "light_green" if side > 0 else "light_red", segments=10,
-                          rings=5))
+        # Wing-tip end plate with a countermeasure dispenser.
+        parts.append(box((side * 2.64, -0.5, -0.1), (0.05, 0.6, 0.35), "paint", bevel_width=0.015))
+        parts.append(box((side * 2.68, -0.6, -0.2), (0.06, 0.3, 0.12), "dark", bevel_width=0.01))
+    parts += nav_lights((-2.68, -0.3, 0.05), (2.68, -0.3, 0.05))
     turret, tips = chin_turret((0, 3.25, -0.82), 2, 0.9)
     parts += turret
+    parts.append(ring((0, 3.25, -0.6), (0, 0, 1), 0.25, 0.025, "metal", 24))
+    return parts, pods, tips
+
+
+def build_heavy():
+    fresh()
+    s = 1.3
+    ground = -1.15 * s
+    base.GROUND_Z = ground  # The preview floor.
+    body = loft("fuselage", HEAVY_BODY, "paint", count=44)
+    sub = body.modifiers.new("subsurf", "SUBSURF")
+    sub.levels = 1
+    base.apply_all(body)
+    use_hull(body, HEAVY_BODY)
+    parts = [body]
+    # Two framed canopies, the gunner in the nose and the pilot above and behind: glass
+    # panes between a sill and a solid roof, like the Little Bird's cabin. The pilot's
+    # posts are where the cockpit shows them from inside (HEAVY_POSTS in make_cockpit.py).
+    parts += framed_canopy(*HEAVY_GUNNER, -0.25, 1.3, 1.6, [0.0, -0.5, 0.5, -1.1, 1.1], [0.55])
+    parts += framed_canopy(*HEAVY_PILOT, -0.38, 0.95, 2.1, [-0.78, 0.78, -1.45, 1.45])
+    for side in (-1, 1):  # The pilot's blister door and its latch.
+        parts.append(box(ell(HEAVY_PILOT[0], (0.68, 0.97, 0.6), side * 1.75, 0.1), (0.03, 0.12, 0.03), "brass",
+                         bevel_width=0.008))
+    parts += heavy_nose()
+    parts += heavy_cabin()
+    engines, exhausts = heavy_engines()
+    parts += engines
+    weapons, pods, tips = heavy_weapons()
+    parts += weapons
     t, rotor_at = tail(-3.4, -8.2, 0.6, 1.0, 0.32, 0.14, 1.35)
     parts += t
-    # Retractable-look wheels: two main gear legs and a nose wheel.
+    parts.append(cyl((0, -3.5, 0.92), (0, -7.9, 1.12), 0.06, "paint", 12, radius2=0.045))  # Driveshaft cover.
+    parts.append(tube([(0, -7.6, 0.75), (0, -8.0, 0.45), (0, -8.5, 0.5)], 0.03, "metal", 8))  # Tail bumper.
+    # Wheels: two main legs with oleo struts and a twin nose wheel.
     for side in (-1, 1):
         hub = Vector((side * 1.15, -0.6, ground + 0.32))
         parts.append(tube([(side * 0.9, -0.6, -0.7), (side * 1.12, -0.6, -1.0), hub], 0.06, "metal", 12))
+        parts.append(cyl((side * 0.95, -0.35, -0.6), hub + Vector((0, 0.1, 0.25)), 0.04, "metal", 10))
         parts += wheel(hub, 0.32, 0.22)
     nose = Vector((0, 2.6, ground + 0.24))
     parts.append(tube([(0, 2.6, -0.95), nose], 0.05, "metal", 12))
     for side in (-1, 1):
         parts += wheel(nose + Vector((side * 0.13, 0, 0)), 0.24, 0.12)
+    lamp = Vector((0, 2.2, -1.12))  # Landing light.
+    parts.append(cyl(lamp + Vector((0, 0, 0.06)), lamp, 0.09, "dark", 18, bevel_width=0.01))
+    parts.append(cyl(lamp, lamp + Vector((0, 0.01, -0.01)), 0.08, "lamp", 18))
+    for side in (-1, 1):
+        parts.append(number("45", side, 2.2, 0.15, 0.3, body))
+        parts += roundel(side, -3.1, 0.15, 0.16, body)
     body = join(parts, "body")
     base.activate(body)
     bpy.ops.object.shade_smooth_by_angle(angle=math.radians(35))
@@ -571,6 +670,9 @@ def build_heavy():
     empty("pod_r", pods[1])
     empty("exhaust_l", exhausts[0])
     empty("exhaust_r", exhausts[1])
+    g, p = HEAVY_GUNNER, HEAVY_PILOT
+    crack_spots([(p[0], p[1], 1.1, 0.3), (p[0], p[1], -1.2, 0.4), (g[0], g[1], 0.6, 0.6), (p[0], p[1], 0.4, 0.2),
+                 (g[0], g[1], -0.8, 0.3), (p[0], p[1], -0.5, 0.6), (g[0], g[1], -0.2, 0.9), (p[0], p[1], 1.7, 0.6)])
 
 
 # --- the striker -------------------------------------------------------------------

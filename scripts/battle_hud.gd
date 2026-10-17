@@ -23,6 +23,10 @@ var _clock: Label
 var _feed: VBoxContainer
 var _death: Label
 var _death_sub: Label
+const STREAK_WINDOW := 6.0  ## Seconds between kills for them to count as a streak.
+var _streak := 0
+var _last_kill := -100.0
+var _time := 0.0  ## Seconds since the HUD started, for streaks.
 var _killed_by := ""
 var _big: Label
 var _big_time := 0.0
@@ -112,6 +116,7 @@ func _on_restarted() -> void:
 
 
 func _process(delta: float) -> void:
+	_time += delta
 	var minutes := int(battle.time_left / 60.0)
 	_kills.text = "%d / %d" % [battle.kills_of(choppa), battle.kill_limit]
 	_rank.text = "#%d" % (battle.standings().find(choppa) + 1)
@@ -161,8 +166,19 @@ func _on_kill(killer: Choppa, victim: Choppa) -> void:
 			_killed_by = shout if shout != "" else "CRASHED"
 	elif killer == choppa:
 		var left := battle.kill_limit - battle.kills_of(choppa)
+		_streak = _streak + 1 if _time - _last_kill < STREAK_WINDOW else 1
+		_last_kill = _time
+		if _streak >= 2:
+			_flash_big("%s
+%s" % [streak_name(_streak), victim.pilot_name.to_upper()], 1.8)
+			return
 		_flash_big("SPLASHED %s%s" % [victim.pilot_name.to_upper(),
 			"\n%d TO GO" % left if left > 0 and left <= 3 else ""], 1.6)
+
+
+## What a run of quick kills is called.
+static func streak_name(count: int) -> String:
+	return ["", "", "DOUBLE KILL", "TRIPLE KILL", "QUAD KILL"][mini(count, 4)] if count < 5 else "RAMPAGE"
 
 
 ## How a choppa went down, for the feed ("" when nobody knows, e.g. on a network client).

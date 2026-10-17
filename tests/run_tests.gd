@@ -1957,6 +1957,8 @@ func test_death_causes() -> void:
 	await _fly(striker, 2)
 	_check(striker.cause == "rotor strike", "blades in a wall: %s" % striker.cause)
 	_check(BattleHud.how_down("") == "", "unknown stays unknown (network clients)")
+	_check(BattleHud.streak_name(1) == "" and BattleHud.streak_name(2) == "DOUBLE KILL" and BattleHud.streak_name(9) == "RAMPAGE",
+		"kill streaks have names")
 
 
 ## A shot-down choppa leaves its charred body: it falls, lands, burns, and is gone later.

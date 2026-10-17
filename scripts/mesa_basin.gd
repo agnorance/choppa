@@ -94,6 +94,8 @@ func _ready() -> void:
 		var x: float = entry[1]
 		var z: float = entry[2]
 		Props.place(self, entry[0], Vector3(x, _ground(x, z) - 0.25, z), entry[3])
+		if entry[0] == "radar_station":  # Its warning lamp on top, red after dark.
+			MapKit.night_light(self, Vector3(x, _ground(x, z) + 15.0, z), Color(1.0, 0.12, 0.08), 16.0)
 		if (entry[0] as String).begins_with("wreck"):
 			MapKit.smolder(self, Vector3(x, _ground(x, z), z))
 	GameMap.report("basin: rocks", t0)

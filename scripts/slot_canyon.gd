@@ -122,6 +122,10 @@ func _mining_camp() -> void:
 	_place("fuel_tank", Vector3(c - w * 0.15, 0.0, z + 48.0), 0.5)
 	_place("crates", Vector3(c + w * 0.1, 0.0, z - 8.0), 0.0)
 	_place("crates", Vector3(c - w * 0.3, 0.0, z + 8.0), 1.0)
+	# After dark the camp's lamps burn: the headframe, the shacks.
+	for spot: Vector3 in [Vector3(c + w * 0.55, 18.0, z + 18.0), Vector3(c + w * 0.45, 4.0, z - 25.0),
+			Vector3(c + w * 0.2, 4.0, z - 45.0), Vector3(c - w * 0.5, 4.0, z + 30.0)]:
+		MapKit.night_light(self, Vector3(spot.x, _ground(spot.x, spot.z) + spot.y, spot.z), Color(1.0, 0.78, 0.45), 20.0)
 
 
 ## Wrecks on the canyon floor: a convoy caught in the south, crashed helicopters, a

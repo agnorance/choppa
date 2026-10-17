@@ -16,6 +16,7 @@ extends Node
 ##   --cam=fp|showcase        start in first-person view / a fixed front view of the choppa
 ##   --cam=orbit|side|low|fp_look  camera moves for recording a video (ChaseCamera.cinematic)
 ##   --clean                  no key overlay, no music (for recording; nothing is saved)
+##   --look=yaw,pitch         first person: the head turned so (degrees; left and up positive)
 ##   --time=day|dusk|night    time of day whatever the setting says
 ##   --shot=<file.png>        save a screenshot after --frames physics ticks and quit
 ##   --frames=<n>             ticks before the screenshot (default 90)
@@ -211,6 +212,9 @@ func _player_view() -> void:
 	chase.target = choppa
 	chase.first_person = _args.get("cam", "") == "fp" or (not _args.has("cam") and Settings.flag("cockpit_view"))
 	chase.showcase = _args.get("cam", "") == "showcase"
+	if _args.has("look"):
+		var turn: PackedStringArray = (_args.look as String).split(",")
+		chase.fixed_look = Vector2(deg_to_rad(float(turn[0])), deg_to_rad(float(turn[1]) if turn.size() > 1 else 0.0))
 	if _args.get("cam", "") in ["orbit", "side", "low", "fp_look"]:
 		chase.cinematic = _args.cam
 		chase.first_person = _args.cam == "fp_look"

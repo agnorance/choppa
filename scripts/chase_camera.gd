@@ -25,6 +25,7 @@ var _kick := 0.0  ## Recoil from our own gun: a short punch per round, gone in a
 var _last_shot := -10.0
 var _fov := 70.0  ## The field of view before the recoil punch.
 var look := Vector2.ZERO  ## Free look: yaw (x, left) and pitch (y, up) away from ahead, radians.
+var fixed_look := Vector2.INF  ## Screenshots (--look=yaw,pitch in degrees): hold the head turned so.
 var _cine_time := 0.0
 var _killer: Choppa  ## Kill cam: who shot us down, watched until we respawn.
 var _cine_spot := Vector3.INF  ## "low": where the camera stands.
@@ -101,7 +102,9 @@ func _process(delta: float) -> void:
 	fov = _fov + _kick * 1.1 * Settings.SHAKE_AMOUNTS[Settings.choice("camera_shake")]
 
 	_cine_time += delta
-	if cinematic == "fp_look":
+	if fixed_look != Vector2.INF:
+		look = fixed_look
+	elif cinematic == "fp_look":
 		# Down at the panel, round to the left, across to the right, back ahead.
 		look = Vector2(sin(_cine_time * 0.45) * 1.1, -0.35 + 0.3 * cos(_cine_time * 0.3))
 	elif not InputMap.has_action("free_look") or not Input.is_action_pressed("free_look"):

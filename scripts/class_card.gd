@@ -10,19 +10,21 @@ var _bars := {}  ## stat -> UiKit.Bar
 var _values := {}  ## stat -> Label with the real number
 
 
-func _init() -> void:
-	add_theme_stylebox_override("panel", _style())
+## `compact`: only the bars, for laying over the hangar's turntable.
+func _init(compact := false) -> void:
+	add_theme_stylebox_override("panel", _style(compact))
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
+	box.add_theme_constant_override("separation", 4 if compact else 6)
 	add_child(box)
-	box.add_child(UiKit.caption("Helicopter", 13, UiKit.ACCENT))
 	_name = UiKit.display("", 34)
-	box.add_child(_name)
 	_blurb = UiKit.label("", 14, UiKit.MUTED)
-	_blurb.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_blurb.custom_minimum_size.x = 300.0
-	box.add_child(_blurb)
+	if not compact:
+		box.add_child(UiKit.caption("Helicopter", 13, UiKit.ACCENT))
+		box.add_child(_name)
+		_blurb.autowrap_mode = TextServer.AUTOWRAP_WORD
+		_blurb.custom_minimum_size.x = 300.0
+		box.add_child(_blurb)
 	var grid := GridContainer.new()
 	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 12)
@@ -55,7 +57,7 @@ func show_class(id: String) -> void:
 		(_values[stat] as Label).text = Airframe.stat_text(id, stat)
 
 
-func _style() -> StyleBoxFlat:
-	var s := UiKit.style(UiKit.PANEL, UiKit.LINE, 6)
-	s.set_content_margin_all(18.0)
+func _style(compact: bool) -> StyleBoxFlat:
+	var s := UiKit.style(UiKit.PANEL if not compact else Color(0, 0, 0, 0.45), UiKit.LINE if not compact else Color(0, 0, 0, 0), 6)
+	s.set_content_margin_all(10.0 if compact else 18.0)
 	return s

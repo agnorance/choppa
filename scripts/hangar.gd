@@ -8,6 +8,7 @@ signal closed
 
 var _airframe := Airframe.SCOUT
 var _preview: ChoppaModel
+var _card: ClassCard  ## The class's speed, armour and the rest over the turntable.
 var _pivot: Node3D  ## Spins; the model sits on it centred on its length.
 var _stage: Node3D
 var _grid: GridContainer
@@ -100,6 +101,16 @@ func _ready() -> void:
 	_stage = Node3D.new()
 	viewport.add_child(_stage)
 	_build_stage(viewport)
+	var overlay := Control.new()  # The class's bars over the bottom left of the turntable.
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	view_panel.add_child(overlay)
+	_card = ClassCard.new(true)
+	_card.anchor_top = 1.0
+	_card.anchor_bottom = 1.0
+	_card.offset_left = 8.0
+	_card.offset_bottom = -8.0
+	_card.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	overlay.add_child(_card)
 	_detail = UiKit.label("", 15, UiKit.MUTED)
 	_detail.custom_minimum_size.x = 480.0
 	_detail.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -158,10 +169,12 @@ func _build_stage(viewport: SubViewport) -> void:
 	camera.fov = 34.0
 	camera.position = Vector3(0.0, 1.9, 12.0)
 	viewport.add_child(camera)
-	camera.look_at(Vector3(0.0, 0.3, 0.0))
+	camera.look_at(Vector3(0.0, -1.0, 0.0))  # The model high in the frame: the class bars sit on the floor.
 
 
 func _rebuild_preview() -> void:
+	if _card:
+		_card.show_class(_airframe)
 	if _pivot:
 		_pivot.queue_free()
 	_pivot = Node3D.new()

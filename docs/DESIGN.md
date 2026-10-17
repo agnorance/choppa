@@ -65,6 +65,14 @@ twist, heavy atmosphere, strong lighting and post-processing.
   launch and motor, missile lock warning in the cockpit, item pickup chime. 3D
   positioned, far sounds lose their highs. To tune on real speakers.
 
+## Death (2026-10-17)
+
+A shot-down choppa blows up and leaves its charred body (`Effects.Wreck`): it tumbles
+down, lands, burns with a smoke column and fades after half a minute (visual only, no
+collision). The kill feed and the shot-down screen name the cause (gunned down,
+rocketed, missile, mined, crashed, hard landing, rotor strike, burned out, power line;
+`Choppa.cause`). Until you respawn the camera turns to whoever shot you down (kill cam).
+
 ## Time of day (2026-10-17)
 
 Settings, Graphics tab: Afternoon (the golden hour every map was made in), Dusk or

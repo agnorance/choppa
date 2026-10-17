@@ -26,6 +26,7 @@ var _last_shot := -10.0
 var _fov := 70.0  ## The field of view before the recoil punch.
 var look := Vector2.ZERO  ## Free look: yaw (x, left) and pitch (y, up) away from ahead, radians.
 var _cine_time := 0.0
+var _killer: Choppa  ## Kill cam: who shot us down, watched until we respawn.
 var _cine_spot := Vector3.INF  ## "low": where the camera stands.
 
 const LOOK_GAIN := 0.004  ## Radians per pixel of mouse travel.
@@ -41,6 +42,7 @@ func _ready() -> void:
 	_shake_noise.frequency = 2.0
 	if target:
 		target.damaged.connect(func(amount: float, _attacker: Choppa) -> void: _trauma += amount * 0.025)
+		target.died.connect(func(killer: Choppa) -> void: _killer = killer if killer != target else null)
 
 
 ## Free look (held key): the mouse turns the view; let go and it swings back ahead.
@@ -79,6 +81,12 @@ func toggle_mode() -> void:
 func _process(delta: float) -> void:
 	if target == null:
 		return
+	if not target.alive and _killer and is_instance_valid(_killer) and _killer.alive:
+		_kill_cam(delta)
+		return
+	if _killer and target.alive:
+		_killer = null
+		_ready_to_follow = false  # Back behind our own choppa at once.
 	var speed_ratio := clampf(target.velocity.length() / target.boost_speed, 0.0, 1.2)
 	var wanted := base_fov if showcase else Settings.number("fov")
 	_fov = lerpf(_fov, wanted + speed_fov * speed_ratio, 1.0 - exp(-4.0 * delta))
@@ -137,6 +145,23 @@ func _process(delta: float) -> void:
 	if not global_position.is_equal_approx(focus):
 		look_at(focus, Vector3.UP)
 	_apply_shake(delta)
+
+
+## Shot down: swing round to whoever did it and keep them in view from about 22 m.
+func _kill_cam(delta: float) -> void:
+	cull_mask = 0xFFFFF
+	if target.model.cockpit_view:
+		target.model.cockpit_view.reticle.visible = false
+	var them := _killer.get_global_transform_interpolated().origin
+	var away := global_position - them
+	away.y = 0.0
+	away = away.normalized() if away.length() > 0.1 else Vector3.BACK
+	var wanted := _avoid_walls(them + Vector3.UP, them + away * 22.0 + Vector3.UP * 6.0)
+	global_position = global_position.lerp(wanted, 1.0 - exp(-2.5 * delta))
+	if not global_position.is_equal_approx(them):
+		var look := global_transform.looking_at(them, Vector3.UP)
+		global_transform.basis = global_transform.basis.slerp(look.basis, 1.0 - exp(-6.0 * delta)).orthonormalized()
+	fov = lerpf(fov, Settings.number("fov") * 0.8, 1.0 - exp(-3.0 * delta))
 
 
 func _cinematic_move(body: Transform3D, delta: float) -> void:

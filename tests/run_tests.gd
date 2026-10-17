@@ -105,6 +105,7 @@ func _run() -> void:
 		"test_death_causes",
 		"test_wreck_falls_and_burns",
 		"test_time_of_day",
+		"test_kill_cam_watches_the_killer",
 		"test_spawns_are_on_dry_clear_ground",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
@@ -2005,3 +2006,23 @@ func test_time_of_day() -> void:
 	_check(lit[0][0] > lit[2][0] * 2.0, "the moon is far dimmer than the sun: %s" % [lit])
 	_check(lit[0][1] == 0.0 and lit[2][1] > 0.5, "stars only at night: %s" % [lit])
 	_check(MapKit.time_of_day() == Settings.choice("time_of_day"), "without an override the setting decides")
+
+
+## Shot down: the chase camera turns to whoever did it until we are back.
+func test_kill_cam_watches_the_killer() -> void:
+	var me := _choppa(Vector3(0.0, 40.0, 0.0))
+	var them := _choppa(Vector3(60.0, 40.0, -40.0))
+	var camera := ChaseCamera.new()
+	camera.target = me
+	_world.add_child(camera)
+	await process_frame
+	me.damage(1000.0, them)
+	for t in 120:
+		await process_frame
+	var to_them := (them.global_position - camera.global_position).normalized()
+	_check(-camera.global_transform.basis.z.dot(to_them) > 0.9, "the camera looks at the killer")
+	_check(camera.global_position.distance_to(them.global_position) < 40.0, "from close by, %.0f m" % camera.global_position.distance_to(them.global_position))
+	me.respawn(Transform3D(Basis(), Vector3(0.0, 40.0, 0.0)))
+	await process_frame
+	_check(camera._killer == null, "back to our own choppa once respawned")
+	camera.free()

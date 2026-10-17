@@ -32,6 +32,7 @@ const DEFAULTS := {
 	"volumetric_fog": AUTO,
 	"bloom": AUTO,
 	"grass": AUTO,  ## 0 off, 1 sparse, 2 dense
+	"time_of_day": 0,  ## MapKit.TIMES: 0 afternoon, 1 dusk, 2 night. Applies to the next match.
 	# Gameplay
 	"airframe": 0,  ## Index into Airframe.ORDER: scout, gunship, heavy. Chosen on the title screen.
 	"pilot_name": "",  ## Your name online; empty means "Pilot". Set on the multiplayer screen.

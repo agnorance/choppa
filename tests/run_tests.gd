@@ -104,6 +104,7 @@ func _run() -> void:
 		"test_new_camos_are_earned",
 		"test_death_causes",
 		"test_wreck_falls_and_burns",
+		"test_time_of_day",
 		"test_spawns_are_on_dry_clear_ground",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
@@ -1974,3 +1975,23 @@ func test_wreck_falls_and_burns() -> void:
 	await physics_frame
 	await physics_frame
 	_check(not is_instance_valid(wreck), "gone once it burned out")
+
+
+## Time of day: night dims the sun and the water and lights the stars; afternoon is the
+## look every map was made in.
+func test_time_of_day() -> void:
+	var lit := {}
+	for time in [0, 2]:
+		MapKit.time_override = time
+		var holder := Node3D.new()
+		_world.add_child(holder)
+		MapKit.environment(holder)
+		var sun: DirectionalLight3D = holder.get_children().filter(func(n: Node) -> bool: return n is DirectionalLight3D)[0]
+		var env: WorldEnvironment = holder.get_children().filter(func(n: Node) -> bool: return n is WorldEnvironment)[0]
+		var sky := env.environment.sky.sky_material as ShaderMaterial
+		lit[time] = [sun.light_energy, sky.get_shader_parameter("stars")]
+		holder.free()
+	MapKit.time_override = -1
+	_check(lit[0][0] > lit[2][0] * 2.0, "the moon is far dimmer than the sun: %s" % [lit])
+	_check(lit[0][1] == 0.0 and lit[2][1] > 0.5, "stars only at night: %s" % [lit])
+	_check(MapKit.time_of_day() == Settings.choice("time_of_day"), "without an override the setting decides")

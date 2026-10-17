@@ -53,7 +53,7 @@ mouse, Q / E or the shoulder buttons.
   adaptive), FPS limit, render scale with bilinear / FSR 1 / FSR 2 upscaling,
   anti-aliasing (FXAA, TAA, MSAA 2x to 8x), brightness, FPS counter.
 - **Graphics:** quality preset, shadows, global illumination, ambient occlusion,
-  reflections, volumetric fog, bloom, grass. "Auto" follows the preset; the preset and
+  reflections, volumetric fog, bloom, grass, time of day (afternoon, dusk, night). "Auto" follows the preset; the preset and
   the grass apply when the next match starts, everything else at once.
 - **Gameplay:** field of view, camera distance, camera shake, default view (chase or
   cockpit), HUD size, damage flash, aim assist, controls overlay.

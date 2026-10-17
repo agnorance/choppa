@@ -16,6 +16,7 @@ extends Node
 ##   --cam=fp|showcase        start in first-person view / a fixed front view of the choppa
 ##   --cam=orbit|side|low|fp_look  camera moves for recording a video (ChaseCamera.cinematic)
 ##   --clean                  no key overlay, no music (for recording; nothing is saved)
+##   --time=day|dusk|night    time of day whatever the setting says
 ##   --shot=<file.png>        save a screenshot after --frames physics ticks and quit
 ##   --frames=<n>             ticks before the screenshot (default 90)
 ##   --dummies=<n>            training targets in free flight (default 3)
@@ -88,6 +89,7 @@ func _ready() -> void:
 	Settings.keep_window = _args.has("shot")
 	Settings.load_once(get_tree())
 	Controls.apply_bindings()  # The player's own keys, now that the settings are read.
+	MapKit.time_override = ["day", "dusk", "night"].find(_args.get("time", ""))
 	if _args.has("clean"):  # In memory only: a recording run saves nothing.
 		Settings.set_value("show_controls", false)
 		Settings.set_value("music_volume", 0)

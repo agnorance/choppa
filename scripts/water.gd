@@ -24,6 +24,12 @@ func _ready() -> void:
 		_material.set_shader_parameter("ripples_a", _ripples(3, 0.012))
 		_material.set_shader_parameter("ripples_b", _ripples(8, 0.03))
 	material_override = _material
+	# The water fakes its sky reflection and foam: dim them with the time of day.
+	var time: Dictionary = MapKit.TIMES[MapKit.time_of_day()]
+	for key: String in ["water_sky", "water_foam", "water_shallow", "water_deep"]:
+		if time.has(key):
+			_material.set_shader_parameter({"water_sky": "sky_tint", "water_foam": "foam_color",
+				"water_shallow": "shallow", "water_deep": "deep"}[key], time[key])
 
 
 func _process(_delta: float) -> void:

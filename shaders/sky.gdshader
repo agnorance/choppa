@@ -9,6 +9,9 @@ uniform vec3 opposite_horizon : source_color = vec3(0.55, 0.58, 0.66);
 uniform vec3 ground_color : source_color = vec3(0.28, 0.22, 0.18);
 uniform float cloud_coverage : hint_range(0.0, 1.0) = 0.52;
 uniform float cloud_speed = 0.0015;
+// Time of day (MapKit.TIMES): how bright the clouds are lit, and stars at night.
+uniform vec3 cloud_light : source_color = vec3(1.0);
+uniform float stars = 0.0;
 
 // A hash without sin(): sin() of large arguments loses precision on GPUs, and the
 // noise turned into hard-edged blocks across the sky (seen on NVIDIA).
@@ -55,6 +58,11 @@ void sky() {
 		col = mix(horizon * 0.85, ground_color, clamp(-up * 6.0, 0.0, 1.0));
 	}
 	col += sun_col * (pow(sun, 4.0) * 0.12 + pow(sun, 32.0) * 0.35 + pow(sun, 400.0) * 1.2);
+	if (stars > 0.0 && up > 0.0) {
+		vec2 cell = floor(vec2(atan(dir.z, dir.x) * 380.0, up * 380.0));
+		float twinkle = 0.5 + 0.5 * hash(cell + vec2(7.0, 3.0));
+		col += vec3(0.85, 0.9, 1.0) * stars * twinkle * step(0.9975, hash(cell)) * smoothstep(0.04, 0.3, up);
+	}
 
 	if (up > 0.0) {
 		vec2 drift = vec2(TIME * cloud_speed, TIME * cloud_speed * 0.35);
@@ -71,11 +79,11 @@ void sky() {
 		float lit = clamp(0.5 + (shape - toward_sun) * 4.0, 0.0, 1.0);
 		vec3 shadow_col = vec3(0.36, 0.33, 0.42);
 		vec3 lit_col = mix(vec3(1.0, 0.86, 0.7), vec3(1.0, 0.95, 0.9), up);
-		vec3 cloud = mix(shadow_col, lit_col, lit);
+		vec3 cloud = mix(shadow_col, lit_col, lit) * cloud_light;
 		// Silver lining when looking toward the sun through thin edges.
 		cloud += sun_col * pow(sun, 6.0) * (1.0 - density) * 0.9;
 		float fade = smoothstep(0.0, 0.12, up);
-		col = mix(col, mix(vec3(1.0, 0.85, 0.72), col, 0.4), cirrus * fade);
+		col = mix(col, mix(vec3(1.0, 0.85, 0.72) * cloud_light, col, 0.4), cirrus * fade);
 		col = mix(col, cloud, density * fade * 0.92);
 	}
 	// Low haze bank hugging the horizon.

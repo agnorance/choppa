@@ -13,10 +13,40 @@ static var _meshes := {}  ## Shared meshes and materials, built on first use.
 
 
 ## Sky, sun, haze and post-processing. How much of it runs depends on Graphics.quality.
+## Time of day (Settings "time_of_day", or --time= for screenshots): 0 the golden
+## afternoon every map was made in, 1 dusk, 2 night. Each entry overrides the sun and
+## the sky; the map keeps its sun's compass direction.
+const TIMES := [
+	{},
+	{"sun_pitch": -5.0, "sun_color": Color(1.0, 0.5, 0.26), "sun_energy": 1.5, "zenith": Color(0.07, 0.1, 0.24),
+		"horizon": Color(1.0, 0.42, 0.22), "opposite": Color(0.36, 0.3, 0.42), "fog": Color(0.72, 0.44, 0.32),
+		"exposure": 1.05, "ambient": 0.8, "clouds": Color(1.0, 0.68, 0.58), "water_sky": Color(0.85, 0.5, 0.36),
+		"unlit": 0.8},
+	{"sun_pitch": -38.0, "sun_color": Color(0.62, 0.72, 1.0), "sun_energy": 0.55, "zenith": Color(0.012, 0.022, 0.055),
+		"horizon": Color(0.07, 0.085, 0.14), "opposite": Color(0.045, 0.055, 0.09), "ground": Color(0.02, 0.02, 0.03),
+		"fog": Color(0.06, 0.08, 0.13), "exposure": 1.8, "ambient": 1.2, "clouds": Color(0.08, 0.09, 0.13), "stars": 1.4,
+		"water_sky": Color(0.06, 0.07, 0.11), "water_foam": Color(0.32, 0.35, 0.4), "water_shallow": Color(0.03, 0.08, 0.09),
+		"water_deep": Color(0.01, 0.03, 0.05), "unlit": 0.2},
+]
+static var time_override := -1  ## Set by --time=; otherwise the setting decides.
+
+
+## The time of day the next map is built with (TIMES index).
+static func time_of_day() -> int:
+	return time_override if time_override >= 0 else clampi(Settings.choice("time_of_day"), 0, TIMES.size() - 1)
+
+
 static func environment(parent: Node3D, sun_rotation := Vector3(-19.0, 70.0, 0.0)) -> void:
 	var high := Graphics.at_least(Graphics.Quality.HIGH)
+	var time: Dictionary = TIMES[time_of_day()]
 	var sky_material := ShaderMaterial.new()
 	sky_material.shader = load("res://shaders/sky.gdshader")
+	for key: String in ["zenith", "horizon", "opposite", "ground"]:
+		if time.has(key):
+			sky_material.set_shader_parameter({"zenith": "zenith_color", "horizon": "horizon_color",
+				"opposite": "opposite_horizon", "ground": "ground_color"}[key], time[key])
+	sky_material.set_shader_parameter("cloud_light", time.get("clouds", Color.WHITE))
+	sky_material.set_shader_parameter("stars", time.get("stars", 0.0))
 	var sky := Sky.new()
 	sky.sky_material = sky_material
 	sky.radiance_size = Sky.RADIANCE_SIZE_256
@@ -29,10 +59,11 @@ static func environment(parent: Node3D, sun_rotation := Vector3(-19.0, 70.0, 0.0
 	env.ambient_light_energy = 1.0
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
-	env.tonemap_exposure = 1.05
+	env.tonemap_exposure = time.get("exposure", 1.05)
+	env.ambient_light_energy = time.get("ambient", 1.0)
 
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.78, 0.66, 0.56)
+	env.fog_light_color = time.get("fog", Color(0.78, 0.66, 0.56))
 	env.fog_sun_scatter = 0.45
 	env.fog_density = 0.00045
 	env.fog_aerial_perspective = 0.75
@@ -75,9 +106,9 @@ static func environment(parent: Node3D, sun_rotation := Vector3(-19.0, 70.0, 0.0
 
 	# Low afternoon sun: warm light, long soft shadows.
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = sun_rotation
-	sun.light_color = Color(1.0, 0.8, 0.6)
-	sun.light_energy = 2.0
+	sun.rotation_degrees = Vector3(time.get("sun_pitch", sun_rotation.x), sun_rotation.y, sun_rotation.z)
+	sun.light_color = time.get("sun_color", Color(1.0, 0.8, 0.6))
+	sun.light_energy = time.get("sun_energy", 2.0)
 	sun.light_angular_distance = 0.6
 	sun.shadow_enabled = true
 	sun.shadow_blur = 1.2

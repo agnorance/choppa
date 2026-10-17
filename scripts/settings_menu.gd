@@ -194,7 +194,8 @@ func _build_graphics(page: VBoxContainer) -> void:
 	_pick(page, "Volumetric fog", ["Auto", "Off", "On"], "volumetric_fog", 1)
 	_pick(page, "Bloom", ["Auto", "Off", "On"], "bloom", 1)
 	_pick(page, "Grass", ["Auto", "Off", "Sparse", "Dense"], "grass", 1)
-	_note(page, "Auto follows the quality preset. The preset and the grass apply when the next match starts; global illumination, fog and reflections need the high-end renderer.")
+	_pick(page, "Time of day", ["Afternoon", "Dusk", "Night"], "time_of_day")
+	_note(page, "Auto follows the quality preset. The preset, the grass and the time of day apply when the next match starts; global illumination, fog and reflections need the high-end renderer.")
 
 
 func _build_gameplay(page: VBoxContainer) -> void:

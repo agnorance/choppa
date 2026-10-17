@@ -162,6 +162,19 @@ func _build() -> void:
 
 	_build_guns(model)
 	_build_cracks(model)
+	if MapKit.time_of_day() == 2:
+		# At night every choppa carries a searchlight under the nose, lighting the way and
+		# giving itself away.
+		var lamp := SpotLight3D.new()
+		lamp.light_color = Color(1.0, 0.95, 0.85)
+		lamp.light_energy = 7.0
+		lamp.spot_range = 70.0
+		lamp.spot_angle = 24.0
+		lamp.spot_attenuation = 0.6
+		lamp.shadow_enabled = false
+		lamp.position = eye + Vector3(0.0, -0.9, -0.8)
+		lamp.rotation_degrees.x = -14.0
+		_parts.add_child(lamp)
 	for exhaust in ["exhaust_l", "exhaust_r"]:
 		_haze.append(_build_haze(_marker(model, exhaust)))
 	_build_downwash()
@@ -358,8 +371,9 @@ func update_pose(c: Choppa, delta: float) -> void:
 	if _downwash.visible:
 		_downwash.global_position = ground + Vector3.UP * 0.15
 		_downwash_material.set_shader_parameter("power", wash * 0.7 * c.lift_share())
+		var lit: float = MapKit.TIMES[MapKit.time_of_day()].get("unlit", 1.0)  # The shader is unshaded.
 		_downwash_material.set_shader_parameter("tint",
-			Color(0.88, 0.94, 1.0) if c.over_water else Color(0.8, 0.76, 0.66))
+			(Color(0.88, 0.94, 1.0) if c.over_water else Color(0.8, 0.76, 0.66)) * lit)
 
 
 ## Twin machine guns: a star-shaped flash with a light at each muzzle (shown for the gun

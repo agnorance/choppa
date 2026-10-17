@@ -65,6 +65,14 @@ twist, heavy atmosphere, strong lighting and post-processing.
   launch and motor, missile lock warning in the cockpit, item pickup chime. 3D
   positioned, far sounds lose their highs. To tune on real speakers.
 
+## Time of day (2026-10-17)
+
+Settings, Graphics tab: Afternoon (the golden hour every map was made in), Dusk or
+Night, for the next match (`--time=` for screenshots). `MapKit.TIMES` holds each look:
+sun pitch, colour and strength, the sky's colours, cloud light, stars, fog, exposure,
+ambient, and the water's faked sky reflection and foam. At night every choppa carries a
+searchlight under its nose: it lights the way and gives you away.
+
 ## Brand (2026-10-17, owner: "the logo is quite shitty currently")
 
 `tools/brand/make_brand.py` builds everything into `assets/brand/`: the wordmark

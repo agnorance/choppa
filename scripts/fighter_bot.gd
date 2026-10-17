@@ -7,6 +7,7 @@ extends Node
 
 const PREFERRED_RANGE := 45.0
 const PROBE_LENGTH := 14.0
+const BRAKING := 7.0  ## m/s^2 a bot counts on to stop before a wall.
 
 var choppa: Choppa
 var skill := 1.0  ## Around 1: speed, dodging, aim lead and trigger discipline. Hard bots go above 1.
@@ -92,7 +93,7 @@ func steer(delta: float) -> void:
 		look = goal
 	# Keep off the ground and under the ceiling, unless landing at a station.
 	if not landing:
-		goal.y = clampf(goal.y, 8.0, ceiling - 8.0)
+		goal.y = clampf(goal.y, 11.0, ceiling - 10.0)  # Room for the rotor disc above and below.
 
 	var local_look := choppa.facing().inverse() * (look - pos)
 	var angle := atan2(local_look.x, -local_look.z)  # Positive: look point is to the right.
@@ -106,7 +107,12 @@ func steer(delta: float) -> void:
 			want = Vector3(0.0, -1.0, 0.0)
 	else:
 		want += _avoidance() * 20.0
-	Autopilot.fly(choppa, i, want, look)
+		want = _brake_for_walls(want)
+	# Low down, tip the rotor less: a steep bank there puts the blades into the ground.
+	var tilt := lerpf(0.3, Autopilot.MAX_TILT, clampf((choppa.altitude - 3.0) / 10.0, 0.0, 1.0))
+	if landing:
+		tilt = minf(tilt, 0.3)
+	Autopilot.fly(choppa, i, want, look, tilt)
 
 	# Trigger discipline: let the gun cool before it overheats.
 	if choppa.heat > lerpf(0.6, 0.9, skill):
@@ -122,7 +128,7 @@ func steer(delta: float) -> void:
 	var dodge_chance := 0.05 * skill if _under_fire > 0.0 else 0.0
 	if _missile_incoming():
 		dodge_chance = 0.25 * skill
-	if _dodge_cooldown <= 0.0 and rng.randf() < dodge_chance:
+	if _dodge_cooldown <= 0.0 and choppa.altitude > 14.0 and rng.randf() < dodge_chance:
 		_dodge_dir = 1.0 if rng.randf() < 0.5 else -1.0
 		_dodge_time = 0.7
 		_dodge_cooldown = 3.0
@@ -232,6 +238,28 @@ func _can_see(other: Choppa) -> bool:
 	return choppa.get_world_3d().direct_space_state.intersect_ray(query).is_empty()
 
 
+## Slows the part of `want` that heads into a wall ahead to what can still stop in time:
+## at 25 m/s a wall hurts badly, at 32 it kills, so bots must not trust the push alone.
+func _brake_for_walls(want: Vector3) -> Vector3:
+	var speed := choppa.velocity.length()
+	if speed < 8.0:
+		return want
+	var pos := choppa.global_position
+	var ahead := choppa.velocity / speed
+	var query := PhysicsRayQueryParameters3D.create(pos, pos + ahead * (speed * 1.6 + choppa.rotor_radius + 6.0))
+	query.exclude = [choppa.get_rid()]
+	var hit := choppa.get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty() or hit.collider is Choppa:
+		return want
+	var normal: Vector3 = hit.normal
+	var room := maxf(0.0, pos.distance_to(hit.position) - choppa.rotor_radius - 2.0)
+	var allowed := sqrt(2.0 * BRAKING * room)
+	var into := -want.dot(normal)
+	if into > allowed:
+		want += normal * (into - allowed)
+	return want
+
+
 ## A push away from nearby walls and the ground, from rays fanned out ahead.
 func _avoidance() -> Vector3:
 	var pos := choppa.global_position
@@ -254,6 +282,22 @@ func _avoidance() -> Vector3:
 		if hit and not hit.collider is Choppa:
 			var closeness := 1.0 - pos.distance_to(hit.position) / length
 			push += (hit.normal + Vector3.UP * 0.3) * closeness * 2.0
+	# The rotor disc reaches well past the body: feel around it at hub height, sideways
+	# and diagonally ahead, so the blades never touch a wall or a roof.
+	var hub := pos + choppa.global_transform.basis * choppa.rotor_hub
+	var side := choppa.facing() * Vector3.RIGHT
+	var front := choppa.facing() * Vector3.FORWARD
+	var disc := choppa.rotor_radius + 3.0
+	for dir: Vector3 in [side, -side, (front + side).normalized(), (front - side).normalized(), Vector3.UP,
+			(side + Vector3.DOWN).normalized(), (-side + Vector3.DOWN).normalized(), ahead,
+			(side + Vector3.UP).normalized(), (-side + Vector3.UP).normalized(), (front + Vector3.UP).normalized(),
+			(ahead + Vector3.UP * 0.5).normalized()]:
+		var query := PhysicsRayQueryParameters3D.create(hub, hub + dir * (disc if dir != ahead else reach))
+		query.exclude = [choppa.get_rid()]
+		var hit := space.intersect_ray(query)
+		if hit and not hit.collider is Choppa:
+			var closeness := clampf(1.0 - hub.distance_to(hit.position) / disc, 0.0, 1.0)
+			push += (hit.normal - dir * 0.5) * closeness * 5.0
 	# Power lines have no collision for the rays to find: keep well clear of the cables,
 	# passing under them rather than over.
 	var look_ahead := pos + choppa.velocity * 0.8

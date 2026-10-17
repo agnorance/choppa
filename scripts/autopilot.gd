@@ -12,7 +12,9 @@ const TILT_GAIN := 2.8  ## Stick per radian of tilt error. Softer gains let the 
 const RATE_DAMPING := 0.25  ## Stick against the current rotation rate.
 
 
-static func fly(c: Choppa, i: PilotInput, want_velocity: Vector3, look_at: Vector3) -> void:
+## `max_tilt` caps nose-down and bank (radians): low near the ground, where a tipped rotor
+## disc would strike it.
+static func fly(c: Choppa, i: PilotInput, want_velocity: Vector3, look_at: Vector3, max_tilt := MAX_TILT) -> void:
 	var yaw_local := c.facing().inverse() * (look_at - c.global_position)
 	if c.easy:
 		# Drone controls: a move stick in the yaw frame, collective as climb rate.
@@ -27,8 +29,8 @@ static func fly(c: Choppa, i: PilotInput, want_velocity: Vector3, look_at: Vecto
 	var local := yaw_frame.inverse() * want_accel
 	# A level rotor pushes up; tipping it nose-down by a radians pushes forward by
 	# about thrust * a. Forward is -Z in the yaw frame.
-	var want_pitch := clampf(-local.z / c.hover_thrust, -MAX_TILT, MAX_TILT)
-	var want_roll := clampf(local.x / c.hover_thrust, -MAX_TILT, MAX_TILT)
+	var want_pitch := clampf(-local.z / c.hover_thrust, -max_tilt, max_tilt)
+	var want_roll := clampf(local.x / c.hover_thrust, -max_tilt, max_tilt)
 	i.cyclic.y = clampf((want_pitch - c.nose_down()) * TILT_GAIN + c.rates.x * RATE_DAMPING, -1.0, 1.0)
 	i.cyclic.x = clampf((want_roll - c.bank_right()) * TILT_GAIN + c.rates.z * RATE_DAMPING, -1.0, 1.0)
 

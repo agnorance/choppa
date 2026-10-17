@@ -48,8 +48,25 @@ const AIM_ASSIST_ANGLE := deg_to_rad(12.0)  ## Horizontal cone that snaps bullet
 const AIM_ASSIST_PITCH := deg_to_rad(35.0)
 const AIM_ASSIST_RANGE := 160.0
 const MAX_HEALTH := 100.0
-const CRASH_DAMAGE_FROM := 8.0  ## Impacts (m/s into the obstacle) harder than this hurt.
-const CRASH_DAMAGE_PER_MS := 2.0  ## Hull damage per m/s above that.
+## Crashes cost a share of the hull, whatever the class: nothing below CRASH_DAMAGE_FROM
+## (m/s into the obstacle), all of it at CRASH_LETHAL. 25 m/s into a wall nearly kills.
+const CRASH_DAMAGE_FROM := 6.0
+const CRASH_LETHAL := 32.0
+const LANDING_SAFE := 5.0  ## Sink rate (m/s) the skids take without damage...
+const LANDING_LETHAL := 13.0  ## ...and the one that flattens the choppa.
+const SCRAPE_SPEED := 14.0  ## Sliding over the ground faster than this grinds the hull...
+const SCRAPE_DAMAGE := 0.015  ## ...by this share of it per m/s above, per crash window.
+## Rotor strikes: blades in a wall or the ground. Only this share of the blade radius
+## counts, so a near miss stays a near miss. One strike costs ROTOR_STRIKE_DAMAGE of the
+## rotor and ROTOR_STRIKE_HULL of the hull; a wrecked rotor that strikes comes apart.
+const ROTOR_STRIKE_REACH := 0.75
+const ROTOR_STRIKE_DAMAGE := 0.6
+const ROTOR_STRIKE_HULL := 0.12
+const ROTOR_STRIKE_KICK := 5.0  ## m/s the obstacle shoves you away.
+const ROTOR_STRIKE_SPIN := 1.1  ## rad/s it throws the body over.
+const ROTOR_STRIKE_WINDOW := 0.35
+const ROLLOVER_UP := 0.35  ## Body up axis this far from vertical (about 70 degrees) on the ground...
+const ROLLOVER_TIME := 2.0  ## ...for this long: it catches fire and burns out.
 const TAIL_TORQUE := 2.2  ## rad/s the body spins with the tail rotor gone, at hover thrust.
 const VIBRATION := 0.9  ## rad/s of shaking with the main rotor wrecked.
 ## Damage each part takes before it is wrecked. The hull is `health`.
@@ -107,6 +124,11 @@ var easy := false  ## The easy flight model (a setting): no gravity, auto-hover,
 var _thrust := GRAVITY  ## Current rotor thrust; follows the collective with `thrust_lag`.
 var _aim := 0.0  ## Easy model: nose-down angle set by the stick, held.
 var _crash_cooldown := 0.0  ## Grinding along terrain hurts once per window, not every tick.
+var _strike_cooldown := 0.0
+var _rollover := 0.0  ## Seconds spent on its side on the ground.
+var rotor_radius := 5.0  ## Blade tip radius, metres (Airframe "rotor").
+var rotor_hub := Vector3(0.0, 1.95, 0.3)  ## Rotor hub in body space.
+var _rotor_shape: CylinderShape3D
 var boost_meter := 1.0  ## Afterburner charge, 0..1.
 var stun := 0.0
 var locked := false  ## Ignores input, e.g. during a race countdown.
@@ -284,6 +306,7 @@ func step(delta: float) -> void:
 	move_and_slide()
 	_handle_collisions(before)
 	_update_altitude()
+	_check_wreck_hazards(delta)
 	if not replaying:
 		model.update_pose(self, delta)
 
@@ -340,6 +363,7 @@ func _step_easy(i: PilotInput, delta: float) -> void:
 	move_and_slide()
 	_handle_collisions(before)
 	_update_altitude()
+	_check_wreck_hazards(delta)
 	if not replaying:
 		model.update_pose(self, delta)
 
@@ -576,6 +600,8 @@ func set_airframe(id: String) -> void:
 	easy_accel = 28.0 * spec.inertia
 	turn_accel = 14.0 * spec.inertia
 	clearance = GROUND_CLEARANCE * spec.size
+	rotor_radius = spec.rotor[0]
+	rotor_hub = Vector3(0.0, spec.rotor[1], spec.rotor[2])
 	if _shape:
 		var capsule := _shape.shape as CapsuleShape3D
 		capsule.radius = 1.1 * spec.size
@@ -818,18 +844,94 @@ func _handle_collisions(before: Vector3) -> void:
 		stun = clampf(impact / 60.0, 0.15, 0.5)
 		rates *= 0.3  # The knock takes most of the spin out.
 		bumped.emit(impact)
-	if impact > CRASH_DAMAGE_FROM and _crash_cooldown <= 0.0:
-		_crash_cooldown = CRASH_WINDOW
-		var credit := _last_attacker if clock - _last_attacker_time < CRASH_CREDIT_TIME else null
-		var excess := impact - CRASH_DAMAGE_FROM
-		# Whatever struck first takes the brunt: tail strikes wreck the tail rotor, and a
-		# body tilted this far has its blades in the obstacle too.
-		var part := part_at(where)
-		if part != Part.HULL:
-			damage_part(part, excess * 3.0, credit)
-		if absf(bank_right()) > 0.6 or absf(nose_down()) > 0.6:
-			damage_part(Part.ROTOR, excess * 2.0, credit)
-		damage(excess * CRASH_DAMAGE_PER_MS, credit)
+	if _crash_cooldown > 0.0:
+		return
+	# The share of the hull this costs: a hard landing or a slide on the ground, or a hit
+	# into a wall. 1 or more destroys any class.
+	var share := 0.0
+	if is_ground:
+		share = maxf(inverse_lerp(LANDING_SAFE, LANDING_LETHAL, impact),
+			(Vector2(before.x, before.z).length() - SCRAPE_SPEED) * SCRAPE_DAMAGE)
+	else:
+		share = inverse_lerp(CRASH_DAMAGE_FROM, CRASH_LETHAL, impact)
+	if share <= 0.0:
+		return
+	_crash_cooldown = CRASH_WINDOW
+	var credit := _credit()
+	# Whatever struck first takes the brunt: tail strikes wreck the tail rotor, and a
+	# body tilted this far has its blades in the obstacle too.
+	var part := part_at(where)
+	if part != Part.HULL:
+		damage_part(part, part_max(part) * share * 2.0, credit)
+	if absf(bank_right()) > 0.6 or absf(nose_down()) > 0.6:
+		damage_part(Part.ROTOR, part_max(Part.ROTOR) * share * 1.5, credit)
+	damage(max_health * share, credit)
+
+
+## Whoever shot you lately gets the kill if you crash now.
+func _credit() -> Choppa:
+	return _last_attacker if clock - _last_attacker_time < CRASH_CREDIT_TIME else null
+
+
+## Rotor blades in a wall or the ground, a choppa lying on its side: crashes nobody walks
+## away from. Runs after the move in both flight models.
+func _check_wreck_hazards(delta: float) -> void:
+	_strike_cooldown = maxf(0.0, _strike_cooldown - delta)
+	if mortal and spool > 0.3 and _strike_cooldown <= 0.0:  # Races: blades are only paint.
+		var hit := _rotor_contact()
+		if not hit.is_empty():
+			_rotor_strike(hit)
+	if not alive:
+		return
+	if altitude < 1.5 and global_transform.basis.y.y < ROLLOVER_UP:
+		_rollover += delta
+		if _rollover > ROLLOVER_TIME:
+			damage(max_health * 2.0, _credit())
+	else:
+		_rollover = 0.0
+
+
+## Where the rotor disc touches the world (not other choppas), or {} if it is clear.
+func _rotor_contact() -> Dictionary:
+	if _rotor_shape == null:
+		_rotor_shape = CylinderShape3D.new()
+		_rotor_shape.height = 0.5
+	_rotor_shape.radius = rotor_radius * ROTOR_STRIKE_REACH
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = _rotor_shape
+	query.transform = Transform3D(global_transform.basis, global_transform * rotor_hub)
+	var skip: Array[RID] = []
+	for node in get_tree().get_nodes_in_group("choppas"):
+		skip.append((node as CollisionObject3D).get_rid())
+	query.exclude = skip
+	return get_world_3d().direct_space_state.get_rest_info(query)
+
+
+func _rotor_strike(hit: Dictionary) -> void:
+	_strike_cooldown = ROTOR_STRIKE_WINDOW
+	var credit := _credit()
+	var shattered: bool = parts[Part.ROTOR] <= 0.0
+	damage_part(Part.ROTOR, part_max(Part.ROTOR) * ROTOR_STRIKE_DAMAGE * spool, credit)
+	damage(max_health * ROTOR_STRIKE_HULL * spool, credit)
+	if shattered and spool > 0.5:
+		damage(max_health * 2.0, credit)  # Wrecked blades striking again come apart.
+	# The blades bite: the obstacle shoves the disc away and throws the body over, away
+	# from the side that struck (a strike on the right rolls you left, in front pitches up).
+	var point: Vector3 = hit.point
+	var normal: Vector3 = hit.normal
+	velocity += normal * ROTOR_STRIKE_KICK * spool
+	var arm := to_local(point)
+	var spin := Vector3(-arm.z, 0.0, arm.x)
+	if spin.length() > 0.1:
+		rates += spin.normalized() * ROTOR_STRIKE_SPIN * spool
+	if not replaying:
+		bumped.emit(ROTOR_STRIKE_KICK * 3.0)
+		var sparks := Effects.Impact.new()
+		sparks.kind = Effects.Impact.Kind.METAL
+		sparks.normal = normal
+		get_parent().add_child(sparks)
+		sparks.global_position = point
+		Sounds.play_at(get_parent(), "impact_metal", point, 6.0, 0.7)
 
 func _update_altitude() -> void:
 	var query := PhysicsRayQueryParameters3D.create(

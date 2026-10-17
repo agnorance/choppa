@@ -55,6 +55,9 @@ func _run() -> void:
 		"test_crash_damages_hull_and_parts",
 		"test_blast_wrecks_the_nearest_part",
 		"test_landing_is_gentle_slamming_is_not",
+		"test_wall_crashes_scale_with_speed",
+		"test_rotor_strike_wrecks_the_rotor",
+		"test_rollover_burns_out",
 		"test_easy_model_hovers_and_flies_where_it_looks",
 		"test_loadout_runs_out_and_waits_between_shots",
 		"test_rocket_hits_the_part_it_strikes",
@@ -822,24 +825,28 @@ func test_landing_is_gentle_slamming_is_not() -> void:
 	_check(choppa.health == Choppa.MAX_HEALTH, "a 4 m/s touchdown does not hurt, hp=%f" % choppa.health)
 	_check(choppa.altitude < 0.3, "on the ground, alt=%f" % choppa.altitude)
 	_check(Vector2(choppa.velocity.x, choppa.velocity.z).length() < 2.0, "the skids brought it to a stop, v=%s" % choppa.velocity)
-	var slammed := _choppa(Vector3(0.0, 6.0, 50.0))
-	slammed.velocity = Vector3(0.0, -14.0, 0.0)
+	var slammed := _choppa(Vector3(0.0, 4.0, 50.0))
+	slammed.velocity = Vector3(0.0, -9.0, 0.0)
 	await _fly(slammed, 30, func(i: PilotInput, _t: int) -> void: i.collective = -1.0)
-	_check(slammed.health < Choppa.MAX_HEALTH and slammed.alive, "a 14 m/s slam hurts but does not kill, hp=%f" % slammed.health)
+	_check(slammed.health < Choppa.MAX_HEALTH * 0.8 and slammed.alive, "a 9 m/s slam hurts badly but does not kill, hp=%f" % slammed.health)
+	var flattened := _choppa(Vector3(0.0, 4.0, 100.0))
+	flattened.velocity = Vector3(0.0, -15.0, 0.0)
+	await _fly(flattened, 30, func(i: PilotInput, _t: int) -> void: i.collective = -1.0)
+	_check(not flattened.alive, "a 15 m/s slam destroys it, hp=%f" % flattened.health)
 
 
 func test_easy_model_hovers_and_flies_where_it_looks() -> void:
 	_ground()
-	var choppa := _choppa(Vector3(0.0, 30.0, 0.0))
+	var choppa := _choppa(Vector3(0.0, 90.0, 0.0))  # Room for the dive: the ground hurts now.
 	choppa.easy = true
 	await _fly(choppa, 60)
-	_check(absf(choppa.global_position.y - 30.0) < 0.1 and choppa.velocity.length() < 0.1, "hovers by itself")
+	_check(absf(choppa.global_position.y - 90.0) < 0.1 and choppa.velocity.length() < 0.1, "hovers by itself")
 	# Aim the nose down a little, then push forward: it descends while flying ahead.
 	await _fly(choppa, 120, func(i: PilotInput, t: int) -> void:
 		i.cyclic.y = 1.0 if t < 15 else 0.0
 		i.move.y = 1.0)
 	_check(choppa.global_position.z < -20.0, "flew forward, z=%f" % choppa.global_position.z)
-	_check(choppa.global_position.y < 27.0, "and down along the nose, y=%f" % choppa.global_position.y)
+	_check(choppa.global_position.y < 87.0, "and down along the nose, y=%f" % choppa.global_position.y)
 	_check(choppa.nose_down() > 0.2, "the nose stays where it was aimed, %f" % choppa.nose_down())
 	choppa.input.clear()  # Let go of the move stick before pulling collective.
 	await _fly(choppa, 60, func(i: PilotInput, _t: int) -> void: i.collective = 1.0)
@@ -1618,3 +1625,53 @@ func test_coaxial_striker_shrugs_off_tail_hits() -> void:
 		c.free()
 	_check(spun.gunship > 1.0, "the gunship spins without its tail rotor, %.2f rad" % spun.gunship)
 	_check(spun.striker < 0.1, "the striker holds its heading, %.2f rad" % spun.striker)
+
+
+## Owner: environment hits must hurt like a real crash. 12 m/s into a wall scrapes the
+## paint, 25 nearly kills, 35 kills any class.
+func test_wall_crashes_scale_with_speed() -> void:
+	var left := {}
+	for speed: float in [12.0, 25.0, 35.0]:
+		var x := speed * 10.0
+		MapKit.block(_world, Vector3(x, 30.0, -20.0), Vector3(20.0, 60.0, 2.0), Color.GRAY)
+		var choppa := _choppa(Vector3(x, 30.0, -8.0))
+		choppa.set_airframe(Airframe.HEAVY)  # The toughest hull.
+		choppa.velocity = Vector3(0.0, 0.0, -speed)
+		await _fly(choppa, 90)
+		left[speed] = choppa.health / choppa.max_health if choppa.alive else 0.0
+	_check(left[12.0] > 0.6 and left[12.0] < 1.0, "12 m/s costs a little, %s" % [left])
+	_check(left[25.0] > 0.0 and left[25.0] < 0.4, "25 m/s nearly kills, %s" % [left])
+	_check(left[35.0] == 0.0, "35 m/s kills even the heavy, %s" % [left])
+
+
+## Blades into a wall: the rotor takes the hit, the choppa is shoved away, and a wrecked
+## rotor that strikes again comes apart. In a race the blades are only paint.
+func test_rotor_strike_wrecks_the_rotor() -> void:
+	MapKit.block(_world, Vector3(4.0, 30.0, 0.0), Vector3(2.0, 60.0, 40.0), Color.GRAY)
+	var choppa := _choppa(Vector3(0.0, 30.0, 0.0))  # Body 2 m clear of the wall, the blades not.
+	await _fly(choppa, 2)
+	_check(choppa.parts[Choppa.Part.ROTOR] < choppa.part_max(Choppa.Part.ROTOR), "the rotor took the strike")
+	_check(choppa.velocity.x < -1.0, "shoved away from the wall, v=%s" % choppa.velocity)
+	_check(choppa.alive, "one strike is survivable")
+	for t in 3:
+		choppa.global_position = Vector3(0.0, 30.0, 0.0)
+		choppa._strike_cooldown = 0.0
+		await _fly(choppa, 1)
+	_check(not choppa.alive, "a wrecked rotor striking again comes apart")
+	var racer := _choppa(Vector3(0.0, 30.0, 10.0))
+	racer.mortal = false
+	await _fly(racer, 2)
+	_check(racer.velocity.length() < 0.5, "races ignore rotor strikes, v=%s" % racer.velocity)
+
+
+## On its side on the ground, it burns out after a couple of seconds.
+func test_rollover_burns_out() -> void:
+	_ground()
+	var choppa := _choppa(Vector3(0.0, 1.2, 0.0))
+	choppa.engine_on = false
+	choppa.spool = 0.0  # No blades turning: only the rollover can do it.
+	choppa.global_transform.basis = Basis(Vector3.FORWARD, PI * 0.5)
+	await _fly(choppa, 60)
+	_check(choppa.alive, "not at once")
+	await _fly(choppa, 90)
+	_check(not choppa.alive, "burned out on its side, up=%f" % choppa.global_transform.basis.y.y)

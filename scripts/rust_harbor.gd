@@ -334,12 +334,21 @@ func _basin_traffic() -> void:
 	Props.place(self, "ship_hulk", Vector3(136.0, -6.0, -100.0), -PI * 0.5)
 	for t: Vector4 in [Vector4(108.0, -172.0, 0.0, 0.0), Vector4(40.0, 50.0, PI, 0.0), Vector4(25.0, -140.0, 0.6, 0.0),
 			Vector4(75.0, 215.0, -0.4, 0.0)]:
-		Props.place(self, "tugboat", Vector3(t.x, -1.8, t.y), t.z)
+		_bob(Props.place(self, "tugboat", Vector3(t.x, -1.8, t.y), t.z), 1.0)
 	_barge(Vector3(62.0, -1.5, -110.0), PI * 0.5)
 	_barge(Vector3(88.0, -1.5, 25.0), 0.0)
 	for k in 8:
 		var z := -230.0 + k * 62.0
-		Props.place(self, "buoy", Vector3(55.0 + (25.0 if k % 2 == 0 else -25.0), 0.0, z), 0.0)
+		_bob(Props.place(self, "buoy", Vector3(55.0 + (25.0 if k % 2 == 0 else -25.0), 0.0, z), 0.0), 2.2)
+
+
+func _bob(body: Node3D, amount: float) -> void:
+	if body == null:
+		return
+	var bob := MapKit.Bob.new()
+	bob.body = body
+	bob.amount = amount
+	add_child(bob)
 
 
 ## A barge (40 m along its length) with a deck load of containers.

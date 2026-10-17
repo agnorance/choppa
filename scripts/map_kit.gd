@@ -153,6 +153,27 @@ static func smolder(parent: Node3D, at: Vector3) -> void:
 		night_light(parent, at + Vector3.UP * 0.8, Color(1.0, 0.45, 0.15), 9.0)
 
 
+## Rocks something floating on the water: a slow heave and a little roll and pitch.
+## Purely for the look; `amount` 1 is a tug, more for a buoy.
+class Bob extends Node:
+	var body: Node3D
+	var amount := 1.0
+	var _rest: Transform3D
+	var _t := 0.0
+
+	func _ready() -> void:
+		_rest = body.transform
+		_t = absf(_rest.origin.x * 0.37 + _rest.origin.z * 0.11)  # Each one out of step.
+
+	func _process(delta: float) -> void:
+		_t += delta
+		var heave := sin(_t * 0.9) * 0.25 * amount
+		var roll := sin(_t * 0.7 + 1.3) * 0.035 * amount
+		var pitch := sin(_t * 0.55 + 0.4) * 0.02 * amount
+		body.transform = Transform3D(_rest.basis * Basis.from_euler(Vector3(pitch, 0.0, roll)),
+			_rest.origin + Vector3.UP * heave)
+
+
 ## A lighthouse lamp: a beam sweeping round, after sunset only.
 class Beacon extends Node3D:
 	func _ready() -> void:

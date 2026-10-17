@@ -778,25 +778,38 @@ func test_mouse_steers() -> void:
 	pilot.set_physics_process(false)  # Stepped by hand below.
 	_world.add_child(pilot)
 	Settings.reset()
-	pilot.feed_mouse(Vector2(40.0, -40.0))  # Right, and forward (up the screen).
-	pilot._physics_process(TICK)
+	var tick := func(relative: Vector2) -> void:  # Mouse travel, then the tick and the next one's half.
+		pilot.feed_mouse(relative)
+		pilot._physics_process(TICK)
+	tick.call(Vector2(80.0, -80.0))  # Right, and forward (up the screen).
 	_check(choppa.input.cyclic.x > 0.5, "mouse right rolls right: %f" % choppa.input.cyclic.x)
 	_check(choppa.input.cyclic.y > 0.5, "mouse forward puts the nose down: %f" % choppa.input.cyclic.y)
 	_check(choppa.input.yaw == 0.0, "no yaw from the mouse in the pitch & roll layout")
+	var first := choppa.input.cyclic.x
 	pilot._physics_process(TICK)
-	_check(choppa.input.cyclic == Vector2.ZERO, "mouse travel is used up each tick")
+	_check(is_equal_approx(choppa.input.cyclic.x, first), "the travel is spread over two ticks, none lost")
+	pilot._physics_process(TICK)
+	_check(choppa.input.cyclic == Vector2.ZERO, "then it is used up")
+	# Owner: "flying in the cockpit feels shaky". Frames of mouse land unevenly on ticks
+	# (two, then three); the stick must not jump with them.
+	var sticks := []
+	for k in 8:
+		tick.call(Vector2(20.0 if k % 2 == 0 else 30.0, 0.0))
+		sticks.append(choppa.input.cyclic.x)
+	_check(absf(sticks[7] - sticks[6]) < 0.02 * absf(sticks[7]) + 0.001, "even stick from uneven mouse: %s" % [sticks])
+	for k in 2:
+		pilot._physics_process(TICK)
 	Settings.set_value("invert_mouse", true)
-	pilot.feed_mouse(Vector2(0.0, -40.0))
-	pilot._physics_process(TICK)
+	tick.call(Vector2(0.0, -80.0))
 	_check(choppa.input.cyclic.y < -0.5, "inverted: mouse forward pulls the nose up: %f" % choppa.input.cyclic.y)
+	pilot._physics_process(TICK)
 	Settings.set_value("invert_mouse", false)
 	Settings.set_value("mouse_mode", 1)
-	pilot.feed_mouse(Vector2(40.0, 0.0))
-	pilot._physics_process(TICK)
+	tick.call(Vector2(80.0, 0.0))
 	_check(choppa.input.yaw > 0.5 and choppa.input.cyclic.x == 0.0, "pitch & yaw layout: mouse right turns right")
-	Settings.set_value("mouse_steer", false)
-	pilot.feed_mouse(Vector2(40.0, 0.0))
 	pilot._physics_process(TICK)
+	Settings.set_value("mouse_steer", false)
+	tick.call(Vector2(80.0, 0.0))
 	_check(choppa.input.yaw == 0.0, "mouse steering off: the mouse does nothing")
 	Settings.reset()
 

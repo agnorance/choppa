@@ -13,6 +13,7 @@ const MOUSE_GAIN := 0.012
 var choppa: Choppa
 
 var _mouse := Vector2.ZERO  ## Mouse travel since the last tick, in pixels.
+var _mouse_before := Vector2.ZERO  ## The tick before's travel, for the smoothing.
 ## Keys and sticks after the ramp: x roll (or strafe), y pitch, z yaw (or side).
 var _stick := Vector3.ZERO
 
@@ -57,9 +58,15 @@ func _physics_process(delta: float) -> void:
 	i.engine = Input.is_action_pressed("engine")
 	var gain := Settings.choice("mouse_sensitivity") * MOUSE_GAIN
 	# While free look is held the mouse turns the camera, not the choppa.
-	var mouse := _mouse if Settings.flag("mouse_steer") and not Input.is_action_pressed("free_look") else Vector2.ZERO
-	mouse.y *= Settings.number("mouse_vertical")
+	var raw := _mouse if Settings.flag("mouse_steer") and not Input.is_action_pressed("free_look") else Vector2.ZERO
 	_mouse = Vector2.ZERO
+	# Frames and ticks don't line up (at 144 fps a 60 Hz tick gets two frames of mouse,
+	# then three), so the raw travel per tick jumps by half while the hand moves evenly;
+	# rigidly mounted in the cockpit you see that as a shake. Spreading each tick's travel
+	# over two ticks evens it out for half a tick of delay, and no travel is lost.
+	var mouse := (raw + _mouse_before) * 0.5
+	_mouse_before = raw
+	mouse.y *= Settings.number("mouse_vertical")
 	var invert := -1.0 if Settings.flag("invert_mouse") else 1.0
 	if choppa.easy:
 		# Drone layout: W/S forward and back, A/D strafe, Q/E and mouse X turn, mouse Y

@@ -170,6 +170,56 @@ def chin_turret(center, barrels, length):
 
 # --- the gunship -------------------------------------------------------------------
 
+def ell(c, r, a, e):
+    """A point on an ellipsoid: azimuth 0 = ahead (+Y), + = right; elevation 0 = equator."""
+    return Vector(c) + Vector((r[0] * math.cos(e) * math.sin(a), r[1] * math.cos(e) * math.cos(a), r[2] * math.sin(e)))
+
+
+def framed_canopy(c, r, sill, roof, rear, posts, rails=(), bar=0.022):
+    """A canopy the way the Little Bird's cabin is made: one ellipsoid shell, glass only
+    between the sill and the roof and ahead of the rear posts (azimuth +-rear), painted
+    elsewhere, the cut lines on the mesh's own edges so the glass edge is clean; frame
+    bars over every edge of the glass, the posts at `posts` and rails at the elevations
+    `rails`."""
+    steps_a = sorted(set([round(-math.pi + 2 * math.pi * k / 48, 5) for k in range(48)] + [round(-rear, 5), round(rear, 5)]))
+    steps_e = sorted(set([round(-math.pi / 2 + math.pi * k / 24, 5) for k in range(1, 24)] + [round(sill, 5), round(roof, 5)]))
+    bm = bmesh.new()
+    grid = [[bm.verts.new(ell(c, r, a, e)) for a in steps_a] for e in steps_e]
+    south = bm.verts.new(ell(c, r, 0.0, -math.pi / 2))
+    north = bm.verts.new(ell(c, r, 0.0, math.pi / 2))
+    n = len(steps_a)
+
+    def glass(a, e):
+        return sill < e < roof and abs(a) < rear
+
+    for i in range(len(steps_e) - 1):
+        for k in range(n):
+            j = (k + 1) % n
+            a_mid = (steps_a[k] + (steps_a[j] if j else steps_a[k] + 2 * math.pi / 48)) / 2
+            face = bm.faces.new((grid[i][k], grid[i][j], grid[i + 1][j], grid[i + 1][k]))
+            face.material_index = 1 if glass(a_mid, (steps_e[i] + steps_e[i + 1]) / 2) else 0
+    for k in range(n):
+        j = (k + 1) % n
+        bm.faces.new((grid[0][j], grid[0][k], south)).material_index = 0
+        bm.faces.new((grid[-1][k], grid[-1][j], north)).material_index = 0
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    parts = [base.link(bm, "canopy", ["paint", "glass"])]
+    out = (r[0] + 0.012, r[1] + 0.012, r[2] + 0.012)
+
+    def line(a0, e0, a1, e1, steps=20):
+        return tube([ell(c, out, a0 + (a1 - a0) * k / steps, e0 + (e1 - e0) * k / steps) for k in range(steps + 1)],
+                    bar, "paint", 8)
+
+    parts.append(line(-rear, sill, rear, sill, 32))
+    if roof < math.pi / 2 - 0.01:
+        parts.append(line(-rear, roof, rear, roof, 32))
+    for a in list(posts) + [-rear, rear]:
+        parts.append(line(a, sill, a, roof, 12))
+    for e in rails:
+        parts.append(line(-rear, e, rear, e, 32))
+    return parts
+
+
 def build_gunship():
     fresh()
     s = 1.1
@@ -259,11 +309,13 @@ def build_heavy():
     ], "paint", count=44)
     base.HULL.append(body)
     parts = [body]
-    # Two bubble canopies, gunner in the nose and pilot above and behind.
-    parts.append(ball((0, 2.85, 0.05), 1.0, "glass", scale=(0.55, 0.85, 0.5), segments=28, rings=14))
-    parts.append(ball((0, 1.75, 0.65), 1.0, "glass", scale=(0.6, 0.85, 0.5), segments=28, rings=14))
-    for y, z, r in ((2.15, 0.05, 0.52), (1.05, 0.62, 0.57)):
-        parts.append(ring((0, y, z), (0, 1, 0), r, 0.03, "paint", 28))
+    # Two framed canopies, the gunner in the nose and the pilot above and behind: glass
+    # panes between a sill and a solid roof, like the Little Bird's cabin. The pilot's
+    # posts, sill and roof are where the cockpit shows them from inside (make_cockpit.py).
+    parts += framed_canopy((0, 2.85, 0.05), (0.55, 0.85, 0.5), -0.25, 1.3, 1.6, [0.0, -0.5, 0.5, -1.1, 1.1], [0.55])
+    # The pilot's shell outside stands a little prouder than the one the seat sees, so it
+    # reads over the shoulders of the body.
+    parts += framed_canopy((0, 1.8, 0.72), (0.66, 0.95, 0.58), -0.38, 0.95, 2.1, [0.0, -0.62, 0.62, -1.35, 1.35])
     # Bolted armour: big plates over the flanks and belly, rivet rows.
     for side in (-1, 1):
         for y0, y1, z, h in ((2.3, 0.4, -0.35, 0.8), (0.3, -1.6, -0.25, 1.0)):

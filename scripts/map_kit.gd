@@ -135,6 +135,24 @@ static func night_light(parent: Node3D, at: Vector3, color := Color(1.0, 0.82, 0
 	parent.add_child(lamp)
 
 
+## A wreck still smouldering: a thin smoke column, and embers that glow after dark.
+static func smolder(parent: Node3D, at: Vector3) -> void:
+	var smoke := Effects.puffs(Effects.gradient([
+		Color(0.2, 0.2, 0.2, 0.0), Color(0.18, 0.18, 0.18, 0.55), Color(0.3, 0.3, 0.3, 0.35), Color(0.4, 0.4, 0.4, 0.0),
+	]), 24, 7.0, true)
+	smoke.position = at + Vector3.UP * 1.0
+	smoke.direction = Vector3.UP
+	smoke.spread = 10.0
+	smoke.initial_velocity_min = 1.5
+	smoke.initial_velocity_max = 2.5
+	smoke.gravity = Vector3(0.5, 0.6, 0.0)
+	smoke.scale_amount_min = 2.0
+	smoke.scale_amount_max = 4.5
+	parent.add_child(smoke)
+	if time_of_day() > 0:
+		night_light(parent, at + Vector3.UP * 0.8, Color(1.0, 0.45, 0.15), 9.0)
+
+
 ## A lighthouse lamp: a beam sweeping round, after sunset only.
 class Beacon extends Node3D:
 	func _ready() -> void:

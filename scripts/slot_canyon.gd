@@ -134,6 +134,8 @@ func _battlefield() -> void:
 		if at.y > RIVER_LEVEL + 0.5 and not _near_feature(at):
 			_wrecks.append(at)
 			_place(entry[0], at, entry[3])
+			if (entry[0] as String).begins_with("wreck_heli"):
+				MapKit.smolder(self, at)
 
 
 func _crossings() -> void:

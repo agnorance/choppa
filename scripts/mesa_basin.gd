@@ -94,6 +94,8 @@ func _ready() -> void:
 		var x: float = entry[1]
 		var z: float = entry[2]
 		Props.place(self, entry[0], Vector3(x, _ground(x, z) - 0.25, z), entry[3])
+		if (entry[0] as String).begins_with("wreck"):
+			MapKit.smolder(self, Vector3(x, _ground(x, z), z))
 	GameMap.report("basin: rocks", t0)
 	# Bridge over the trench.
 	var trench_x := _trench_center(0.0)

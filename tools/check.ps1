@@ -40,6 +40,17 @@ $shots = [ordered]@{
 	"harbor_battle"   = "--mode=battle --map=harbor --autopilot=bot --frames=600"
 	"striker"         = "--map=harbor --airframe=striker --cam=showcase --autopilot=hover --frames=150 --dummies=0"
 	"flares"          = "--map=basin --spawn=0,60,120,0 --autopilot=weapon:flares --cam=showcase --frames=150 --dummies=0"
+	"mule"            = "--map=harbor --airframe=mule --cam=showcase --autopilot=hover --frames=150 --dummies=0"
+	"cockpit_gunship" = "--map=basin --airframe=gunship --cam=fp --autopilot=hover --frames=60 --dummies=0"
+	"cockpit_heavy"   = "--map=basin --airframe=heavy --cam=fp --autopilot=hover --frames=60 --dummies=0"
+	"cockpit_striker" = "--map=basin --airframe=striker --cam=fp --autopilot=hover --frames=60 --dummies=0"
+	"cockpit_mule"    = "--map=basin --airframe=mule --cam=fp --autopilot=hover --frames=60 --dummies=0"
+	"shark"           = "--map=basin --airframe=gunship --camo=shark --cam=showcase --spawn=150,6,150,45 --autopilot=hover --frames=100 --dummies=0"
+	"dam"             = "--map=dam --spawn=30,30,120,0 --cam=fp --autopilot=hover --frames=60 --dummies=0"
+	"dam_battle"      = "--mode=battle --map=dam --autopilot=bot --frames=600"
+	"night"           = "--map=harbor --time=night --spawn=-15,12,110,0 --cam=orbit --autopilot=hover --frames=260 --dummies=0 --clean"
+	"dusk"            = "--map=dam --time=dusk --spawn=30,30,120,0 --cam=fp --autopilot=hover --frames=300 --dummies=0"
+	"wreck"           = "--map=basin --autopilot=flip --health=1 --cam=low --frames=480 --dummies=0 --clean"
 }
 foreach ($name in $shots.Keys) {
 	$out = Join-Path $dir "$name.png"

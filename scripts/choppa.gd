@@ -620,7 +620,9 @@ func fire_flares() -> bool:
 		var missile := node as Weapons.Missile
 		if missile.is_hunting(self):
 			missile.shake_off()
-	_drop(Weapons.Flares.new(), Vector3(0.0, -0.8, 1.5))
+	var flares := Weapons.Flares.new()
+	flares.carrier = self
+	_drop(flares, Vector3(0.0, -0.8, 1.5))
 	return true
 
 

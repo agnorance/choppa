@@ -566,6 +566,7 @@ func _show_fire(event: Array) -> void:
 			missile.global_position = at + c.global_transform.basis * Vector3(0.0, -0.6, -3.0)
 		"flares":
 			var flares := Weapons.Flares.new()
+			flares.carrier = c
 			c.get_parent().add_child(flares)
 			flares.global_position = at + c.facing() * Vector3(0.0, -0.8, 1.5)
 		"mines":

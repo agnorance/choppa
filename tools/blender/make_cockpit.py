@@ -249,7 +249,7 @@ def build_scout():
     shell += cp.seat(0, -0.05, -0.72, 0.5, 0.62)
     shell += bulkhead(-0.42, -0.62, 0.62, -1.0, 0.22)
     shell += cp.extinguisher(-0.5, -0.25, -0.98, (0, 0, 1))
-    shell += cp.compass((-0.36, 0.6, -0.07), hanging=False)  # On the coaming, clear of the view ahead.
+    shell += cp.compass((-0.4, 0.6, -0.1), hanging=False)  # Low on the coaming, out of the view ahead.
     # The canopy frame (the inside of the exterior's members) and the tub walls.
     off = lambda pts: [p - eye for p in pts]  # noqa: E731
     frame.append(tube(off(shared.sill_points(-0.03, 30)), 0.03))
@@ -269,6 +269,11 @@ def build_scout():
 
 
 # --- gunship: tandem, the pilot behind --------------------------------------------------
+
+# Windscreen corners, door bows and rear posts (azimuths on the canopy): set back far
+# enough that none stands in the view ahead. make_airframes.py frames the outside the same.
+GUNSHIP_POSTS = [-1.3, 1.3, -1.8, 1.8, -2.4, 2.4]
+
 
 def build_gunship():
     eye = EYES["gunship"]
@@ -316,7 +321,7 @@ def build_gunship():
     # A closed cabin, the same frame the outside shows (GUNSHIP_PILOT in make_airframes.py):
     # a solid roof strip, the windscreen corners and door bows running into its rail, and
     # nothing across the side view; the gunner's sill ahead and below.
-    frame += cabin(c_pilot, r, 1.25, [-0.9, 0.9, -1.35, 1.35, -2.2, 2.2], sill=-0.18, sill_from=0.2, bar=0.011)
+    frame += cabin(c_pilot, r, 1.25, GUNSHIP_POSTS, sill=-0.18, sill_from=0.2, bar=0.011)
     for side in (-1, 1):
         frame.append(cp.frame_member(c_gunner, r, side * 0.2, -0.1, side * 2.4, -0.1, 0.011))
     finish(shell, frame)
@@ -562,7 +567,40 @@ BUILDS = {"scout": build_scout, "gunship": build_gunship, "heavy": build_heavy, 
           "mule": build_mule}
 
 
+# The forward window that must stay clear (owner: "visibility is everything, nothing
+# right in front"): degrees left/right and down/up from the eye. Only the sight may sit
+# in it, inside SIGHT_GAP of dead ahead and below it on its post.
+VIEW_AZIMUTH = 30.0
+VIEW_DOWN, VIEW_UP = -6.0, 22.0
+SIGHT_GAP = 7.0
+
+
+def blocked_view(name):
+    """Casts rays from the eye across the forward window; returns the share that hit
+    the cockpit, and where (azimuth, elevation in degrees) the first few did."""
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    scene = bpy.context.scene
+    hits, total = [], 0
+    for i in range(int(2 * VIEW_AZIMUTH) + 1):
+        az = -VIEW_AZIMUTH + i
+        for j in range(int(VIEW_UP - VIEW_DOWN) + 1):
+            el = VIEW_DOWN + j
+            if abs(az) < SIGHT_GAP and el < SIGHT_GAP:
+                continue  # The sight and its post.
+            total += 1
+            a, e = math.radians(az), math.radians(el)
+            d = Vector((math.cos(e) * math.sin(a), math.cos(e) * math.cos(a), math.sin(e)))
+            hit = scene.ray_cast(depsgraph, Vector((0, 0, 0)), d, distance=3.0)[0]
+            if hit:
+                hits.append((az, el))
+    return len(hits) / max(1, total), hits[:12]
+
+
 def export(name):
+    share, where = blocked_view(name)
+    print(f"{name}: {share * 100:.1f}% of the forward window blocked {where}", flush=True)
+    if share > 0.01:
+        raise SystemExit(f"{name}: the view ahead is blocked, not exported")
     for o in bpy.context.scene.objects:
         o.select_set(True)
     path = os.path.abspath(os.path.join(OUT_DIR, "cockpit_%s.glb" % name))

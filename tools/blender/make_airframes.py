@@ -220,61 +220,253 @@ def framed_canopy(c, r, sill, roof, rear, posts, rails=(), bar=0.022):
     return parts
 
 
-def build_gunship():
-    fresh()
-    s = 1.1
-    ground = -1.15 * s
-    base.GROUND_Z = ground  # The preview floor.
-    # Slim, tall fuselage: nose, front seat, rear seat, engine bay, tail cone.
-    body = loft("fuselage", [
-        (3.25, 0.06, -0.15, -0.08, -0.22, 2.0, 2.0),
-        (2.95, 0.3, -0.18, 0.2, -0.55, 2.2, 2.4),
-        (2.3, 0.44, -0.15, 0.45, -0.72, 2.4, 2.8),
-        (1.2, 0.5, -0.1, 0.62, -0.8, 2.6, 3.0),
-        (0.0, 0.52, 0.0, 0.8, -0.78, 2.6, 3.0),
-        (-1.1, 0.5, 0.1, 0.85, -0.6, 2.6, 2.8),
-        (-1.9, 0.34, 0.28, 0.72, -0.2, 2.4, 2.4),
-        (-2.5, 0.2, 0.42, 0.62, 0.15, 2.2, 2.2),
-    ], "paint", count=40)
+def use_hull(body, sections):
+    """Points the Little Bird's surface helpers (base.plate, base.surface) at this body:
+    its loft outline for the first guess, its mesh for the exact spot."""
+    base.HULL.clear()
     base.HULL.append(body)
-    parts = [body]
-    # Stepped tandem canopy, framed panes like the Little Bird's cabin: the gunner low in
-    # front, the pilot behind and higher, looking over his head. The pilot's frame is the
-    # one the cockpit shows from inside (make_cockpit.py, build_gunship).
-    parts += framed_canopy((0, 1.75, 0.3), (0.36, 0.95, 0.42), -0.15, 1.15, 1.9, [-0.6, 0.6], [0.5], bar=0.018)
-    parts += framed_canopy((0, 0.75, 0.68), (0.36, 0.95, 0.42), -0.18, 1.25, 2.2, [-0.9, 0.9, -1.35, 1.35], bar=0.018)
-    # Armour plates and rivet lines along the flanks.
+    base.hull_x = lambda y, z: base.section_x(sections, y, z)
+
+
+def louvres(side, y0, y1, z, count, height=0.22, lean=0.3):
+    """A row of cooling slats standing proud of the skin."""
+    parts = []
+    for k in range(count):
+        y = y0 + (y1 - y0) * k / max(1, count - 1)
+        p, _ = base.surface(side, y, z, 0.025)
+        parts.append(box(p, (0.03, 0.03, height), "dark", rotation=Matrix.Rotation(side * lean, 4, "Z"),
+                         bevel_width=0.005))
+    return parts
+
+
+def blade_antenna(at, height, lean=0.35):
+    """A swept blade antenna on a small base plate."""
+    at = Vector(at)
+    return [box(at, (0.08, 0.16, 0.015), "dark", bevel_width=0.004),
+            box(at + Vector((0, -height * lean * 0.5, height / 2)), (0.012, 0.09, height), "dark",
+                rotation=Matrix.Rotation(-lean, 4, "X"), bevel_width=0.004)]
+
+
+def handholds(side, points):
+    """Recessed steps and grab handles up the flank, where crews climb."""
+    parts = []
+    for y, z in points:
+        p, n = base.surface(side, y, z, 0.0)
+        parts.append(cyl(p - n * 0.01, p + n * 0.012, 0.035, "dark", 10))
+        parts.append(cyl(p + n * 0.012 + Vector((0, -0.04, 0)), p + n * 0.012 + Vector((0, 0.04, 0)), 0.008, "metal", 6))
+    return parts
+
+
+def wire_cutter(at, up, length):
+    """A wire-strike cutter: a serrated blade standing on the skin."""
+    at, up = Vector(at), Vector(up).normalized()
+    parts = [box(at + up * length / 2, (0.02, 0.06, length), "metal",
+                 rotation=Vector((0, 0, 1)).rotation_difference(up).to_matrix().to_4x4(), bevel_width=0.004)]
+    for k in range(3):
+        parts.append(box(at + up * length * (0.3 + k * 0.25) + Vector((0, 0.04, 0)), (0.016, 0.04, 0.03), "metal",
+                         bevel_width=0.003))
+    return parts
+
+
+def crack_spots(spots, first=0):
+    """Where bullet hits crack the glass (the game shows more as the hull takes damage):
+    `spots` are (centre, radii, azimuth, elevation) on a canopy ellipsoid, in the order
+    they appear. Local +Z of each marker is the glass normal."""
+    for k, (c, r, a, e) in enumerate(spots):
+        c, r = Vector(c), Vector(r)
+        p = ell(c, r * 1.0, a, e)
+        q = p - c
+        n = Vector((q.x / r.x ** 2, q.y / r.y ** 2, q.z / r.z ** 2)).normalized()
+        m = empty("crack_%d" % (first + k), p + n * 0.006)
+        m.rotation_mode = "QUATERNION"
+        m.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(n)
+
+
+def number(text, side, y, z, height, target):
+    """The tail number, pressed onto the flank."""
+    p, n = base.surface(side, y, z)
+    return base.stencil(text, p, Vector((side, 0, 0)), Vector((0, 0, 1)), height, "decal", target)
+
+
+def roundel(side, y, z, radius, target):
+    p, _ = base.surface(side, y, z)
+    return base.roundel(p, Vector((side, 0, 0)), Vector((0, 0, 1)), radius, target)
+
+
+def nav_lights(left, right):
+    return [ball(left, 0.04, "light_red", segments=10, rings=5), ball(right, 0.04, "light_green", segments=10, rings=5)]
+
+
+def beacon(at):
+    at = Vector(at)
+    return [cyl(at, at + Vector((0, 0, 0.03)), 0.05, "dark", 12),
+            ball(at + Vector((0, 0, 0.05)), 0.045, "light_red", scale=(1, 1, 0.8), segments=12, rings=6)]
+
+
+# Slim, tall fuselage: nose, front seat, rear seat, engine bay, tail cone.
+# (y, half width, z of the widest line, z top, z bottom, top exponent, bottom exponent)
+GUNSHIP_BODY = [
+    (3.25, 0.06, -0.15, -0.08, -0.22, 2.0, 2.0),
+    (2.95, 0.3, -0.18, 0.2, -0.55, 2.2, 2.4),
+    (2.3, 0.44, -0.15, 0.45, -0.72, 2.4, 2.8),
+    (1.2, 0.5, -0.1, 0.62, -0.8, 2.6, 3.0),
+    (0.0, 0.52, 0.0, 0.8, -0.78, 2.6, 3.0),
+    (-1.1, 0.5, 0.1, 0.85, -0.6, 2.6, 2.8),
+    (-1.9, 0.34, 0.28, 0.72, -0.2, 2.4, 2.4),
+    (-2.5, 0.2, 0.42, 0.62, 0.15, 2.2, 2.2),
+]
+GUNSHIP_GUNNER = ((0, 1.75, 0.3), (0.36, 0.95, 0.42))
+GUNSHIP_PILOT = ((0, 0.75, 0.68), (0.36, 0.95, 0.42))
+
+
+def gunship_sensors():
+    """The nose: a sight turret under the chin of the nose (a drum with two sensor windows
+    and a laser port), a night-vision ball on top, a pitot probe and the wire cutter."""
+    parts = []
+    drum = Vector((0, 3.3, -0.3))  # Hung under the nose tip, out in the air.
+    parts.append(cyl(drum + Vector((0, 0, 0.17)), drum + Vector((0, 0, 0.24)), 0.13, "dark", 20))  # Mount.
+    parts.append(cyl(drum + Vector((-0.2, 0, 0)), drum + Vector((0.2, 0, 0)), 0.17, "paint", 28, bevel_width=0.03))
+    for x in (-0.21, 0.21):
+        parts.append(cyl(drum + Vector((x, 0, 0)), drum + Vector((x * 1.06, 0, 0)), 0.12, "dark", 24, bevel_width=0.01))
+    for x, w in ((-0.09, 0.13), (0.09, 0.1)):  # Day and thermal windows, and the laser port.
+        parts.append(box(drum + Vector((x, 0.165, 0.02)), (w, 0.02, 0.1), "glass", bevel_width=0.006))
+        parts.append(box(drum + Vector((x, 0.158, 0.02)), (w + 0.03, 0.02, 0.13), "dark", bevel_width=0.006))
+    parts.append(cyl(drum + Vector((0, 0.15, -0.09)), drum + Vector((0, 0.18, -0.09)), 0.025, "glass", 12))
+    ball_at = Vector((0, 3.28, -0.02))  # Night-vision ball over the sight turret.
+    parts.append(ball(ball_at, 0.1, "paint", segments=18, rings=9))
+    parts.append(cyl(ball_at + Vector((0, 0.07, 0)), ball_at + Vector((0, 0.1, 0)), 0.05, "glass", 14))
+    parts.append(cyl(ball_at + Vector((0, -0.08, -0.04)), ball_at + Vector((0, -0.25, -0.1)), 0.06, "paint", 14))
+    # Pitot probes on both cheeks, the gun under the chin turret's yoke, a wire cutter.
     for side in (-1, 1):
-        parts.append(box((side * 0.5, 0.9, -0.3), (0.04, 1.8, 0.5), "paint", bevel_width=0.015))
-        parts += rivets((side * 0.53, 0.05, -0.08), (side * 0.53, 1.75, -0.08), 10)
-        parts += rivets((side * 0.53, 0.05, -0.52), (side * 0.53, 1.75, -0.52), 10)
-    # Engine pods on the shoulders.
-    exhausts = []
+        p, n = base.surface(side, 2.6, -0.1, 0.0)
+        parts.append(cyl(p, p + Vector((side * 0.12, 0.3, 0.02)), 0.012, "metal", 6))
+    parts += wire_cutter((0, 2.65, 0.55), (0, 0.35, 1), 0.28)  # Over the gunner's canopy.
+    parts += wire_cutter((0, 2.6, -0.72), (0, 0.25, -1), 0.18)  # Under the chin.
+    return parts
+
+
+def gunship_skin():
+    """Riveted access panels: the avionics bays in the cheeks, the engine bay, the nose,
+    the tail cone; louvres over the engine bay; steps up the flank."""
+    parts = []
+    for side in (-1, 1):
+        parts += base.plate(side, 2.35, 1.1, -0.62, -0.22)  # Forward avionics bay.
+        parts += base.plate(side, 1.0, -0.1, -0.6, -0.15)  # Aft avionics bay, under the pilot.
+        parts += base.plate(side, -0.2, -1.5, 0.3, 0.7)  # Engine bay.
+        parts += base.plate(side, -1.6, -2.4, 0.38, 0.6, bolt_step=0.09)  # Tail cone.
+        parts += louvres(side, -0.3, -1.3, 0.2, 9, 0.16)
+        parts += handholds(side, [(1.4, -0.6), (1.2, -0.25), (0.6, 0.15)])
+        # Hinges on the forward bay door.
+        for z in (-0.55, -0.3):
+            p, n = base.surface(side, 2.37, z, 0.02)
+            parts.append(cyl(p + Vector((0, 0, -0.04)), p + Vector((0, 0, 0.04)), 0.014, "metal", 8))
+    return parts
+
+
+def gunship_engines():
+    """Shoulder engines with dust-filter intakes and exhaust suppressors that turn the hot
+    gas out sideways, an infrared jammer on the spine, the mast fairing and its gearbox."""
+    parts, exhausts = [], []
     for side in (-1, 1):
         p, ex = engine_pod(side, 0.48, 0.2, -1.5, 0.82, 0.24)
         parts += p
         exhausts.append(ex)
-    # Mast fairing and rotor.
+        # Suppressor: a black box over the exhaust with its mouth turned outboard.
+        sup = Vector((side * 0.6, -1.55, 0.9))
+        parts.append(box(sup, (0.24, 0.4, 0.24), "dark", rotation=Matrix.Rotation(side * -0.25, 4, "Z"), bevel_width=0.04))
+        parts.append(box(sup + Vector((side * 0.11, -0.05, 0)), (0.04, 0.3, 0.18), "exhaust",
+                         rotation=Matrix.Rotation(side * -0.25, 4, "Z"), bevel_width=0.01))
+        # Intake screen ahead of the engine face.
+        face = Vector((side * 0.48, 0.26, 0.82))
+        parts.append(ring(face, (0, 1, 0), 0.23, 0.018, "metal", 28))
+        for k in range(5):
+            parts.append(cyl(face + Vector((-0.2, 0.01, -0.12 + k * 0.06)), face + Vector((0.2, 0.01, -0.12 + k * 0.06)),
+                             0.006, "metal", 5))
+        parts += rivets((side * 0.7, 0.0, 0.82), (side * 0.7, -1.3, 0.82), 9)
     parts.append(cyl((0, -0.35, 0.95), (0, -0.35, 1.35), 0.22, "paint", 24, radius2=0.14, bevel_width=0.02))
     parts.append(cyl((0, -0.35, 1.35), (0, -0.35, 1.62), 0.09, "metal", 16))
-    # Stub wings with rocket pods underneath and missile rails at the tips.
+    for k in range(8):  # Bolt ring on the mast fairing.
+        a = 2 * math.pi * k / 8
+        parts.append(ball((0.2 * math.cos(a), -0.35 + 0.2 * math.sin(a), 1.0), 0.014, "metal", segments=6, rings=3))
+    jam = Vector((0, -1.25, 0.95))  # The infrared jammer: a faceted lantern on a post.
+    parts.append(cyl(jam, jam + Vector((0, 0, 0.12)), 0.05, "paint", 12))
+    parts.append(cyl(jam + Vector((0, 0, 0.12)), jam + Vector((0, 0, 0.3)), 0.11, "dark", 8, bevel_width=0.01))
+    parts.append(cyl(jam + Vector((0, 0, 0.3)), jam + Vector((0, 0, 0.33)), 0.08, "paint", 12))
+    parts += blade_antenna((0, -0.9, 0.86), 0.18)
+    parts += blade_antenna((0, -2.1, 0.66), 0.14)
+    parts += beacon((0, -1.7, 0.73))
+    return parts, exhausts
+
+
+def gunship_weapons():
     pods = []
+    parts = []
     for side in (-1, 1):
         parts.append(stub_wing(side, (0.48, 0.15, -0.05), (1.75, 0.05, -0.12), 0.85, 0.6))
+        parts += rivets((side * 0.6, 0.3, 0.0), (side * 1.65, 0.25, -0.06), 7)
         parts.append(box((side * 1.45, 0.1, -0.28), (0.06, 0.45, 0.3), "dark", bevel_width=0.015))
         pod = Vector((side * 1.45, 0.25, -0.55))
         parts += rocket_pod(pod, 1.2, 0.2)
         pods.append(pod + Vector((0, 0.65, 0)))
         parts += missile_rail((side * 1.85, 0.0, -0.3), 1.3)
-        parts.append(ball((side * 1.78, 0.0, -0.1), 0.04, "light_green" if side > 0 else "light_red", segments=10,
-                          rings=5))
-    # Chin turret.
+        # Countermeasure dispensers on the wing tips, the navigation lights.
+        parts.append(box((side * 1.78, -0.15, -0.02), (0.1, 0.3, 0.1), "dark", bevel_width=0.015))
+        for k in range(3):
+            parts.append(cyl((side * 1.78, -0.28 + k * 0.08, 0.03), (side * 1.78, -0.28 + k * 0.08, 0.04), 0.02,
+                             "metal", 8))
+    parts += nav_lights((-1.8, 0.05, -0.08), (1.8, 0.05, -0.08))
     turret, tips = chin_turret((0, 2.55, -0.72), 3, 0.75)
     parts += turret
-    # Tail.
+    # Ammunition chute from the belly into the turret.
+    parts.append(tube([(0, 1.6, -0.82), (0, 2.1, -0.88), (0, 2.45, -0.8)], 0.06, "dark", 10))
+    return parts, pods, tips
+
+
+def build_gunship():
+    fresh()
+    s = 1.1
+    ground = -1.15 * s
+    base.GROUND_Z = ground  # The preview floor.
+    body = loft("fuselage", GUNSHIP_BODY, "paint", count=40)
+    sub = body.modifiers.new("subsurf", "SUBSURF")
+    sub.levels = 1
+    base.apply_all(body)
+    use_hull(body, GUNSHIP_BODY)
+    parts = [body]
+    # Stepped tandem canopy, framed panes like the Little Bird's cabin: the gunner low in
+    # front, the pilot behind and higher, looking over his head. The pilot's frame is the
+    # one the cockpit shows from inside (make_cockpit.py, build_gunship).
+    parts += framed_canopy(*GUNSHIP_GUNNER, -0.15, 1.15, 1.9, [-0.6, 0.6], [0.5], bar=0.018)
+    parts += framed_canopy(*GUNSHIP_PILOT, -0.18, 1.25, 2.4, [-1.3, 1.3, -1.8, 1.8], bar=0.018)  # As GUNSHIP_POSTS inside.
+    for side in (-1, 1):  # Door latches and the canopy hinge line.
+        parts.append(box(ell(GUNSHIP_PILOT[0], (0.38, 0.97, 0.44), side * 1.6, 0.1), (0.03, 0.1, 0.03), "brass",
+                         bevel_width=0.008))
+        parts.append(box(ell(GUNSHIP_GUNNER[0], (0.38, 0.97, 0.44), side * 1.2, 0.05), (0.03, 0.1, 0.03), "brass",
+                         bevel_width=0.008))
+    parts += gunship_sensors()
+    parts += gunship_skin()
+    engines, exhausts = gunship_engines()
+    parts += engines
+    weapons, pods, tips = gunship_weapons()
+    parts += weapons
     t, rotor_at = tail(-2.3, -6.6, 0.5, 0.82, 0.2, 0.1, 1.05)
     parts += t
+    # Tail-rotor driveshaft cover along the boom, a tail-rotor guard, a tail bumper.
+    parts.append(cyl((0, -2.4, 0.71), (0, -6.3, 0.92), 0.045, "paint", 12, radius2=0.035))
+    parts.append(tube([(0, -5.95, 0.6), (0, -6.25, 0.38), (0, -6.6, 0.42)], 0.025, "metal", 8))
     parts += skid_gear(ground, 0.85, -1.0, 1.9, [(1.5, -0.7), (-0.4, -0.6)])
+    for side in (-1, 1):  # Boarding steps on the skids.
+        z = ground + 0.05
+        parts.append(tube([(side * 0.85, 1.05, z), (side * 0.97, 1.03, z + 0.12), (side * 0.97, 0.78, z + 0.12),
+                           (side * 0.85, 0.76, z)], 0.014, "metal", 8))
+    # Landing light under the nose.
+    lamp = Vector((0, 2.2, -0.82))
+    parts.append(cyl(lamp + Vector((0, -0.05, 0.06)), lamp, 0.07, "dark", 18, bevel_width=0.01))
+    parts.append(cyl(lamp, lamp + Vector((0, 0.01, -0.01)), 0.06, "lamp", 18))
+    # Markings: the number on the nose, a roundel on the tail cone, the number on the fin.
+    for side in (-1, 1):
+        parts.append(number("21", side, 1.55, 0.02, 0.2, body))
+        parts += roundel(side, -1.95, 0.2, 0.11, body)
     body = join(parts, "body")
     base.activate(body)
     bpy.ops.object.shade_smooth_by_angle(angle=math.radians(35))
@@ -287,6 +479,9 @@ def build_gunship():
     empty("pod_r", pods[1])
     empty("exhaust_l", exhausts[0])
     empty("exhaust_r", exhausts[1])
+    g, p = GUNSHIP_GUNNER, GUNSHIP_PILOT
+    crack_spots([(p[0], p[1], 1.2, 0.3), (p[0], p[1], -1.1, 0.5), (g[0], g[1], 0.4, 0.4), (p[0], p[1], 0.5, 0.2),
+                 (g[0], g[1], -0.9, 0.3), (p[0], p[1], -0.4, 0.6), (g[0], g[1], -0.2, 0.7), (p[0], p[1], 1.6, 0.7)])
 
 
 # --- the heavy ---------------------------------------------------------------------
@@ -578,6 +773,12 @@ def build_mule():
     empty("exhaust_r", exhausts[1])
 
 
+# Closer looks for judging the details (scaled for the bigger classes in preview).
+base.VIEWS.update({
+    "quarter": ((4.6, 6.0, 1.4), (0, 1.2, 0.1)),
+    "rear": ((-5.5, -7.5, 3.2), (0, -1.8, 0.6)),
+})
+
 BUILDS = {"gunship": build_gunship, "heavy": build_heavy, "striker": build_striker, "mule": build_mule}
 
 
@@ -592,7 +793,7 @@ if __name__ == "__main__":
         directory = args[1]
         for name in args[2:] or list(BUILDS):
             BUILDS[name]()
-            base.preview(os.path.join(directory, name), ["front", "side", "top"])
+            base.preview(os.path.join(directory, name), ["front", "side", "top", "quarter", "rear"])
     else:
         for name in args or list(BUILDS):
             BUILDS[name]()

@@ -154,6 +154,7 @@ func _dam() -> void:
 		if absf(x) < 14.0 or absf(x + 75.0) < 14.0:
 			continue
 		Props.place(self, "lamp_mast", Vector3(x, CREST + 0.5, -5.5 if k % 2 == 0 else 5.5), 0.0, 0.3)
+		MapKit.night_light(self, Vector3(x, CREST + 8.0, -5.5 if k % 2 == 0 else 5.5), Color(1.0, 0.85, 0.6), 22.0)
 
 
 ## The power station at the dam's foot, three penstocks down the dam face into it, a
@@ -163,6 +164,8 @@ func _power_station() -> void:
 	MapKit.block(self, Vector3(0.0, 3.0 + 11.0, 52.0), Vector3(70.0, 22.0, 24.0), walls)
 	MapKit.block(self, Vector3(0.0, STATION_ROOF - 0.5, 52.0), Vector3(72.0, 1.0, 26.0), Color(0.3, 0.3, 0.32))
 	MapKit.block(self, Vector3(0.0, 15.0, 64.2), Vector3(66.0, 3.0, 0.4), Color(0.12, 0.14, 0.16))  # Window band.
+	for x: float in [-24.0, 0.0, 24.0]:  # The halls are lit at night.
+		MapKit.night_light(self, Vector3(x, 15.0, 67.0), Color(1.0, 0.8, 0.5), 18.0)
 	for x: float in [-24.0, 0.0, 24.0]:
 		_pipe(Vector3(x, 34.0, DAM_HALF), Vector3(x, 10.0, 40.0), 2.2)
 	for k in 6:

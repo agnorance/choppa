@@ -1991,7 +1991,15 @@ func test_time_of_day() -> void:
 		var sky := env.environment.sky.sky_material as ShaderMaterial
 		lit[time] = [sun.light_energy, sky.get_shader_parameter("stars")]
 		holder.free()
+	for time in [0, 2]:  # Lamps burn only after sunset.
+		MapKit.time_override = time
+		var holder := Node3D.new()
+		_world.add_child(holder)
+		MapKit.night_light(holder, Vector3.UP)
+		lit["lamps %d" % time] = holder.get_child_count()
+		holder.free()
 	MapKit.time_override = -1
+	_check(lit["lamps 0"] == 0 and lit["lamps 2"] == 1, "lamps only at night: %s" % [lit])
 	_check(lit[0][0] > lit[2][0] * 2.0, "the moon is far dimmer than the sun: %s" % [lit])
 	_check(lit[0][1] == 0.0 and lit[2][1] > 0.5, "stars only at night: %s" % [lit])
 	_check(MapKit.time_of_day() == Settings.choice("time_of_day"), "without an override the setting decides")

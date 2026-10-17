@@ -119,6 +119,39 @@ static func environment(parent: Node3D, sun_rotation := Vector3(-19.0, 70.0, 0.0
 	parent.add_child(sun)
 
 
+## A lamp that only burns after sunset: an omni light at `at`, brighter at night than at
+## dusk, none in the afternoon. For floodlights, crest lamps, windows.
+static func night_light(parent: Node3D, at: Vector3, color := Color(1.0, 0.82, 0.55), reach := 26.0) -> void:
+	var time := time_of_day()
+	if time == 0:
+		return
+	var lamp := OmniLight3D.new()
+	lamp.position = at
+	lamp.light_color = color
+	lamp.light_energy = 2.4 if time == 2 else 0.9
+	lamp.omni_range = reach
+	lamp.omni_attenuation = 1.4
+	lamp.shadow_enabled = false
+	parent.add_child(lamp)
+
+
+## A lighthouse lamp: a beam sweeping round, after sunset only.
+class Beacon extends Node3D:
+	func _ready() -> void:
+		for side in [0.0, PI]:
+			var beam := SpotLight3D.new()
+			beam.light_color = Color(1.0, 0.92, 0.75)
+			beam.light_energy = 12.0
+			beam.spot_range = 160.0
+			beam.spot_angle = 7.0
+			beam.shadow_enabled = false
+			beam.rotation = Vector3(-0.08, side, 0.0)
+			add_child(beam)
+
+	func _process(delta: float) -> void:
+		rotate_y(delta * 0.9)
+
+
 ## Textured, world-space triplanar stone for structures. Warm colours become sandstone,
 ## neutral ones rock; the colour tints the texture.
 static func surface(color: Color) -> Material:

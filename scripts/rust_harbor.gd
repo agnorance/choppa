@@ -368,6 +368,10 @@ func _breakwater() -> void:
 			_rng.randf() * TAU, _rng.randf_range(0.9, 1.15))
 	MapKit.block(self, Vector3(BREAKWATER_TIP, 1.0, BREAKWATER_Z), Vector3(12.0, 4.0, 12.0), rock)
 	Props.place(self, "lighthouse", Vector3(BREAKWATER_TIP, 3.0, BREAKWATER_Z), 0.0)
+	if MapKit.time_of_day() > 0:
+		var beacon := MapKit.Beacon.new()
+		beacon.position = Vector3(BREAKWATER_TIP, 3.0 + 25.9, BREAKWATER_Z)
+		add_child(beacon)
 
 
 ## The south-west corner: an empty-container depot of tall towers (pillars to circle);
@@ -391,6 +395,7 @@ func _lamp_masts() -> void:
 			Vector2(170.0, -160.0), Vector2(170.0, 100.0), Vector2(240.0, -250.0), Vector2(345.0, -100.0),
 			Vector2(345.0, 60.0), Vector2(230.0, 120.0), Vector2(345.0, 265.0)]:
 		Props.place(self, "lamp_mast", Vector3(at.x, QUAY, at.y), 0.0)
+		MapKit.night_light(self, Vector3(at.x, QUAY + 25.0, at.y), Color(1.0, 0.85, 0.6), 34.0)
 
 
 func _stations_and_spawns() -> void:

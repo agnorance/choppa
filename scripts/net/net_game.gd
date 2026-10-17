@@ -27,7 +27,7 @@ const INTERP_TICKS := 6  ## Others are drawn 100 ms behind the newest snapshot.
 const CORRECT_ABOVE := 0.12  ## Prediction error (see NetCodec.error) worth a correction.
 const MAX_QUEUE := 4  ## Server: inputs buffered per client before it catches up.
 const ROUND_BREAK := 12.0  ## Server: seconds between a round's end and the next.
-const PROTOCOL := 2  ## Raise whenever the wire format changes.
+const PROTOCOL := 3  ## Raise whenever the wire format changes.
 
 enum Role { NONE, SERVER, CLIENT }
 

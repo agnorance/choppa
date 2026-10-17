@@ -270,7 +270,7 @@ func _build() -> void:
 ## Spins the rotors and drives the effects; the body's attitude is the choppa's own
 ## transform now, so the model sits straight on it.
 func update_pose(c: Choppa, delta: float) -> void:
-	var target_rotor := 20.0 + (10.0 if c.is_boosting() else 0.0) + c.velocity.y * 0.3
+	var target_rotor := (20.0 + (10.0 if c.is_boosting() else 0.0) + c.velocity.y * 0.3) * c.spool
 	_rotor_speed = lerpf(_rotor_speed, target_rotor, 1.0 - exp(-3.0 * delta))
 	# A chewed-up main rotor wobbles on its mast; a wrecked tail rotor is gone.
 	var rotor_wear := c.wear(Choppa.Part.ROTOR)
@@ -291,8 +291,13 @@ func update_pose(c: Choppa, delta: float) -> void:
 	# In the cockpit the listener sits right at the rotor and the guns: without this they
 	# play at full volume (owner: "inside is way too loud"). The engine whine stays more.
 	var inside := cockpit_view != null and cockpit_view.reticle.visible
-	_rotor_sound.volume_db = ROTOR_DB + (INSIDE_DB if inside else 0.0)
-	_engine_sound.volume_db = ENGINE_DB + (INSIDE_DB * 0.55 if inside else 0.0)
+	# Spooling up from cold: the turbine whine rises first, the rotor slap follows.
+	var spin := sqrt(c.spool)
+	_rotor_sound.volume_db = ROTOR_DB + (INSIDE_DB if inside else 0.0) + lerpf(-30.0, 0.0, spin)
+	_engine_sound.volume_db = ENGINE_DB + (INSIDE_DB * 0.55 if inside else 0.0) + lerpf(-18.0, 0.0, spin)
+	_engine_sound.pitch_scale *= lerpf(0.45, 1.0, spin)
+	_rotor_sound.stream_paused = not c.alive or c.spool < 0.02
+	_engine_sound.stream_paused = not c.alive or c.spool < 0.02
 	_boost_sound.volume_db = BOOST_DB + (INSIDE_DB if inside else 0.0)
 	var gun_db := (0.0 if own else -3.0) + (INSIDE_DB if inside else 0.0)
 	if c.last_shot_time != _last_shot and c.last_shot_time > _last_shot:
@@ -330,7 +335,7 @@ func update_pose(c: Choppa, delta: float) -> void:
 		trail.emitting = c.is_boosting()
 	_smoke.emitting = c.health < 35.0 or c.wear(Choppa.Part.ENGINE) > 0.5
 	_tail_smoke.emitting = c.wear(Choppa.Part.TAIL) > 0.5
-	_dust.emitting = c.altitude < 14.0
+	_dust.emitting = c.altitude < 14.0 and c.spool > 0.5  # A stopped rotor blows nothing.
 	var ground := c.global_position + Vector3.DOWN * (c.altitude + c.clearance - 0.3)
 	if _dust.emitting:
 		_dust.global_position = ground
@@ -339,7 +344,7 @@ func update_pose(c: Choppa, delta: float) -> void:
 	_downwash.visible = wash > 0.0
 	if _downwash.visible:
 		_downwash.global_position = ground + Vector3.UP * 0.15
-		_downwash_material.set_shader_parameter("power", wash * 0.7)
+		_downwash_material.set_shader_parameter("power", wash * 0.7 * c.lift_share())
 		_downwash_material.set_shader_parameter("tint",
 			Color(0.88, 0.94, 1.0) if c.over_water else Color(0.8, 0.76, 0.66))
 

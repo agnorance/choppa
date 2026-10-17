@@ -40,6 +40,7 @@ func _physics_process(_delta: float) -> void:
 	i.flares = Input.is_action_pressed("flares")
 	i.mine = Input.is_action_pressed("mine")
 	i.smoke = Input.is_action_pressed("smoke")
+	i.engine = Input.is_action_pressed("engine")
 	var gain := Settings.choice("mouse_sensitivity") * MOUSE_GAIN
 	var mouse := _mouse if Settings.flag("mouse_steer") else Vector2.ZERO
 	_mouse = Vector2.ZERO
@@ -47,10 +48,10 @@ func _physics_process(_delta: float) -> void:
 	if choppa.easy:
 		# Drone layout: W/S forward and back, A/D strafe, Q/E and mouse X turn, mouse Y
 		# aims the nose up or down, Space/C (or W/S on the right stick) climb and dive.
-		i.move = Input.get_vector("yaw_left", "yaw_right", "collective_down", "collective_up")
+		i.move = Input.get_vector("strafe_left", "strafe_right", "move_back", "move_forward")
 		i.yaw = Input.get_axis("turn_left", "turn_right")
 		i.collective = Input.get_axis("vertical_down", "vertical_up")
-		i.cyclic = Vector2(0.0, Input.get_axis("pitch_up", "pitch_down"))
+		i.cyclic = Vector2(0.0, Input.get_axis("aim_up", "aim_down"))
 		i.yaw = clampf(i.yaw + mouse.x * gain, -1.0, 1.0)
 		i.cyclic.y = clampf(i.cyclic.y - mouse.y * gain * invert, -1.0, 1.0)
 	else:

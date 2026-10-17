@@ -23,12 +23,12 @@ const COURSE := [
 
 func _init() -> void:
 	spawn_points = [
-		Transform3D(Basis(), Vector3(0.0, 3.0, 90.0)),
-		Transform3D(Basis(), Vector3(-14.0, 3.0, 90.0)),
-		Transform3D(Basis(), Vector3(14.0, 3.0, 90.0)),
-		Transform3D(Basis(), Vector3(-7.0, 3.0, 108.0)),
-		Transform3D(Basis(), Vector3(7.0, 3.0, 108.0)),
-		Transform3D(Basis(), Vector3(-21.0, 3.0, 108.0)),
+		Transform3D(Basis(), Vector3(0.0, 0.0, 90.0)),
+		Transform3D(Basis(), Vector3(-14.0, 0.0, 90.0)),
+		Transform3D(Basis(), Vector3(14.0, 0.0, 90.0)),
+		Transform3D(Basis(), Vector3(-7.0, 0.0, 108.0)),
+		Transform3D(Basis(), Vector3(7.0, 0.0, 108.0)),
+		Transform3D(Basis(), Vector3(-21.0, 0.0, 108.0)),
 	]
 	dummy_posts = [
 		Vector3(-25.0, 10.0, 50.0), Vector3(25.0, 13.0, 45.0), Vector3(0.0, 17.0, 15.0),

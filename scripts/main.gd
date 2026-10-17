@@ -232,7 +232,7 @@ func _pilot_name() -> String:
 
 ## A choppa in the world. Rivals fly a class picked from their name, so a match mixes them.
 func _new_choppa(pilot_name: String, color: Color, at: Transform3D, local := false, airframe := "",
-		camo := "") -> Choppa:
+		camo := "", grounded := true) -> Choppa:
 	var c := Choppa.new()
 	c.local_player = local  # Must be set before _ready: it decides the cockpit and layers.
 	# Rivals wear an earned camo picked from their name.
@@ -242,7 +242,13 @@ func _new_choppa(pilot_name: String, color: Color, at: Transform3D, local := fal
 	c.team_color = color
 	c.max_altitude = map.ceiling
 	add_child(c)
-	c.respawn(at)
+	if not grounded:
+		c.respawn(at)
+	elif _args.has("autopilot") and _args.autopilot != "bot":
+		c.respawn(Transform3D(at.basis, at.origin + Vector3.UP * 8.0))  # Screenshot plans start flying.
+	else:
+		# On the ground; matches start with the engine off, races with it running.
+		c.spawn_on_ground(at, mode != "race")
 	return c
 
 
@@ -346,7 +352,7 @@ func _spawn_dummy(post: Vector3, color: Color) -> void:
 	# Face the player's spawn so they show their good side.
 	var toward := map.spawn_points[0].origin - post
 	var home := Transform3D(Basis(Vector3.UP, atan2(-toward.x, -toward.z)), post)
-	var dummy := _new_choppa("Dummy", color, home)
+	var dummy := _new_choppa("Dummy", color, home, false, "", "", false)
 	dummy.died.connect(func(_killer: Choppa) -> void:
 		get_tree().create_timer(Battle.RESPAWN_DELAY).timeout.connect(dummy.respawn.bind(home)))
 	var pilot := DummyPilot.new()
@@ -531,7 +537,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_camera"):
 		(camera as ChaseCamera).toggle_mode()
 	elif event.is_action_pressed("respawn") and not battle:
-		choppa.respawn(race.respawn_point(choppa) if race else map.spawn_points[0])
+		if race:
+			choppa.respawn(race.respawn_point(choppa))
+		else:
+			choppa.spawn_on_ground(map.spawn_points[0])
 	elif event.is_action_pressed("toggle_help"):
 		hud.toggle_help()
 	elif event.is_action_pressed("pause"):

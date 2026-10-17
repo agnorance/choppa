@@ -16,11 +16,19 @@ var _bindings := {
 	"yaw_right": [KEY_D, KEY_E, [JOY_AXIS_RIGHT_X, 1.0]],
 	"collective_up": [KEY_W, KEY_SPACE, [JOY_AXIS_RIGHT_Y, -1.0]],
 	"collective_down": [KEY_S, KEY_C, [JOY_AXIS_RIGHT_Y, 1.0]],
-	# The easy model reads these instead of sharing A/D and W/S with turning and climbing.
+	# The easy model has its own actions, so no key does two things there: Space/C only
+	# climb and dive (they used to drive forward and back too, owner: "C doesn't go down").
+	"move_forward": [KEY_W, [JOY_AXIS_LEFT_Y, -1.0]],
+	"move_back": [KEY_S, [JOY_AXIS_LEFT_Y, 1.0]],
+	"strafe_left": [KEY_A, [JOY_AXIS_LEFT_X, -1.0]],
+	"strafe_right": [KEY_D, [JOY_AXIS_LEFT_X, 1.0]],
 	"turn_left": [KEY_Q, [JOY_AXIS_RIGHT_X, -1.0]],
 	"turn_right": [KEY_E, [JOY_AXIS_RIGHT_X, 1.0]],
 	"vertical_up": [KEY_SPACE, [JOY_AXIS_RIGHT_Y, -1.0]],
 	"vertical_down": [KEY_C, [JOY_AXIS_RIGHT_Y, 1.0]],
+	"aim_up": [KEY_DOWN],
+	"aim_down": [KEY_UP],
+	"engine": [KEY_I, JOY_BUTTON_DPAD_UP],
 	"boost": [KEY_SHIFT, JOY_BUTTON_LEFT_SHOULDER],
 	"fire": [KEY_CTRL, "mouse:%d" % MOUSE_BUTTON_LEFT, [JOY_AXIS_TRIGGER_RIGHT, 1.0]],
 	"rockets": ["mouse:%d" % MOUSE_BUTTON_RIGHT, [JOY_AXIS_TRIGGER_LEFT, 1.0]],
@@ -60,6 +68,7 @@ static func cheat_sheet(mouse: bool, mouse_yaws := false, easy := false) -> Arra
 		rows.append(["Collective", ["W", "S"]])
 	rows.append_array([
 		["Afterburner", ["Shift"]],
+		["Engine on / off", ["I"]],
 		["Fire", ["LMB", "Ctrl"]],
 		["Rockets", ["RMB"]],
 		["Missile", ["F"]],

@@ -194,7 +194,29 @@ func _rocks_and_trees() -> void:
 
 
 ## Keeps scattered rocks and trees off the camp, the stations and the crossings.
+## Where the choppas start: on dry ground, alternating sides along the canyon.
+func _spawn_spots() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for k in 8:
+		var z := lerpf(-LENGTH * 0.4, LENGTH * 0.4, k / 7.0)
+		var side := 1.0 if k % 2 == 0 else -1.0
+		var at := floor_point(z, 0.4 * side)
+		for spot: Vector3 in _station_spots() + _ammo_spots():  # Not on top of a station.
+			if absf(spot.z - z) < 28.0:
+				z += 28.0 if z < 0.0 else -28.0  # Toward the middle, never past the ends.
+				at = floor_point(z, 0.4 * side)
+		for push: float in [0.5, 0.6, 0.7]:  # Off the river onto the bank.
+			if at.y > RIVER_LEVEL + 0.5:
+				break
+			at = floor_point(z, push * side)
+		out.append(at)
+	return out
+
+
 func _near_feature(at: Vector3) -> bool:
+	for s: Vector3 in _spawn_spots():
+		if Vector2(at.x - s.x, at.z - s.z).length() < 12.0:
+			return true
 	for z: float in [120.0, -60.0, 40.0, -180.0, 260.0, -330.0]:
 		if absf(at.z - z) < (60.0 if z == 120.0 else 14.0):
 			return true
@@ -227,10 +249,8 @@ func _stations_and_spawns() -> void:
 	for at in _ammo_spots():
 		MapKit.station(self, at, _ground, true)
 	# Spawns spread along the canyon, alternating sides, facing up or down it.
-	for k in 8:
-		var z := lerpf(-LENGTH * 0.4, LENGTH * 0.4, k / 7.0)
-		var at := floor_point(z, 0.4 if k % 2 == 0 else -0.4)
-		at.y = maxf(at.y, RIVER_LEVEL) + 10.0
+	for at: Vector3 in _spawn_spots():
+		var z := at.z
 		# Face along the canyon toward the middle (forward is -Z; the canyon runs along z).
 		var toward := -1.0 if z > 0.0 else 1.0
 		var dir := Vector3(_slope(z) * toward, 0.0, toward).normalized()

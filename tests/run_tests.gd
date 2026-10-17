@@ -77,6 +77,10 @@ func _run() -> void:
 		"test_wrecking_a_part_tells_the_shooter_and_shows",
 		"test_loops_loop_and_takes_are_counted",
 		"test_music_crossfades_between_tracks",
+		"test_cold_start_spools_up_before_lift",
+		"test_engine_key_toggles_and_off_sinks",
+		"test_easy_dive_key_only_dives",
+		"test_spawns_are_on_dry_clear_ground",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
 		"test_net_survives_lag_and_loss",
@@ -340,7 +344,7 @@ func test_bot_flies_the_course() -> void:
 	_world.add_child(map)
 	var bot_choppa := Choppa.new()
 	_world.add_child(bot_choppa)
-	bot_choppa.respawn(map.spawn_points[0])
+	bot_choppa.spawn_on_ground(map.spawn_points[0])
 	var race := Race.new()
 	_world.add_child(race)
 	race.setup(map.gates, [bot_choppa], 2)
@@ -373,7 +377,7 @@ func test_four_bots_all_finish() -> void:
 	for n in 4:
 		var c := Choppa.new()
 		_world.add_child(c)
-		c.respawn(map.spawn_points[n])
+		c.spawn_on_ground(map.spawn_points[n])
 		field.append(c)
 	var race := Race.new()
 	_world.add_child(race)
@@ -456,7 +460,7 @@ func test_battle_kills_respawn_and_limit() -> void:
 	_check(battle.respawn_in(b) > 0.0, "victim waits to respawn")
 	battle.tick(Battle.RESPAWN_DELAY + 0.01)
 	_check(b.alive, "victim respawned")
-	_check(b.global_position.distance_to(spawns[1].origin) < 0.1, "respawned far from the killer")
+	_check(b.global_position.distance_to(spawns[1].origin + Vector3.UP * (b.clearance + 0.05)) < 0.1, "respawned far from the killer, skids on the spawn point")
 	_check(battle.standings()[0] == a, "killer leads")
 	b.invulnerable = 0.0
 	b.damage(500.0, a)
@@ -509,7 +513,7 @@ func _bot_battle(map: GameMap) -> void:
 		c.pilot_name = "Bot%d" % n
 		c.max_altitude = map.ceiling
 		_world.add_child(c)
-		c.respawn(map.spawn_points[n * 2])
+		c.spawn_on_ground(map.spawn_points[n * 2], true)  # As in a match: on the ground, engine off.
 		field.append(c)
 	var battle := Battle.new()
 	_world.add_child(battle)
@@ -1463,3 +1467,86 @@ func test_music_crossfades_between_tracks() -> void:
 	for t in 120:
 		await process_frame
 	_check(not Sounds._music.playing, "and stops")
+
+
+## A cold choppa on the ground: no lift without the engine; throttle up starts it, and
+## it only lifts off once the rotor has spooled up.
+func test_cold_start_spools_up_before_lift() -> void:
+	_ground()
+	var c := _choppa(Vector3.ZERO)
+	c.spawn_on_ground(Transform3D(), true)
+	var start := c.global_position.y
+	await _fly(c, 60)
+	_check(not c.engine_on and c.spool == 0.0, "the engine stays off by itself")
+	_check(absf(c.global_position.y - start) < 0.2, "and the choppa sits on its skids")
+	await _fly(c, 60, func(i: PilotInput, _t: int) -> void: i.collective = 1.0)
+	_check(c.engine_on, "throttle up starts the engine")
+	_check(c.global_position.y - start < 0.5, "but one second in, the rotor is still too slow to lift, %.2f m" % (c.global_position.y - start))
+	await _fly(c, 60 * 4, func(i: PilotInput, _t: int) -> void: i.collective = 1.0)
+	_check(c.spool == 1.0 and c.global_position.y - start > 5.0, "spooled up and climbing, %.1f m" % (c.global_position.y - start))
+
+
+## The engine key switches the engine off in the air: you come down. Again: it restarts.
+func test_engine_key_toggles_and_off_sinks() -> void:
+	for easy in [false, true]:
+		var c := _choppa(Vector3(0.0, 80.0, 0.0))
+		c.easy = easy
+		await _fly(c, 30)
+		await _fly(c, 2, func(i: PilotInput, _t: int) -> void: i.engine = true)
+		_check(not c.engine_on, "easy=%s: the key switched it off" % easy)
+		await _fly(c, 60 * 3, func(i: PilotInput, _t: int) -> void: i.engine = false)
+		_check(c.global_position.y < 76.0 and c.velocity.y < -2.0, "easy=%s: coming down, %.1f m at %.1f m/s" % [easy, c.global_position.y, c.velocity.y])
+		await _fly(c, 2, func(i: PilotInput, _t: int) -> void: i.engine = true)
+		_check(c.engine_on, "easy=%s: and on again" % easy)
+		c.free()
+
+
+## Easy model, the real keys: C dives and does nothing else (it used to fly you
+## backwards too, because the forward/back keys shared it).
+func test_easy_dive_key_only_dives() -> void:
+	_ground()
+	var c := Choppa.new()
+	c.easy = true
+	_world.add_child(c)
+	c.respawn(Transform3D(Basis(), Vector3(0.0, 30.0, 0.0)))
+	var pilot := LocalPilot.new()
+	pilot.choppa = c
+	_world.add_child(pilot)
+	for t in 20:
+		await physics_frame
+	Input.action_press("vertical_down")
+	for t in 60:
+		await physics_frame
+	Input.action_release("vertical_down")
+	_check(c.global_position.y < 22.0, "C dives, now at %.1f m" % c.global_position.y)
+	_check(Vector2(c.global_position.x, c.global_position.z).length() < 1.0, "and does not drive anywhere, %s" % c.global_position)
+	pilot.free()
+	c.free()
+
+
+## Every battle map: each spawn point is on the ground, above water, with room for a
+## choppa (no rock, tree or prop in the way).
+func test_spawns_are_on_dry_clear_ground() -> void:
+	for entry: Array in GameMap.catalog():
+		var map := GameMap.create(entry[1])
+		map.mode = "battle"
+		_world.add_child(map)
+		await physics_frame
+		await physics_frame
+		var space := _world.get_world_3d().direct_space_state
+		var ball := SphereShape3D.new()
+		ball.radius = 2.6
+		var bad := []
+		for t: Transform3D in map.spawn_points:
+			var down := PhysicsRayQueryParameters3D.create(t.origin + Vector3.UP * 5.0, t.origin + Vector3.DOWN * 5.0)
+			var hit := space.intersect_ray(down)
+			var query := PhysicsShapeQueryParameters3D.new()
+			query.shape = ball
+			query.transform = Transform3D(Basis(), t.origin + Vector3.UP * 3.2)
+			var blocked := space.intersect_shape(query, 4)
+			if hit.is_empty() or absf((hit.position as Vector3).y - t.origin.y) > 0.6 or (hit.collider as Node).is_in_group("water") \
+					or not blocked.is_empty():
+				bad.append(t.origin)
+		_check(bad.is_empty(), "%s: every spawn on dry, clear ground; bad: %s" % [entry[1], bad])
+		map.free()
+		await physics_frame

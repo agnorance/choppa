@@ -238,6 +238,10 @@ func _process(delta: float) -> void:
 	_loadout_extra.text = "MINE %d   SMOKE %d" % [a.mines, a.smoke]
 	_loadout.add_theme_color_override("font_color", UiKit.DANGER if a.rockets + a.missiles == 0 else UiKit.TEXT)
 	var effects := PackedStringArray()
+	if not choppa.engine_on and choppa.alive:
+		effects.append("ENGINE OFF  ·  I or throttle up")
+	elif choppa.spool < 0.999 and choppa.alive:
+		effects.append("ENGINE START  %d%%" % roundi(choppa.spool * 100.0))
 	var station := _my_station()
 	if station:
 		effects.append("%s  %d%%" % ["REARMING" if station.ammo_only else "SERVICING", roundi(station.progress() * 100.0)])

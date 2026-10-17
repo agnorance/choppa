@@ -17,6 +17,9 @@ func _ready() -> void:
 	process_physics_priority = -10
 
 
+const MIN_ALTITUDE := 4.0
+
+
 func _physics_process(delta: float) -> void:
 	steer(delta)
 
@@ -35,6 +38,16 @@ func steer(delta := 1.0 / 60.0) -> void:
 
 	# Ease off for sharp turns so we don't overshoot the gate.
 	var speed := clampf(1.0 - absf(angle) / 1.4, 0.15, 1.0) * lerpf(0.84, 0.9, skill) * choppa.max_speed
+	# Lining up for a tight gate (a tunnel): slow down while off its line, as a pilot
+	# would; at full speed the heavy model slides wide out of a turn into the rock.
+	var gate := race.next_gate(choppa)
+	if gate.radius < 6.0 and choppa.global_position.distance_to(gate.global_position) < 130.0:
+		var off_line := (choppa.global_position - gate.global_position).slide(gate.global_basis.z.normalized()).length()
+		speed *= clampf(1.0 - (off_line - gate.radius) / 15.0, 0.3, 1.0)
+	# Never skim the ground: climb back to a few metres before anything else.
+	if choppa.altitude < MIN_ALTITUDE:
+		target.y = maxf(target.y, choppa.global_position.y + (MIN_ALTITUDE - choppa.altitude) * 2.0)
+		to = target - choppa.global_position
 	# Pinned against a wall or a tunnel mouth: back off upward for a moment, then try again.
 	if choppa.velocity.length() < 3.0 and distance > 15.0:
 		_stuck += delta

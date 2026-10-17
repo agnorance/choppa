@@ -14,6 +14,7 @@ var missile := false  ## Weapons below fire while held, at most once per their i
 var flares := false
 var mine := false
 var smoke := false
+var engine := false  ## Held: each press switches the engine on or off.
 
 
 func copy_from(other: PilotInput) -> void:
@@ -28,6 +29,7 @@ func copy_from(other: PilotInput) -> void:
 	flares = other.flares
 	mine = other.mine
 	smoke = other.smoke
+	engine = other.engine
 
 
 func clear() -> void:

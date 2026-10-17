@@ -121,11 +121,9 @@ func _ready() -> void:
 	for at: Vector3 in AMMO_STATIONS:
 		MapKit.station(self, at, _ground, true)
 
-	for k in 8:
-		var angle := TAU * k / 8.0 + 0.2
-		var at := Vector3(cos(angle), 0.0, sin(angle)) * 215.0
-		at.y = _ground(at.x, at.z) + 8.0
-		# Face the middle of the arena.
+	for at: Vector3 in _spawn_spots():
+		at.y = _ground(at.x, at.z)
+		# On the ground, facing the middle of the arena.
 		spawn_points.append(Transform3D(Basis(Vector3.UP, atan2(at.x, at.z)), at))
 	for at: Vector3 in [Vector3(-30.0, 18.0, 110.0), Vector3(30.0, 22.0, 100.0), Vector3(0.0, 28.0, 75.0)]:
 		dummy_posts.append(at)
@@ -139,8 +137,22 @@ func _trench_center(z: float) -> float:
 	return -175.0 + sin(z / 55.0) * 18.0
 
 
+## Where the choppas start: on the ground around the arena (kept clear of rocks and trees).
+func _spawn_spots() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	# Angles chosen around the lake (south-east) and the trench (west): spawns sit on
+	# dry, open ground.
+	for degrees: float in [-120.0, -90.0, -60.0, -25.0, 5.0, 85.0, 108.0, 126.0]:
+		var angle := deg_to_rad(degrees)
+		out.append(Vector3(cos(angle), 0.0, sin(angle)) * 205.0)
+	return out
+
+
 func _clear_of_structures(at: Vector3) -> bool:
 	var flat := Vector2(at.x, at.z)
+	for s: Vector3 in _spawn_spots():
+		if flat.distance_to(Vector2(s.x, s.z)) < 12.0:
+			return false
 	for s: Vector3 in AMMO_STATIONS:
 		if flat.distance_to(Vector2(s.x, s.z)) < 14.0:
 			return false

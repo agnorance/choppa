@@ -20,6 +20,10 @@ signal restocked
 
 ## Distance from the body origin to the bottom of the skids.
 const GROUND_CLEARANCE := 1.15
+const SPOOL_UP_TIME := 3.5  ## Seconds from a cold engine to flight rpm.
+const SPOOL_DOWN_TIME := 7.0  ## Rotor run-down after switching off.
+const LIFT_FROM_SPOOL := 0.55  ## Below this share of flight rpm the rotor gives no lift.
+const AUTOROTATION_SINK := 11.0  ## Easy model: how fast you come down with the engine off.
 const BOUNCE_IMPACT := 10.0
 const GRAVITY := 9.81
 
@@ -118,6 +122,11 @@ var airframe := Airframe.SCOUT
 var camo := "factory"  ## Progression.CAMOS id; set before adding the choppa, or model.set_camo().
 var max_health := MAX_HEALTH
 var clearance := GROUND_CLEARANCE  ## Body origin to skid bottom for this airframe.
+## The engine is running or starting; off, the rotor winds down. Matches start cold on
+## the ground (owner: "players should start on the ground", like Wardogs).
+var engine_on := true
+var spool := 1.0  ## Rotor rpm as a share of flight rpm, 0..1. Lift and control follow it.
+var _engine_held := false
 var gun_factor := 1.0  ## Machine-gun damage multiplier of the airframe.
 ## Rounds left: rockets, missiles, flares, mines, smoke. Refilled at service stations.
 var ammo := {"gun": 0, "rockets": 0, "missiles": 0, "flares": 0, "mines": 0, "smoke": 0}
@@ -200,6 +209,7 @@ func step(delta: float) -> void:
 	if locked:
 		i = PilotInput.new()
 
+	_update_engine(i, delta)
 	if not replaying:
 		_update_gun(i, delta)
 		_update_weapons(i, delta)
@@ -227,6 +237,8 @@ func step(delta: float) -> void:
 	if rotor > 0.0:
 		wanted.x += sin(clock * 31.0) * VIBRATION * rotor
 		wanted.z += sin(clock * 23.0 + 1.0) * VIBRATION * rotor
+	var lift := lift_share()
+	wanted *= lift  # No rotor rpm, no control: a parked choppa does not wobble on its skids.
 	rates = rates.move_toward(wanted, angular_accel * delta)
 	var b := (global_transform.basis * Basis.from_euler(rates * delta)).orthonormalized()
 	turn_rate = rates.y
@@ -242,10 +254,12 @@ func step(delta: float) -> void:
 	wanted_thrust *= 1.0 + GROUND_EFFECT * clampf(1.0 - altitude / GROUND_EFFECT_HEIGHT, 0.0, 1.0)
 	wanted_thrust *= 1.0 + TRANSLATIONAL_LIFT * clampf(Vector2(velocity.x, velocity.z).length() / ETL_SPEED, 0.0, 1.0)
 	wanted_thrust *= (1.0 - 0.15 * rotor) * (1.0 - 0.35 * engine)  # Damaged lift and power.
+	# A winding-down rotor still bites a little (autorotation); a cold one does not.
+	wanted_thrust *= lift if engine_on else maxf(lift, 0.55 * spool)
 	_thrust = lerpf(_thrust, wanted_thrust, 1.0 - exp(-delta / thrust_lag))
 	var thrust := _thrust
 	var accel := b.y * thrust + Vector3.DOWN * GRAVITY
-	if is_boosting() and engine < 1.0:
+	if is_boosting() and engine < 1.0 and lift > 0.9:
 		boost_meter = maxf(0.0, boost_meter - boost_drain * delta)
 		accel += forward * afterburner_thrust
 	elif not i.boost:
@@ -273,14 +287,15 @@ func _step_easy(i: PilotInput, delta: float) -> void:
 	var tail := wear(Part.TAIL)
 	var rotor := wear(Part.ROTOR)
 	var engine := wear(Part.ENGINE)
-	var yaw_wish := -i.yaw * turn_speed * (1.0 - 0.75 * tail) - TAIL_TORQUE * tail * tail
+	var lift := lift_share()
+	var yaw_wish := (-i.yaw * turn_speed * (1.0 - 0.75 * tail) - TAIL_TORQUE * tail * tail) * lift
 	turn_rate = move_toward(turn_rate, yaw_wish, turn_accel * delta)
 	heading = wrapf(heading + turn_rate * delta, -PI, PI)
 	_aim = clampf(_aim + i.cyclic.y * aim_rate * delta, -aim_limit, aim_limit)
 	rates = Vector3(0.0, turn_rate, 0.0)
 
-	var boosting := is_boosting() and engine < 1.0
-	var top := max_speed * (1.0 - 0.15 * rotor) * (1.0 - 0.35 * engine)
+	var boosting := is_boosting() and engine < 1.0 and lift > 0.9
+	var top := max_speed * (1.0 - 0.15 * rotor) * (1.0 - 0.35 * engine) * lift
 	if boosting:
 		boost_meter = maxf(0.0, boost_meter - boost_drain * delta)
 		top = boost_speed
@@ -295,6 +310,7 @@ func _step_easy(i: PilotInput, delta: float) -> void:
 	if wish.length_squared() < 0.01 or velocity.length() > top:
 		rate = easy_accel * 0.6
 	var climb := i.collective * climb_speed * (1.0 - 0.35 * engine) - 6.0 * engine * engine
+	climb = lerpf(-AUTOROTATION_SINK, climb, lift)  # Engine off: you come down.
 	var wanted := wish * top + Vector3.UP * climb
 	# Horizontal and vertical ease separately, so a climb does not wait for the run-on to bleed off.
 	var level := Vector3(velocity.x, 0.0, velocity.z).move_toward(Vector3(wanted.x, 0.0, wanted.z), rate * delta)
@@ -316,6 +332,23 @@ func _step_easy(i: PilotInput, delta: float) -> void:
 	_update_altitude()
 	if not replaying:
 		model.update_pose(self, delta)
+
+
+## How much of its lift the rotor can give at the current rpm, 0..1.
+func lift_share() -> float:
+	return smoothstep(LIFT_FROM_SPOOL, 1.0, spool)
+
+
+## The engine key toggles it; on the ground, asking for lift starts it too, so nobody
+## has to know the key to take off. The rotor spools up and runs down over seconds.
+func _update_engine(i: PilotInput, delta: float) -> void:
+	if i.engine and not _engine_held:
+		engine_on = not engine_on
+	_engine_held = i.engine
+	if not engine_on and altitude < 0.8 and (i.collective > 0.3 or i.boost):
+		engine_on = true
+	var target := 1.0 if engine_on else 0.0
+	spool = move_toward(spool, target, delta / (SPOOL_UP_TIME if target > spool else SPOOL_DOWN_TIME))
 
 
 ## Pitch of the nose below the horizon, radians (negative: nose up).
@@ -650,8 +683,20 @@ func _drop(thing: Node3D, offset: Vector3, along_body := false) -> void:
 	thing.reset_physics_interpolation()
 
 
+## Respawn standing on the ground at `at` (a point on the ground), skids down; `cold`
+## with the engine off, as at the start of a match.
+func spawn_on_ground(at: Transform3D, cold := false) -> void:
+	respawn(Transform3D(at.basis, at.origin + Vector3.UP * (clearance + 0.05)))
+	if cold:
+		engine_on = false
+		spool = 0.0
+		_thrust = 0.0
+
+
 func respawn(at: Transform3D) -> void:
 	global_position = at.origin
+	engine_on = true
+	spool = 1.0
 	heading = at.basis.get_euler().y
 	global_transform.basis = Basis(Vector3.UP, heading)
 	velocity = Vector3.ZERO
@@ -747,6 +792,9 @@ func _handle_collisions(before: Vector3) -> void:
 		var braking := exp(-SKID_FRICTION * _tick)
 		velocity.x *= braking
 		velocity.z *= braking
+		# Resting on the skids: the ground takes the weight. Without this the floating body
+		# kept gathering downward speed while parked and had to burn it off before lifting.
+		velocity.y = maxf(velocity.y, 0.0)
 	if impact > BOUNCE_IMPACT and not is_ground:
 		velocity = before.bounce(normal) * 0.45
 		stun = clampf(impact / 60.0, 0.15, 0.5)

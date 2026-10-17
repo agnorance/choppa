@@ -7,7 +7,7 @@ extends RefCounted
 const INPUT_BYTES := 4 + 6 * 4 + 1
 const INPUTS_PER_PACKET := 4  ## Each input packet repeats the last few, so a lost one costs nothing.
 
-const _FLAGS := ["boost", "fire", "rockets", "missile", "flares", "mine", "smoke"]
+const _FLAGS := ["boost", "fire", "rockets", "missile", "flares", "mine", "smoke", "engine"]
 
 
 static func write_input(buf: StreamPeerBuffer, tick: int, i: PilotInput) -> void:
@@ -42,19 +42,19 @@ static func write_choppa(buf: StreamPeerBuffer, c: Choppa) -> void:
 			c.velocity.x, c.velocity.y, c.velocity.z, c.rates.x, c.rates.y, c.rates.z,
 			c.heading, c.turn_rate, c._thrust, c._aim, c.boost_meter, c.stun, c.heat, c._gun_timer,
 			c.decoy_time, c.invulnerable, c.health,
-			c.parts[Choppa.Part.ROTOR], c.parts[Choppa.Part.TAIL], c.parts[Choppa.Part.ENGINE]]:
+			c.parts[Choppa.Part.ROTOR], c.parts[Choppa.Part.TAIL], c.parts[Choppa.Part.ENGINE], c.spool]:
 		buf.put_float(v)
 	buf.put_u16(c.ammo.gun)
 	for weapon: String in ["rockets", "missiles", "flares", "mines", "smoke"]:
 		buf.put_u8(c.ammo[weapon])
 	var flags := (1 if c.alive else 0) | (2 if c.overheated else 0) | (4 if c.input.fire else 0) \
-		| (8 if c.input.boost else 0) | (16 if c.locked else 0)
+		| (8 if c.input.boost else 0) | (16 if c.locked else 0) | (32 if c.engine_on else 0)
 	buf.put_u8(flags)
 
 
 static func read_choppa(buf: StreamPeerBuffer) -> Dictionary:
 	var f := []
-	for k in 27:
+	for k in 28:
 		f.append(buf.get_float())
 	var ammo := {"gun": buf.get_u16()}
 	for weapon: String in ["rockets", "missiles", "flares", "mines", "smoke"]:
@@ -65,9 +65,9 @@ static func read_choppa(buf: StreamPeerBuffer) -> Dictionary:
 		"velocity": Vector3(f[7], f[8], f[9]), "rates": Vector3(f[10], f[11], f[12]),
 		"heading": f[13], "turn_rate": f[14], "thrust": f[15], "aim": f[16], "boost_meter": f[17],
 		"stun": f[18], "heat": f[19], "gun_timer": f[20], "decoy": f[21], "invulnerable": f[22],
-		"health": f[23], "parts": [f[24], f[25], f[26]], "ammo": ammo,
+		"health": f[23], "parts": [f[24], f[25], f[26]], "spool": f[27], "ammo": ammo,
 		"alive": flags & 1 != 0, "overheated": flags & 2 != 0, "fire": flags & 4 != 0,
-		"boost": flags & 8 != 0, "locked": flags & 16 != 0,
+		"boost": flags & 8 != 0, "locked": flags & 16 != 0, "engine_on": flags & 32 != 0,
 	}
 
 
@@ -82,6 +82,8 @@ static func apply_motion(c: Choppa, s: Dictionary) -> void:
 	c._aim = s.aim
 	c.boost_meter = s.boost_meter
 	c.stun = s.stun
+	c.spool = s.spool
+	c.engine_on = s.engine_on
 
 
 ## The server-owned numbers: health, parts, ammo, heat, shields.

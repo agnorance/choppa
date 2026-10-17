@@ -23,7 +23,8 @@ Pick a map in the menu (Mesa Basin, Slot Canyon or Test Range), then:
 - **Free flight:** explore the map with three training dummies to shoot.
 - **Race (test range):** 3 laps through both tunnels against bots. No damage in races.
 
-Esc (or Start) pauses: resume, settings, restart the match,
+Matches start on the ground with the engine off: throttle up or press I to start it
+(I also switches it off in flight). Esc (or Start) pauses: resume, settings, restart the match,
 back to the title.
 
 ## Multiplayer

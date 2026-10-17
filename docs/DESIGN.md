@@ -164,6 +164,18 @@ The realistic model:
 | Item | R | same | X |
 | Camera | V | same | Y |
 
+### Engine and ground starts (owner, 2026-10-17: "like Wardogs")
+
+- Everyone starts a match (and a new online round) on the ground with the engine off.
+  Throttle up (or I) starts it: the rotor spools up over about 3.5 s and lifts from
+  55 % rpm. Respawns after being shot down come back with the engine running.
+- I switches the engine off and on in flight too: the rotor runs down over 7 s and you
+  come down (some autorotation lift in the realistic model). No rpm, no control.
+- Easy model keys are separate from the rest: W/S forward and back, A/D strafe, Q/E or
+  the mouse turn, Space/C climb and dive. (C used to drive backwards as well.)
+- Choppas resting on their skids no longer gather downward speed (they had to burn
+  it off before lifting, and bots skimming the ground were slowed by it).
+
 ### Damage model
 
 Hits land somewhere. Bullets and blasts are attributed to the part of the body they

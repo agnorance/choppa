@@ -14,7 +14,7 @@ var kill_limit := 8
 var time_limit := 300.0
 var time_left := 300.0
 var pilots: Array[Choppa] = []
-var spawn_points: Array[Transform3D] = []
+var spawn_points: Array[Transform3D] = []  ## Points on the ground (Choppa.spawn_on_ground).
 var over := false
 ## False on a network client: scores, respawns and the clock come from the server.
 var authority := true
@@ -80,7 +80,7 @@ func tick(delta: float) -> void:
 		_respawn[choppa] -= delta
 		if _respawn[choppa] <= 0.0:
 			_respawn.erase(choppa)
-			choppa.respawn(best_spawn(choppa))
+			choppa.spawn_on_ground(best_spawn(choppa))  # Engine running: back in the fight.
 			respawned.emit(choppa)
 	if time_left <= 0.0:
 		time_left = 0.0
@@ -119,7 +119,7 @@ func restart() -> void:
 		_score[choppa] = {"kills": 0, "deaths": 0}
 		choppa.locked = false
 		if authority:
-			choppa.respawn(best_spawn(choppa))
+			choppa.spawn_on_ground(best_spawn(choppa), true)  # A new round starts cold.
 	restarted.emit()
 
 

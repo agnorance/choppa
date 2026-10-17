@@ -55,8 +55,7 @@ func _ready() -> void:
 	_home.add_theme_constant_override("separation", 4)
 	root.add_child(_home)
 
-	var title := UiKit.display("CHOPPA", 92)
-	_home.add_child(title)
+	_home.add_child(UiKit.logo(360.0))
 	_home.add_child(UiKit.caption("Get to the choppa!", 16, UiKit.ACCENT))
 	if notice != "":
 		_home.add_child(UiKit.label(notice, 16, UiKit.DANGER))

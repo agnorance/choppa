@@ -119,6 +119,19 @@ static func display(text: String, size := 40, color := TEXT) -> Label:
 	return label(text, size, color, "display")
 
 
+## The CHOPPA wordmark (assets/brand, made by tools/brand/make_brand.py), `width` px wide.
+static func logo(width: float) -> TextureRect:
+	var texture: Texture2D = load("res://assets/brand/logo_wordmark.png")
+	var rect := TextureRect.new()
+	rect.texture = texture
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+	rect.custom_minimum_size = Vector2(width, width * texture.get_height() / texture.get_width())
+	rect.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return rect
+
+
 ## Text drawn straight over the 3D view gets a soft dark outline to stay readable.
 static func outlined(l: Label, strength := 0.75) -> Label:
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, strength))

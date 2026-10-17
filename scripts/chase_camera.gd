@@ -5,6 +5,10 @@ extends Camera3D
 @export var target: Choppa
 @export var first_person := false
 @export var showcase := false  ## Fixed three-quarter front view, for screenshots.
+## Camera moves for recording a video (`--cam=`): "orbit" circles the choppa, "side"
+## tracks it from beside and ahead, "low" watches from the ground, "fp_look" sits in the
+## cockpit and looks slowly round it.
+@export var cinematic := ""
 
 @export var distance := 8.5
 @export var height := 2.6
@@ -21,6 +25,8 @@ var _kick := 0.0  ## Recoil from our own gun: a short punch per round, gone in a
 var _last_shot := -10.0
 var _fov := 70.0  ## The field of view before the recoil punch.
 var look := Vector2.ZERO  ## Free look: yaw (x, left) and pitch (y, up) away from ahead, radians.
+var _cine_time := 0.0
+var _cine_spot := Vector3.INF  ## "low": where the camera stands.
 
 const LOOK_GAIN := 0.004  ## Radians per pixel of mouse travel.
 const LOOK_YAW := 2.6  ## About 150 degrees each way.
@@ -86,7 +92,11 @@ func _process(delta: float) -> void:
 	_kick *= exp(-22.0 * delta)
 	fov = _fov + _kick * 1.1 * Settings.SHAKE_AMOUNTS[Settings.choice("camera_shake")]
 
-	if not InputMap.has_action("free_look") or not Input.is_action_pressed("free_look"):
+	_cine_time += delta
+	if cinematic == "fp_look":
+		# Down at the panel, round to the left, across to the right, back ahead.
+		look = Vector2(sin(_cine_time * 0.45) * 1.1, -0.35 + 0.3 * cos(_cine_time * 0.3))
+	elif not InputMap.has_action("free_look") or not Input.is_action_pressed("free_look"):
 		look = look.lerp(Vector2.ZERO, 1.0 - exp(-8.0 * delta))
 	if target.model.cockpit_view:
 		target.model.cockpit_view.reticle.visible = first_person
@@ -107,6 +117,10 @@ func _process(delta: float) -> void:
 		look_at(body.origin + Vector3.UP * 0.5, Vector3.UP)
 		_apply_shake(delta)
 		return
+	if cinematic in ["orbit", "side", "low"]:
+		_cinematic_move(body, delta)
+		_apply_shake(delta)
+		return
 	var reach: float = Airframe.spec(target.airframe).camera * Settings.CAMERA_DISTANCES[Settings.choice("camera_distance")]
 	# Free look swings the camera round the choppa.
 	var orbit := body.basis * Basis(Vector3.UP, look.x) * Basis(Vector3.RIGHT, -look.y * 0.8)
@@ -123,6 +137,32 @@ func _process(delta: float) -> void:
 	if not global_position.is_equal_approx(focus):
 		look_at(focus, Vector3.UP)
 	_apply_shake(delta)
+
+
+func _cinematic_move(body: Transform3D, delta: float) -> void:
+	var reach: float = Airframe.spec(target.airframe).camera
+	var wanted: Vector3
+	var focus := body.origin + Vector3.UP * 0.8
+	match cinematic:
+		"orbit":
+			var a := _cine_time * 0.35
+			wanted = body.origin + Vector3(sin(a), 0.0, cos(a)) * 11.0 * reach + Vector3.UP * 3.0
+		"side":
+			wanted = body.origin + body.basis * Vector3(9.0 * reach, 1.5, -6.0 * reach)
+			focus = body.origin + body.basis * Vector3(0.0, 0.6, -3.0)
+		_:
+			if _cine_spot == Vector3.INF:
+				var side := body.basis * Vector3(14.0, 0.0, -10.0)
+				_cine_spot = body.origin + side
+				_cine_spot.y = body.origin.y - target.altitude - target.clearance + 0.6
+			wanted = _cine_spot
+	wanted = _avoid_walls(body.origin + Vector3.UP, wanted)
+	if _ready_to_follow:
+		global_position = global_position.lerp(wanted, 1.0 - exp(-3.0 * delta))
+	else:
+		global_position = wanted
+		_ready_to_follow = true
+	look_at(focus, Vector3.UP)
 
 
 func _avoid_walls(from: Vector3, to: Vector3) -> Vector3:

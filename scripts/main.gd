@@ -14,6 +14,8 @@ extends Node
 ##                            "bot" lets the mode's AI fly you
 ##   --spawn=x,y,z[,yaw]      start position, yaw in degrees (free flight)
 ##   --cam=fp|showcase        start in first-person view / a fixed front view of the choppa
+##   --cam=orbit|side|low|fp_look  camera moves for recording a video (ChaseCamera.cinematic)
+##   --clean                  no key overlay, no music (for recording; nothing is saved)
 ##   --shot=<file.png>        save a screenshot after --frames physics ticks and quit
 ##   --frames=<n>             ticks before the screenshot (default 90)
 ##   --dummies=<n>            training targets in free flight (default 3)
@@ -86,6 +88,10 @@ func _ready() -> void:
 	Settings.keep_window = _args.has("shot")
 	Settings.load_once(get_tree())
 	Controls.apply_bindings()  # The player's own keys, now that the settings are read.
+	if _args.has("clean"):  # In memory only: a recording run saves nothing.
+		Settings.set_value("show_controls", false)
+		Settings.set_value("music_volume", 0)
+		Settings.apply(get_tree())
 	_profile_args()
 	var first_start := not started
 	started = true
@@ -201,12 +207,17 @@ func _player_view() -> void:
 	chase.target = choppa
 	chase.first_person = _args.get("cam", "") == "fp" or (not _args.has("cam") and Settings.flag("cockpit_view"))
 	chase.showcase = _args.get("cam", "") == "showcase"
+	if _args.get("cam", "") in ["orbit", "side", "low", "fp_look"]:
+		chase.cinematic = _args.cam
+		chase.first_person = _args.cam == "fp_look"
 	add_child(chase)
 	chase.make_current()
 	camera = chase
 	hud = Hud.new(choppa)
 	hud.camera = camera
 	add_child(hud)
+	if _args.has("clean") and chase.cinematic != "":
+		hud.visible = false  # A camera move for the video: just the picture.
 
 
 func _apply_flight_settings() -> void:
@@ -249,7 +260,7 @@ func _new_choppa(pilot_name: String, color: Color, at: Transform3D, local := fal
 	add_child(c)
 	if not grounded:
 		c.respawn(at)
-	elif _args.has("autopilot") and _args.autopilot != "bot":
+	elif _args.has("autopilot") and not _args.autopilot in ["bot", "takeoff"]:
 		c.respawn(Transform3D(at.basis, at.origin + Vector3.UP * 8.0))  # Screenshot plans start flying.
 	else:
 		# On the ground; matches start with the engine off, races with it running.

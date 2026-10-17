@@ -41,6 +41,8 @@ Godot must be 4.7.2. Two environments:
 | Try a scene | `tools\try.ps1 settings` (no name lists them) | `godot --path . -- --menu --settings=0` |
 | Server | `tools\server.ps1 --map=basin` (then `tools\try.ps1 join`) | `godot --headless --path . -- --server` |
 | Full check | `tools\check.ps1` (tests + every screen into `build\shots\`) | `tools/test.sh` |
+| Demo video | `python tools\make_demo.py` (clips + cut into `build\demo\`, needs ffmpeg) | same |
+| Brand set | `python toolsrand\make_brand.py` (logos, icons, banner into `assetsrand\`) | same |
 
 - Windows scripts find Godot via `$env:GODOT` (path to `Godot_v4.7.2-stable_win64_console.exe`),
   the PATH, or `C:\Tools\Godot\`. Setup: docs/SETUP_WINDOWS.md.

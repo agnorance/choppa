@@ -64,6 +64,17 @@ twist, heavy atmosphere, strong lighting and post-processing.
   launch and motor, missile lock warning in the cockpit, item pickup chime. 3D
   positioned, far sounds lose their highs. To tune on real speakers.
 
+## Brand (2026-10-17, owner: "the logo is quite shitty currently")
+
+`tools/brand/make_brand.py` builds everything into `assets/brand/`: the wordmark
+(CHOPPA in chamfered block letters leaning 12 degrees forward, a level rotor blade
+over the top on a mast out of the O; orange with a light rotor, plus all-light, ink
+and all-orange variants), the mark (the same C under the same rotor on a dark rounded
+tile with an orange keyline: the app icon, `icon.svg`, `icon.ico` for Windows, PNGs 16
+to 1024 px), a lockup, a 1280x640 social banner and the boot splash. Colours: orange
+#FF9E33 (UiKit.ACCENT), ink #121418, light #F0F2F5. Type: Barlow Condensed. The title
+screen shows the wordmark (`UiKit.logo`).
+
 ## UI (decided)
 
 Modern and slick, nothing unnecessary (owner's request after the first build; it

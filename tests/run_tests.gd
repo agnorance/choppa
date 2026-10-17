@@ -96,6 +96,8 @@ func _run() -> void:
 		"test_key_rates_and_ramp",
 		"test_rebinding_keys",
 		"test_every_class_has_its_own_cockpit",
+		"test_takeoff_plan_lifts_off_cold",
+		"test_brand_assets",
 		"test_spawns_are_on_dry_clear_ground",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
@@ -1848,3 +1850,34 @@ func test_every_class_has_its_own_cockpit() -> void:
 		await process_frame
 		_check(cockpit.reticle != null and not cockpit._gauges.is_empty(), "%s: instruments built, %s" % [id, cockpit._gauges.keys()])
 		cockpit.free()
+
+
+## The video's takeoff plan: from the ground, engine off, it starts up and climbs away.
+func test_takeoff_plan_lifts_off_cold() -> void:
+	_ground()
+	var c := Choppa.new()
+	_world.add_child(c)
+	c.spawn_on_ground(Transform3D.IDENTITY, true)
+	c.assists = Choppa.ASSIST_START | Choppa.ASSIST_LEVEL
+	var pilot := ScriptedPilot.new()
+	pilot.choppa = c
+	pilot.plan = "takeoff"
+	_world.add_child(pilot)
+	for t in 50:
+		await physics_frame
+	_check(not c.engine_on, "still for a moment first")
+	for t in 600:
+		await physics_frame
+	_check(c.engine_on and c.altitude > 8.0, "then off the ground and climbing, %.1f m" % c.altitude)
+	pilot.free()
+	c.free()
+
+
+## The brand set is there and the title screen can show the wordmark.
+func test_brand_assets() -> void:
+	for file in ["logo_wordmark.png", "logo_mark_256.png", "logo_lockup.png", "banner.png", "splash.png"]:
+		_check(ResourceLoader.exists("res://assets/brand/" + file), "brand: " + file)
+	_check(FileAccess.file_exists("res://assets/brand/icon.ico"), "brand: the Windows icon")
+	var logo := UiKit.logo(300.0)
+	_check(logo.texture != null and logo.custom_minimum_size.y > 50.0, "the wordmark fits the menu, %s" % logo.custom_minimum_size)
+	logo.free()

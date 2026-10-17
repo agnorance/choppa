@@ -1,8 +1,9 @@
 class_name ScriptedPilot
 extends Node
 ## Canned flight plans for screenshots and smoke tests (`--autopilot=<plan>`).
-## Plans: hover, shoot, forward, boost, roll, flip, pirouette, and weapon:<NAME>
-## (hover, then fire rockets, missile, flares, mine or smoke, e.g. weapon:missile).
+## Plans: hover, shoot, forward, boost, roll, flip, pirouette, takeoff (from the ground
+## with the engine off: a second idle, power up, lift off, climb away), and
+## weapon:<NAME> (hover, then fire rockets, missile, flares, mine or smoke).
 
 const CRUISE_ALTITUDE := 7.0
 
@@ -35,6 +36,14 @@ func _physics_process(_delta: float) -> void:
 			"smoke": i.smoke = on
 	elif plan == "shoot":
 		i.fire = true
+	elif plan == "takeoff":
+		if _tick < 60:
+			return  # Engine off, everything still.
+		want = Vector3(0.0, clampf((16.0 - choppa.altitude) * 0.6, -2.0, 4.0), 0.0)
+		if choppa.altitude > 8.0:
+			want += forward * 8.0
+		if choppa.altitude < 0.8:
+			want.y = 6.0  # Power: the engine starts (auto-start) and spools up.
 	elif plan != "hover":
 		want += forward * 25.0
 	Autopilot.fly(choppa, i, want, pos + forward * 50.0)

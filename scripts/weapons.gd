@@ -26,7 +26,7 @@ static func blast(world: Node, at: Vector3, radius: float, amount: float, owner:
 ## Seeks the target it locked at launch. Flares, or rolling hard as it closes in, shake it off.
 class Missile extends Node3D:
 	const SPEED := 75.0
-	const TURN := 2.6  ## rad/s
+	const TURN := 3.4  ## rad/s: a locked missile hits unless it is shaken off.
 	const LIFETIME := 6.0
 	const DAMAGE := 35.0
 	const RADIUS := 7.0

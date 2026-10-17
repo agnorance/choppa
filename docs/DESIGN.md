@@ -309,7 +309,7 @@ stations**: lit helipads with a mast.
 |---|---|---|
 | Machine gun | 300 / 400 / 500 | 12.5 rounds/s, 4 damage, overheats (see Machine gun). |
 | Rockets | 8 / 14 / 20 | Unguided, fast, 12 damage plus a small blast, hit the part they strike. Alternate pods. |
-| Missiles | 1 / 2 / 3 | Lock on in a 45° cone, chase the target, 35 damage and a big shove. |
+| Missiles | 1 / 2 / 3 | Lock by keeping the target on the nose (8° cone, pitch counts) for 1.2 s, out to 300 m; the lock fades if it slips out (12°) or behind smoke. Fired locked they chase it hard and hit unless shaken off; unlocked they fly straight. 35 damage and a big shove. |
 | Flares | 3 / 2 / 4 | Break every missile lock on you; the missile flies wide. Rolling hard also works. |
 | Mine | 1 | Dropped below, arms after 1 s, 40 damage blast. Good for denying a station. |
 | Smoke | 1 | Cloud for 9 s: nobody inside can lock on or be locked on. |

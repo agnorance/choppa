@@ -110,8 +110,8 @@ func steer(delta: float) -> void:
 		want = _brake_for_walls(want)
 	# Low down, tip the rotor less: a steep bank there puts the blades into the ground.
 	var tilt := lerpf(0.3, Autopilot.MAX_TILT, clampf((choppa.altitude - 3.0) / 10.0, 0.0, 1.0))
-	if landing:
-		tilt = minf(tilt, 0.3)
+	if landing and flat_to_goal < 40.0:
+		tilt = minf(tilt, 0.3)  # Gentle only over the pad: the trip there is at full speed, or it gets shot down on the way.
 	Autopilot.fly(choppa, i, want, look, tilt)
 
 	# Trigger discipline: let the gun cool before it overheats.
@@ -187,7 +187,10 @@ func _station_if_needed(delta: float) -> ServiceStation:
 	if _station and _station.occupant == choppa:
 		return _station  # Already on the pad: stay until it is done.
 	var worn := choppa.wear(Choppa.Part.TAIL) > 0.5 or choppa.wear(Choppa.Part.ENGINE) > 0.5 or choppa.wear(Choppa.Part.ROTOR) > 0.6
-	var dry: bool = choppa.ammo.rockets + choppa.ammo.missiles == 0 or choppa.ammo.gun < choppa.full_ammo("gun") * 0.2
+	# Out of ordnance: the rockets gone (missiles need a lock and often stay), or the
+	# missiles on a class that carries no rockets.
+	var ordnance: int = choppa.ammo.rockets if choppa.full_ammo("rockets") > 0 else choppa.ammo.missiles
+	var dry: bool = ordnance == 0 or choppa.ammo.gun < choppa.full_ammo("gun") * 0.2
 	var hurt := choppa.health < choppa.max_health * 0.65  # Early enough to make it there alive.
 	if not (worn or dry or hurt):
 		_station = null

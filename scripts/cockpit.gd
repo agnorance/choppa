@@ -148,7 +148,7 @@ func _process(delta: float) -> void:
 	for node in choppa.get_tree().get_nodes_in_group("stations"):
 		serviced = serviced or (node as ServiceStation).occupant == choppa
 	_set_lamp("service", serviced and blink)
-	_set_lamp("lock", choppa.ammo.missiles > 0 and choppa.missile_target() != null)
+	_set_lamp("lock", choppa.missile_target() != null or (choppa.lock_progress > 0.0 and blink))  # Blinks while locking.
 	_beacon_light.visible = hunted
 	_warning.stream_paused = not hunted
 	_beacon_dome.emission_energy_multiplier = 4.0 if hunted else 0.2

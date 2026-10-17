@@ -92,8 +92,13 @@ const VIBRATION := 0.9  ## rad/s of shaking with the main rotor wrecked.
 ## Damage each part takes before it is wrecked. The hull is `health`.
 const PART_HEALTH := {Part.ROTOR: 40.0, Part.TAIL: 30.0, Part.ENGINE: 50.0}
 const SPAWN_SHIELD := 2.0  ## Seconds of invulnerability after respawning.
-const MISSILE_CONE := deg_to_rad(45.0)
-const MISSILE_RANGE := 250.0
+## Missile lock (owner, 2026-10-17: "only when looking at the target, it should take some
+## time"): the seeker builds a lock while a target stays inside a narrow cone along the
+## nose, and loses it again when the target slips out of a slightly wider one.
+const LOCK_CONE := deg_to_rad(8.0)
+const LOCK_HOLD_CONE := deg_to_rad(12.0)
+const LOCK_TIME := 1.2  ## Seconds on target for a full lock.
+const MISSILE_RANGE := 300.0
 ## A crash this soon after being shot counts as a kill for whoever shot you.
 const CRASH_CREDIT_TIME := 4.0
 ## Seconds between shots while the trigger is held, per weapon.
@@ -192,6 +197,8 @@ var over_water := false  ## The ground below is water (for spray instead of dust
 ## False on a network client: the server decides damage, repairs and deaths, and the
 ## client only shows what its snapshots say (NetGame).
 var authority := true
+var lock_on: Choppa  ## Who the missile seeker is locking (or has locked); null when nobody.
+var lock_progress := 0.0  ## 0..1; a missile homes only when fired at 1.
 var replaying := false  ## A client re-running inputs after a correction: no shots, no visuals.
 
 
@@ -264,6 +271,7 @@ func step(delta: float) -> void:
 
 	_update_engine(i, delta)
 	if not replaying:
+		_update_lock(delta)
 		_update_gun(i, delta)
 		_update_weapons(i, delta)
 	# Recoil, here rather than in _update_gun so a network replay (which skips the gun)
@@ -453,9 +461,46 @@ func aim_target() -> Choppa:
 	return _target_in_cone(AIM_ASSIST_ANGLE, AIM_ASSIST_RANGE)
 
 
-## Who a missile fired now would chase: a wider cone than the guns.
+## Who a missile fired now would chase: the target of a full lock, or null.
 func missile_target() -> Choppa:
-	return _target_in_cone(MISSILE_CONE, MISSILE_RANGE)
+	return lock_on if lock_progress >= 1.0 and _lockable(lock_on, LOCK_HOLD_CONE) else null
+
+
+## Whether the seeker can hold `other`: alive, in range, inside `cone` of the nose (pitch
+## counts: you have to look at it) and not hidden by smoke.
+func _lockable(other: Choppa, cone: float) -> bool:
+	if other == null or not is_instance_valid(other) or other == self or not other.alive:
+		return false
+	var to := other.global_position - global_position
+	if to.length() > MISSILE_RANGE or to.length() < 1.0 or (-global_transform.basis.z).angle_to(to) > cone:
+		return false
+	return not in_smoke() and not other.in_smoke() and not Weapons.SmokeCloud.screens(get_tree(), global_position,
+		other.global_position)
+
+
+## Builds the missile lock on whoever is nearest the nose, or lets it fade.
+func _update_lock(delta: float) -> void:
+	if ammo.missiles <= 0:
+		lock_on = null
+		lock_progress = 0.0
+		return
+	if not _lockable(lock_on, LOCK_HOLD_CONE):
+		var best: Choppa = null
+		var best_angle := LOCK_CONE
+		for node in get_tree().get_nodes_in_group("choppas"):
+			var other := node as Choppa
+			if _lockable(other, best_angle):
+				best = other
+				best_angle = (-global_transform.basis.z).angle_to(other.global_position - global_position)
+		if best == null:  # Nobody on the nose: the old lock fades out.
+			lock_progress = maxf(0.0, lock_progress - delta * 2.0 / LOCK_TIME)
+			if lock_progress <= 0.0:
+				lock_on = null
+			return
+		if best != lock_on:  # A new target starts from nothing.
+			lock_on = best
+			lock_progress = 0.0
+	lock_progress = minf(1.0, lock_progress + delta / LOCK_TIME)
 
 
 ## Where to shoot from `muzzle` to meet `target`: where it will be when a round gets
@@ -748,7 +793,7 @@ func fire_rocket() -> bool:
 	return true
 
 
-## A homing missile at whoever is in the missile cone, or straight ahead.
+## A homing missile at the locked target, or (without a full lock) straight ahead.
 func fire_missile() -> bool:
 	if not _take("missiles"):
 		return false

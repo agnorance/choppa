@@ -41,6 +41,7 @@ func _run() -> void:
 		"test_battle_time_limit",
 		"test_terrain_collision_matches_mesh",
 		"test_bots_battle_in_arena",
+		"test_lock_needs_the_nose_on_target",
 		"test_missile_homes_and_hits",
 		"test_rolling_hard_shakes_off_missile",
 		"test_mine_arms_then_explodes",
@@ -117,6 +118,8 @@ func _run() -> void:
 		"test_net_leaving_hands_the_seat_to_a_bot",
 		"test_net_rounds_follow_each_other",
 	]:
+		if not OS.get_environment("CHOPPA_TEST").is_empty() and not test.contains(OS.get_environment("CHOPPA_TEST")):
+			continue  # CHOPPA_TEST=<part of a name> runs only the matching tests.
 		_world = Node3D.new()
 		root.add_child(_world)
 		var before := _failures
@@ -671,11 +674,36 @@ func _step_all(field: Array, ticks: int) -> void:
 			c.step(TICK)
 
 
+## Owner: the lock only when looking at the target. Off the nose, or out of sight behind
+## it, nothing locks; turning away loses a lock; no lock, no homing.
+func test_lock_needs_the_nose_on_target() -> void:
+	var shooter := _choppa(Vector3(0.0, 20.0, 0.0))
+	var aside := _choppa(Vector3(60.0, 20.0, -100.0))  # 31 degrees off the nose.
+	await _step_all([shooter, aside], 90)
+	_check(shooter.lock_progress == 0.0 and shooter.missile_target() == null, "nothing locks off the nose: %s %.2f %s" % [
+		shooter.lock_on, shooter.lock_progress, -shooter.global_transform.basis.z])
+	shooter.global_transform.basis = Basis(Vector3.UP, -atan2(60.0, 100.0))  # Turn to face it.
+	shooter.heading = -atan2(60.0, 100.0)
+	await _step_all([shooter, aside], 80)
+	_check(shooter.missile_target() == aside, "locks once looked at")
+	shooter.global_transform.basis = Basis.IDENTITY
+	shooter.heading = 0.0
+	await _step_all([shooter, aside], 40)
+	_check(shooter.missile_target() == null, "the lock goes when it leaves the nose")
+	_check(shooter.fire_missile(), "fired anyway")
+	var missile: Weapons.Missile = _world.get_children().filter(func(n: Node) -> bool: return n is Weapons.Missile)[0]
+	_check(missile.target == null, "without a lock it flies straight")
+
+
 func test_missile_homes_and_hits() -> void:
 	var shooter := _choppa(Vector3(0.0, 20.0, 0.0))
-	# Off to the side and higher: only a homing missile can hit this.
-	var target := _choppa(Vector3(40.0, 35.0, -90.0))
-	_check(shooter.missile_target() == target, "locks on")
+	# A little off the nose and higher: only a homing missile can hit this.
+	var target := _choppa(Vector3(9.0, 28.0, -100.0))
+	_check(shooter.missile_target() == null, "no lock at once")
+	await _step_all([shooter, target], 30)
+	_check(shooter.lock_on == target and shooter.lock_progress > 0.3 and shooter.missile_target() == null, "locking")
+	await _step_all([shooter, target], 50)
+	_check(shooter.missile_target() == target, "locked after %.1f s on target" % Choppa.LOCK_TIME)
 	_check(shooter.fire_missile(), "fired")
 	await _step_all([shooter, target], 150)
 	_check(target.health < Choppa.MAX_HEALTH - 20.0, "missile hit, hp=%f" % target.health)
@@ -685,6 +713,8 @@ func test_missile_homes_and_hits() -> void:
 func test_rolling_hard_shakes_off_missile() -> void:
 	var shooter := _choppa(Vector3(0.0, 20.0, 0.0))
 	var target := _choppa(Vector3(0.0, 20.0, -120.0))
+	await _step_all([shooter, target], 80)
+	_check(shooter.missile_target() == target, "locked")
 	shooter.fire_missile()
 	var missile: Weapons.Missile = _world.get_children().filter(func(n: Node) -> bool: return n is Weapons.Missile)[0]
 	for t in 150:
@@ -1023,6 +1053,7 @@ func test_rocket_hits_the_part_it_strikes() -> void:
 func test_flares_break_a_missile_lock() -> void:
 	var shooter := _choppa(Vector3(0.0, 20.0, 0.0))
 	var target := _choppa(Vector3(0.0, 20.0, -120.0))
+	await _step_all([shooter, target], 80)
 	shooter.fire_missile()
 	await _step_all([shooter, target], 30)
 	var missile: Weapons.Missile = _world.get_children().filter(func(n: Node) -> bool: return n is Weapons.Missile)[0]

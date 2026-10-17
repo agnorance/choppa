@@ -243,14 +243,16 @@ func _draw_crosshair() -> void:
 		return
 	var target := choppa.aim_target()
 	var lock: Choppa = choppa.missile_target() if choppa.ammo.missiles > 0 else null
-	var boxed := target if target else lock  # The guns' target, else the missile's.
+	var building: Choppa = choppa.lock_on if lock == null and choppa.lock_progress > 0.0 else null
+	var boxed := target if target else (lock if lock else building)  # The guns' target, else the seeker's.
 	if boxed != _bracketed:
 		_bracketed = boxed
 		_bracket_time = 0.0
 	# Everything from the interpolated transforms the camera uses, or the symbols shake
 	# against the picture at frame rates above the physics rate.
 	if boxed and not camera.is_position_behind(_smooth(boxed)):
-		_draw_brackets(camera.unproject_position(_smooth(boxed)), boxed, lock == boxed)
+		_draw_brackets(camera.unproject_position(_smooth(boxed)), boxed, lock == boxed,
+			choppa.lock_progress if boxed == choppa.lock_on else 0.0)
 	var cockpit := camera is ChaseCamera and (camera as ChaseCamera).first_person
 	if not cockpit and Settings.flag("hud_flight"):
 		_draw_flight()
@@ -331,25 +333,27 @@ func _draw_pipper(c: Vector2, white: Color) -> void:
 			_line(c + n * (r + 3.0), c + n * (r + 9.0), Color.WHITE, 1.8)
 
 
-func _draw_brackets(at: Vector2, target: Choppa, locked: bool) -> void:
+## Corner brackets on the target, closing in when it is picked up. While the missile seeker
+## builds its lock a thin diamond closes in from far out; locked, it sits tight and red.
+func _draw_brackets(at: Vector2, target: Choppa, locked: bool, progress: float) -> void:
 	_bracket_time += get_process_delta_time()
-	var size := lerpf(48.0, 24.0, smoothstep(0.0, 0.25, _bracket_time))  # Closing in.
+	var size := lerpf(32.0, 17.0, smoothstep(0.0, 0.25, _bracket_time))  # Closing in.
 	var color := UiKit.DANGER if locked else UiKit.ACCENT
-	var leg := size * 0.45
+	var leg := size * 0.4
 	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
 		var p := at + corner * size
-		_line(p, p - Vector2(corner.x, 0.0) * leg, color, 1.6)
-		_line(p, p - Vector2(0.0, corner.y) * leg, color, 1.6)
-	if locked:  # A turning diamond and the word.
-		var a := choppa.clock * 2.5
+		_line(p, p - Vector2(corner.x, 0.0) * leg, color, 1.2)
+		_line(p, p - Vector2(0.0, corner.y) * leg, color, 1.2)
+	if progress > 0.0:
+		var reach := size * (0.8 if locked else lerpf(3.2, 0.8, progress))
 		var pts := PackedVector2Array()
 		for k in 5:
-			pts.append(at + Vector2.from_angle(a + k * PI * 0.5) * (size * 0.62))
-		_crosshair.draw_polyline(pts, Color(0, 0, 0, 0.5), 3.4, true)
-		_crosshair.draw_polyline(pts, color, 1.6, true)
+			pts.append(at + Vector2.from_angle(k * PI * 0.5 - PI * 0.5) * reach)
+		_crosshair.draw_polyline(pts, Color(0, 0, 0, 0.45), 2.8, true)
+		_crosshair.draw_polyline(pts, color if locked else Color(UiKit.ACCENT, 0.5 + 0.5 * progress), 1.1, true)
 	var label := "%s  %d m%s" % [target.pilot_name.to_upper(), roundi(choppa.global_position.distance_to(target.global_position)),
-		"  ·  LOCK" if locked else ""]
-	_text(at + Vector2(0.0, size + 17.0), label, 14, color, HORIZONTAL_ALIGNMENT_CENTER)
+		"  ·  LOCK" if locked else ("  ·  LOCKING" if progress > 0.0 else "")]
+	_text(at + Vector2(0.0, size + 15.0), label, 12, color, HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _smooth(on: Choppa) -> Vector3:

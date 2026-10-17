@@ -1,8 +1,8 @@
-"""Builds the two bigger helicopter classes next to the Little Bird (make_choppa.py):
-assets/models/choppa/gunship.glb and heavy.glb.
+"""Builds the other helicopter classes next to the Little Bird (make_choppa.py):
+assets/models/choppa/gunship.glb, heavy.glb and striker.glb.
 
-Run:     python tools/blender/make_airframes.py [gunship] [heavy]
-Preview: python tools/blender/make_airframes.py --preview DIR [gunship|heavy]
+Run:     python tools/blender/make_airframes.py [gunship] [heavy] [striker]
+Preview: python tools/blender/make_airframes.py --preview DIR [gunship|heavy|striker]
 
 Same conventions as make_choppa.py, whose helpers this reuses: Blender +Y is the nose,
 objects "rotor" and "tail_rotor" spin in the game, empties "eye", "muzzle_l/r",
@@ -15,6 +15,8 @@ material names are the game's (the hull shader paints panels and wear).
 - Heavy: an armoured twin-engine gunship-transport (a Hind in spirit). Bulky body with
   bolted armour plates, troop doors, two big engines with intakes, long stub wings with
   pods, a twin-barrel chin turret, five-blade rotor, wheels. Scale 1.3 of the scout.
+- Striker: a coaxial attack helicopter (Ka-52 in spirit), two stacked counter-rotating
+  rotors and no tail rotor, side-by-side cockpit, twin cannon. Scale 1.15.
 """
 import math
 import os
@@ -325,7 +327,95 @@ def build_heavy():
     empty("exhaust_r", exhausts[1])
 
 
-BUILDS = {"gunship": build_gunship, "heavy": build_heavy}
+# --- the striker -------------------------------------------------------------------
+
+def build_striker():
+    """A coaxial attack helicopter (a Ka-52 in spirit): side-by-side cockpit under a wide
+    canopy, two counter-rotating rotors on one mast and no tail rotor (the game spins
+    "rotor" one way and "rotor_upper" the other; "tail_rotor" is only an empty marking the
+    tail end, for smoke and sparks), twin fins, a twin cannon under the chin, wheels."""
+    fresh()
+    s = 1.15
+    ground = -1.15 * s
+    base.GROUND_Z = ground
+    body = loft("fuselage", [
+        (3.35, 0.1, -0.2, -0.1, -0.3, 2.0, 2.0),
+        (3.0, 0.45, -0.25, 0.25, -0.65, 2.2, 2.4),
+        (2.3, 0.72, -0.2, 0.55, -0.82, 2.5, 2.8),
+        (1.1, 0.78, -0.12, 0.8, -0.86, 2.8, 3.2),
+        (-0.2, 0.74, -0.05, 0.95, -0.8, 2.8, 3.0),
+        (-1.3, 0.6, 0.1, 0.95, -0.55, 2.6, 2.6),
+        (-2.1, 0.38, 0.3, 0.8, -0.15, 2.4, 2.2),
+        (-2.6, 0.24, 0.42, 0.68, 0.18, 2.2, 2.2),
+    ], "paint", count=40)
+    base.HULL.append(body)
+    parts = [body]
+    # Wide side-by-side canopy and its frame.
+    parts.append(ball((0, 2.15, 0.42), 1.0, "glass", scale=(0.7, 1.05, 0.5), segments=32, rings=16))
+    parts.append(ring((0, 1.25, 0.45), (0, 1, 0), 0.62, 0.03, "paint", 28))
+    parts.append(tube([(0, 3.1, 0.05), (0, 2.6, 0.62), (0, 1.9, 0.88), (0, 1.2, 0.9)], 0.03, "paint", 10))
+    for side in (-1, 1):
+        parts.append(box((side * 0.76, 0.7, -0.35), (0.04, 1.6, 0.5), "paint", bevel_width=0.015))
+        parts += rivets((side * 0.79, 0.0, -0.12), (side * 0.79, 1.4, -0.12), 8)
+    # Shoulder engines, the coaxial mast with two hubs, a fairing between them.
+    exhausts = []
+    for side in (-1, 1):
+        p, ex = engine_pod(side, 0.6, 0.4, -1.4, 0.95, 0.27)
+        parts += p
+        exhausts.append(ex)
+    parts.append(cyl((0, -0.3, 0.98), (0, -0.3, 1.42), 0.26, "paint", 24, radius2=0.16, bevel_width=0.02))
+    parts.append(cyl((0, -0.3, 1.42), (0, -0.3, 2.42), 0.08, "metal", 16))
+    parts.append(cyl((0, -0.3, 1.82), (0, -0.3, 2.02), 0.14, "paint", 20, bevel_width=0.02))
+    # Stub wings: rocket pods inboard, missile rails outboard.
+    pods = []
+    for side in (-1, 1):
+        parts.append(stub_wing(side, (0.7, 0.2, -0.1), (2.05, 0.1, -0.2), 0.9, 0.62))
+        parts.append(box((side * 1.35, 0.15, -0.32), (0.06, 0.45, 0.3), "dark", bevel_width=0.015))
+        pod = Vector((side * 1.35, 0.3, -0.6))
+        parts += rocket_pod(pod, 1.25, 0.21)
+        pods.append(pod + Vector((0, 0.68, 0)))
+        parts += missile_rail((side * 1.95, 0.05, -0.38), 1.3)
+        parts.append(ball((side * 2.07, 0.1, -0.18), 0.04, "light_green" if side > 0 else "light_red", segments=10,
+                          rings=5))
+    turret, tips = chin_turret((0, 2.6, -0.82), 2, 1.05)
+    parts += turret
+    # Tail boom with twin fins and a stabiliser; no tail rotor.
+    parts.append(cyl((0, -2.4, 0.5), (0, -6.4, 0.75), 0.24, "paint", 24, radius2=0.12))
+    for k in range(4):
+        t = (k + 0.5) / 4
+        parts.append(ring((0, -2.4 - 4.0 * t, 0.5 + 0.25 * t), (0, 1, 0), 0.24 - 0.12 * t + 0.004, 0.012, "paint", 24))
+    end = Vector((0, -6.2, 0.74))
+    parts.append(wing("stabiliser", (-1.0, end.y + 0.1, end.z), (1.0, end.y + 0.1, end.z), "paint", 0.6, 0.55, 0.1,
+                      count=16, steps=2))
+    for side in (-1, 1):
+        tip_ = end + Vector((side * 1.0, 0.1, 0))
+        parts.append(fin([(0.3, -0.35), (-0.35, -0.3), (-0.55, 0.85), (-0.15, 0.95)], tip_, 0.06))
+        parts.append(ball(tip_ + Vector((0, -0.45, 0.9)), 0.04, "light_red", segments=10, rings=5))
+    # Wheels: two main legs under the wings and a nose wheel.
+    for side in (-1, 1):
+        hub = Vector((side * 0.95, -0.3, ground + 0.28))
+        parts.append(tube([(side * 0.7, -0.3, -0.7), (side * 0.92, -0.3, -0.95), hub], 0.055, "metal", 12))
+        parts += wheel(hub, 0.28, 0.18)
+    nose = Vector((0, 2.3, ground + 0.22))
+    parts.append(tube([(0, 2.3, -0.85), nose], 0.05, "metal", 12))
+    parts += wheel(nose, 0.22, 0.12)
+    body = join(parts, "body")
+    base.activate(body)
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(35))
+    upper = rotor(3, Vector((0, -0.3, 2.42)), 2.42, 1.0)
+    upper.name = "rotor_upper"
+    rotor(3, Vector((0, -0.3, 1.86)), 1.86, 1.0)
+    empty("tail_rotor", (end.x, end.y, end.z))
+    empty("eye", (0, 2.0, 0.62))
+    empty("muzzle_l", tips[0])
+    empty("muzzle_r", tips[-1])
+    empty("pod_l", pods[0])
+    empty("pod_r", pods[1])
+    empty("exhaust_l", exhausts[0])
+    empty("exhaust_r", exhausts[1])
+
+
+BUILDS = {"gunship": build_gunship, "heavy": build_heavy, "striker": build_striker}
 
 
 def export(name):

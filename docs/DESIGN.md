@@ -302,6 +302,11 @@ The classes differ in every system, not only the numbers on the hangar card:
 
 Overheating takes about 6 s for all of them (heat per round scales with the interval).
 
+**Striker** (fourth class, 2026-10-17): a coaxial attack helicopter, Ka-52 in spirit.
+Two counter-rotating rotors and no tail rotor, so a wrecked tail only dulls the yaw and
+never spins it. Quick (1.05x turn, 1.04x speed), hull 125, twin 30 mm (1.5 damage,
+0.096 s), 10 rockets, 2 missiles, 3 flares, engine start 3 s, a lower voice.
+
 ## Maps
 
 Enclosed arenas: cliffs or walls all round that rise above the flight ceiling. Plenty of

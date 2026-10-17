@@ -20,6 +20,7 @@ var cockpit_view: Cockpit  ## Instrumented interior, local player only.
 var _parts: Node3D  ## All meshes, so the spawn shield can blink them.
 var _rotor: Node3D
 var _tail_rotor: Node3D
+var _rotor_upper: Node3D  ## Coaxial classes: the second rotor, turning the other way.
 var _blur_material: StandardMaterial3D
 var _rotor_speed := 0.0
 var _dust: CPUParticles3D
@@ -121,6 +122,7 @@ func _build() -> void:
 			pods.append(_marker(model, "pod_" + side))
 	_rotor = model.find_child("rotor")
 	_tail_rotor = model.find_child("tail_rotor")
+	_rotor_upper = model.find_child("rotor_upper")
 	var eye := _marker(model, "eye")
 
 	var disc := CylinderMesh.new()
@@ -276,6 +278,8 @@ func update_pose(c: Choppa, delta: float) -> void:
 	var rotor_wear := c.wear(Choppa.Part.ROTOR)
 	var wobble := 0.08 * rotor_wear * rotor_wear
 	_rotor.rotation = Vector3(sin(c.clock * 21.0) * wobble, _rotor.rotation.y + _rotor_speed * delta, cos(c.clock * 17.0) * wobble)
+	if _rotor_upper:
+		_rotor_upper.rotation = Vector3(-_rotor.rotation.x, _rotor_upper.rotation.y - _rotor_speed * delta, -_rotor.rotation.z)
 	var tail_gone := c.wear(Choppa.Part.TAIL) >= 1.0
 	_tail_rotor.visible = not tail_gone
 	if not tail_gone:

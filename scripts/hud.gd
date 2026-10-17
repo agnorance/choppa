@@ -143,7 +143,7 @@ func _ready() -> void:
 	var parts_row := HBoxContainer.new()
 	parts_row.add_theme_constant_override("separation", 14)
 	hull_column.add_child(parts_row)
-	for entry: Array in [[Choppa.Part.ROTOR, "Rotor"], [Choppa.Part.TAIL, "Tail rotor"], [Choppa.Part.ENGINE, "Engine"]]:
+	for entry: Array in [[Choppa.Part.ROTOR, "Rotor"], [Choppa.Part.TAIL, "Tail" if choppa.coaxial else "Tail rotor"], [Choppa.Part.ENGINE, "Engine"]]:
 		var lamp := UiKit.outlined(UiKit.caption(entry[1], 12, UiKit.FAINT))
 		parts_row.add_child(lamp)
 		_parts[entry[0]] = lamp
@@ -176,9 +176,9 @@ func _ready() -> void:
 		Sounds.play_ui(self, "hit_marker", -10.0))
 	choppa.wrecked_part.connect(func(target: Choppa, part: Choppa.Part) -> void:
 		Sounds.play_ui(self, "part_hit", -4.0)
-		_show_callout("%s  ·  %s" % [PART_NAMES[part], target.pilot_name.to_upper()], UiKit.ACCENT))
+		_show_callout("%s  ·  %s" % [part_name(part, target), target.pilot_name.to_upper()], UiKit.ACCENT))
 	choppa.part_wrecked.connect(func(part: Choppa.Part, _by: Choppa) -> void:
-		_show_callout("%s DOWN" % PART_NAMES[part], UiKit.DANGER))
+		_show_callout("%s DOWN" % part_name(part, choppa), UiKit.DANGER))
 	choppa.damaged.connect(func(amount: float, _attacker: Choppa) -> void:
 		if Settings.flag("damage_flash"):
 			_vignette.modulate.a = minf(1.0, _vignette.modulate.a + amount / 20.0))
@@ -281,6 +281,13 @@ func _draw_crosshair() -> void:
 		# Hit marker: four short diagonal ticks around the cross.
 		for d: Vector2 in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
 			_crosshair.draw_line(c + d * 9.0, c + d * 17.0, UiKit.TEXT, 2.0, true)
+
+
+## What a part is called on this choppa: a coaxial one has a tail, not a tail rotor.
+static func part_name(part: Choppa.Part, on: Choppa) -> String:
+	if part == Choppa.Part.TAIL and on and on.coaxial:
+		return "TAIL"
+	return PART_NAMES[part]
 
 
 ## A message in the middle of the screen for a moment (e.g. the radio station).

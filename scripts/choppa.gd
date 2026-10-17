@@ -128,6 +128,8 @@ var engine_on := true
 var spool := 1.0  ## Rotor rpm as a share of flight rpm, 0..1. Lift and control follow it.
 var _engine_held := false
 var spool_up_time := SPOOL_UP_TIME  ## Per class (Airframe "spool").
+## Two counter-rotating rotors and no tail rotor: a damaged tail only dulls the yaw.
+var coaxial := false
 var gun_interval := GUN_INTERVAL  ## Seconds between rounds, per class.
 var recoil := GUN_RECOIL  ## Per class.
 var gun_factor := 1.0  ## Machine-gun damage multiplier of the airframe.
@@ -236,7 +238,10 @@ func step(delta: float) -> void:
 	var tail := wear(Part.TAIL)
 	var rotor := wear(Part.ROTOR)
 	var engine := wear(Part.ENGINE)
-	wanted.y = wanted.y * (1.0 - 0.75 * tail) - TAIL_TORQUE * tail * tail * (1.0 + i.collective * collective_range)
+	var torque := 0.0 if coaxial else TAIL_TORQUE  # The coaxial rotors cancel each other.
+	if coaxial:
+		tail *= 0.35
+	wanted.y = wanted.y * (1.0 - 0.75 * tail) - torque * tail * tail * (1.0 + i.collective * collective_range)
 	if rotor > 0.0:
 		wanted.x += sin(clock * 31.0) * VIBRATION * rotor
 		wanted.z += sin(clock * 23.0 + 1.0) * VIBRATION * rotor
@@ -291,7 +296,9 @@ func _step_easy(i: PilotInput, delta: float) -> void:
 	var rotor := wear(Part.ROTOR)
 	var engine := wear(Part.ENGINE)
 	var lift := lift_share()
-	var yaw_wish := (-i.yaw * turn_speed * (1.0 - 0.75 * tail) - TAIL_TORQUE * tail * tail) * lift
+	if coaxial:
+		tail *= 0.35
+	var yaw_wish := (-i.yaw * turn_speed * (1.0 - 0.75 * tail) - (0.0 if coaxial else TAIL_TORQUE) * tail * tail) * lift
 	turn_rate = move_toward(turn_rate, yaw_wish, turn_accel * delta)
 	heading = wrapf(heading + turn_rate * delta, -PI, PI)
 	_aim = clampf(_aim + i.cyclic.y * aim_rate * delta, -aim_limit, aim_limit)
@@ -563,6 +570,7 @@ func set_airframe(id: String) -> void:
 	gun_interval = GUN_INTERVAL * spec.fire
 	recoil = GUN_RECOIL * spec.recoil
 	spool_up_time = spec.spool
+	coaxial = spec.get("coaxial", false)
 	climb_speed = 16.0 * spec.climb
 	collective_range = 0.5 * spec.climb
 	easy_accel = 28.0 * spec.inertia

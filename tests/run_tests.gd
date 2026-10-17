@@ -80,6 +80,7 @@ func _run() -> void:
 		"test_music_crossfades_between_tracks",
 		"test_radio_stations_cycle",
 		"test_classes_feel_apart",
+		"test_coaxial_striker_shrugs_off_tail_hits",
 		"test_cold_start_spools_up_before_lift",
 		"test_engine_key_toggles_and_off_sinks",
 		"test_easy_dive_key_only_dives",
@@ -1601,3 +1602,19 @@ func test_radio_stations_cycle() -> void:
 	_check(seen[-1] == "RADIO  ·  " + Radio.BUILT_IN and seen.has(Radio.OFF), "round the dial and back: %s" % [seen])
 	Settings.set_value("radio_station", saved)
 	Sounds.music(self, "")
+
+
+## A wrecked tail rotor spins a normal choppa round; the coaxial Striker has none to
+## lose and keeps its heading.
+func test_coaxial_striker_shrugs_off_tail_hits() -> void:
+	var spun := {}
+	for id: String in [Airframe.GUNSHIP, Airframe.STRIKER]:
+		var c := _choppa(Vector3(0.0, 50.0, 0.0))
+		c.set_airframe(id)
+		c.parts[Choppa.Part.TAIL] = 0.0
+		var start := c.heading
+		await _fly(c, 120)
+		spun[id] = absf(angle_difference(start, c.heading))
+		c.free()
+	_check(spun.gunship > 1.0, "the gunship spins without its tail rotor, %.2f rad" % spun.gunship)
+	_check(spun.striker < 0.1, "the striker holds its heading, %.2f rad" % spun.striker)

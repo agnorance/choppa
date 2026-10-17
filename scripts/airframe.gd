@@ -7,14 +7,16 @@ extends RefCounted
 const SCOUT := "scout"
 const GUNSHIP := "gunship"
 const HEAVY := "heavy"
-const ORDER := [SCOUT, GUNSHIP, HEAVY]
+const STRIKER := "striker"
+const ORDER := [SCOUT, GUNSHIP, HEAVY, STRIKER]
 
 ## id -> numbers. "rates" scales pitch/roll/yaw rates, "inertia" the angular
 ## acceleration, "speed" level top speed and the afterburner, "climb" climb rate and
 ## power headroom, "size" the collision body, "camera" the chase distance (long tails);
 ## rounds (gun), rockets/missiles/flares are the loadout, "guns" the machine-gun damage
 ## per round, "fire" the time between rounds, "recoil" its kick, "spool" the engine
-## start in seconds, "pitch" how high its rotor, engine and gun sound.
+## start in seconds, "pitch" how high its rotor, engine and gun sound, "coaxial" two
+## counter-rotating rotors and no tail rotor (a tail hit cannot spin it).
 ## The classes are meant to feel apart (owner: "the difference should be feelable"):
 ## the scout darts and buzzes, the heavy wallows, booms and takes its time to start.
 const TABLE := {
@@ -38,6 +40,13 @@ const TABLE := {
 		"rounds": 360, "rockets": 20, "missiles": 3, "flares": 4, "guns": 2.2, "fire": 1.45, "recoil": 1.9,
 		"spool": 5.0, "pitch": 0.8,
 		"blurb": "Armoured and slow to turn. A cannon of a gun; soaks hits, hits back hard.",
+	},
+	STRIKER: {
+		"name": "Striker", "model": "striker", "hull": 125.0, "parts": 1.2,
+		"rates": 1.05, "inertia": 1.1, "thrust_lag": 0.3, "speed": 1.04, "climb": 1.1, "size": 1.05, "camera": 1.1,
+		"rounds": 300, "rockets": 10, "missiles": 2, "flares": 3, "guns": 1.5, "fire": 1.2, "recoil": 1.4,
+		"spool": 3.0, "pitch": 0.92, "coaxial": true,
+		"blurb": "Coaxial rotors, no tail rotor to lose: yaws hard, shrugs off tail hits. Twin 30 mm.",
 	},
 }
 

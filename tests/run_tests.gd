@@ -45,6 +45,7 @@ func _run() -> void:
 		"test_rolling_hard_shakes_off_missile",
 		"test_mine_arms_then_explodes",
 		"test_smoke_blocks_lock_on",
+		"test_guns_lead_a_crossing_target",
 		"test_effects_start_where_placed",
 		"test_grass_only_on_flat_dry_ground",
 		"test_canopy_cracks_follow_damage",
@@ -720,6 +721,43 @@ func test_smoke_blocks_lock_on() -> void:
 	_check(b.in_smoke(), "b is in the cloud")
 	_check(a.aim_target() == null, "can't lock onto a choppa in smoke")
 	_check(b.aim_target() == null, "can't lock from inside smoke")
+	# Owner: "the smoke doesn't really do much". A cloud between two choppas screens them.
+	var c := _choppa(Vector3(200.0, 20.0, 0.0))
+	var d := _choppa(Vector3(200.0, 20.0, -90.0))
+	_check(c.aim_target() == d, "locked across open air")
+	var wall := Weapons.SmokeCloud.new()
+	_world.add_child(wall)
+	wall.global_position = Vector3(200.0, 20.0, -45.0)
+	_check(not c.in_smoke() and not d.in_smoke(), "neither is inside the cloud")
+	_check(c.aim_target() == null and c.missile_target() == null, "no lock through the smoke")
+
+
+## Owner: "when I'm full on target, sometimes I don't hit anything". The guns lead a
+## crossing target, and without a target they cross where the pipper is.
+func test_guns_lead_a_crossing_target() -> void:
+	var shooter := _choppa(Vector3(0.0, 30.0, 0.0))
+	var target := _choppa(Vector3(0.0, 30.0, -120.0))
+	target.velocity = Vector3(30.0, 0.0, 0.0)
+	var muzzle := shooter.global_position
+	var aim := shooter.lead(target, muzzle)
+	_check(aim.x > 8.0 and aim.x < 11.0, "aims ahead of it, where it will be: %s" % aim)
+	var hits := []
+	shooter.scored_hit.connect(func(t: Choppa) -> void: hits.append(t))
+	for t in 60:
+		shooter.input.fire = true
+		await physics_frame
+		shooter.step(TICK)
+		shooter.global_position = Vector3(0.0, 30.0, 0.0)  # Held still: only the gun matters.
+		shooter.velocity = Vector3.ZERO
+		target.global_position += target.velocity * TICK  # Crossing at 30 m/s, by hand.
+	_check(hits.size() >= 6, "hits a crossing target: %d" % hits.size())
+	var gun := _choppa(Vector3(0.0, 30.0, 300.0))
+	gun.aim_assist = false
+	var b := gun.global_transform.basis
+	var muzzle_right := gun.global_position + b * Vector3(1.12, -0.8, -2.35)
+	var cross := Geometry3D.get_closest_point_to_segment(gun.global_position - b.z * Choppa.GUN_CONVERGE,
+		muzzle_right, muzzle_right + (gun.global_position - b.z * Choppa.GUN_CONVERGE - muzzle_right) * 2.0)
+	_check(cross.distance_to(gun.global_position - b.z * Choppa.GUN_CONVERGE) < 0.01, "the guns cross on the nose line")
 
 
 func test_effects_start_where_placed() -> void:
@@ -1549,7 +1587,9 @@ func test_gun_spread_blooms_with_heat() -> void:
 			choppa._shoot()
 		for b: Bullet in _bullets():
 			if b.shooter == choppa:
-				worst = maxf(worst, b.direction.angle_to(-choppa.global_transform.basis.z))
+				# Against the line to where the guns cross, not the nose: they angle in.
+				var cross := choppa.global_position - choppa.global_transform.basis.z * Choppa.GUN_CONVERGE
+				worst = maxf(worst, b.direction.angle_to(cross - b.global_position))
 		spreads.append(worst)
 		for b: Bullet in _bullets():
 			b.free()

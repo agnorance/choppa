@@ -247,18 +247,18 @@ func _draw_crosshair() -> void:
 	if boxed != _bracketed:
 		_bracketed = boxed
 		_bracket_time = 0.0
-	if boxed and not camera.is_position_behind(boxed.global_position):
-		_draw_brackets(camera.unproject_position(boxed.global_position), boxed, lock == boxed)
+	# Everything from the interpolated transforms the camera uses, or the symbols shake
+	# against the picture at frame rates above the physics rate.
+	if boxed and not camera.is_position_behind(_smooth(boxed)):
+		_draw_brackets(camera.unproject_position(_smooth(boxed)), boxed, lock == boxed)
 	var cockpit := camera is ChaseCamera and (camera as ChaseCamera).first_person
 	if not cockpit and Settings.flag("hud_flight"):
 		_draw_flight()
-	var ahead := choppa.global_position - choppa.global_transform.basis.z * 80.0
-	if cockpit:
-		# The sight is collimated: its picture sits at infinity along the boresight, so it
-		# stays put on the world however the head moves (free look swings it away).
-		ahead = camera.global_position - choppa.global_transform.basis.z * 400.0
+	# Where the guns cross on the nose line; on a target the guns snap onto it (and lead it).
+	var body := choppa.get_global_transform_interpolated()
+	var ahead := body.origin - body.basis.z * Choppa.GUN_CONVERGE
 	if target:
-		ahead = target.global_position  # The guns snap onto it.
+		ahead = _smooth(target)
 	if camera.is_position_behind(ahead):
 		return
 	if cockpit:
@@ -350,6 +350,10 @@ func _draw_brackets(at: Vector2, target: Choppa, locked: bool) -> void:
 	var label := "%s  %d m%s" % [target.pilot_name.to_upper(), roundi(choppa.global_position.distance_to(target.global_position)),
 		"  ·  LOCK" if locked else ""]
 	_text(at + Vector2(0.0, size + 17.0), label, 14, color, HORIZONTAL_ALIGNMENT_CENTER)
+
+
+func _smooth(on: Choppa) -> Vector3:
+	return on.get_global_transform_interpolated().origin
 
 
 ## Text on the sight layer with a dark outline, aligned left of, centred on or right of `at`.

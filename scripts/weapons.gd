@@ -375,8 +375,8 @@ class FlarePellet extends Node3D:
 ## A thick cloud. Pilots inside can't see out (no lock-on, dark screen) and can't be
 ## locked onto.
 class SmokeCloud extends Area3D:
-	const RADIUS := 16.0
-	const LIFETIME := 9.0
+	const RADIUS := 24.0
+	const LIFETIME := 12.0
 
 	var _age := 0.0
 	var _puffs: CPUParticles3D
@@ -388,18 +388,19 @@ class SmokeCloud extends Area3D:
 		sphere.radius = RADIUS
 		shape.shape = sphere
 		add_child(shape)
+		# A wall you can't see through: many big, thick puffs filling the whole sphere.
 		_puffs = Effects.puffs(Effects.gradient([
-			Color(0.25, 0.25, 0.28, 0.0), Color(0.22, 0.22, 0.25, 0.85),
-			Color(0.25, 0.25, 0.28, 0.85), Color(0.3, 0.3, 0.32, 0.0),
-		]), 60, 3.0)
+			Color(0.24, 0.24, 0.27, 0.0), Color(0.22, 0.22, 0.25, 0.97),
+			Color(0.25, 0.25, 0.28, 0.97), Color(0.3, 0.3, 0.32, 0.0),
+		]), 170, 4.0)
 		_puffs.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-		_puffs.emission_sphere_radius = RADIUS * 0.7
+		_puffs.emission_sphere_radius = RADIUS * 0.75
 		_puffs.direction = Vector3.UP
 		_puffs.spread = 180.0
-		_puffs.initial_velocity_min = 0.5
-		_puffs.initial_velocity_max = 2.0
-		_puffs.scale_amount_min = 9.0
-		_puffs.scale_amount_max = 14.0
+		_puffs.initial_velocity_min = 0.4
+		_puffs.initial_velocity_max = 1.6
+		_puffs.scale_amount_min = 14.0
+		_puffs.scale_amount_max = 22.0
 		add_child(_puffs)
 		_puffs.emitting = true
 
@@ -413,3 +414,17 @@ class SmokeCloud extends Area3D:
 	## Whether `point` is inside the cloud while it is still thick.
 	func covers(point: Vector3) -> bool:
 		return _age < LIFETIME - 1.5 and point.distance_to(global_position) < RADIUS
+
+	## Whether the line from `a` to `b` runs through the thick of the cloud.
+	func blocks(a: Vector3, b: Vector3) -> bool:
+		if _age >= LIFETIME - 1.5:
+			return false
+		var closest := Geometry3D.get_closest_point_to_segment(global_position, a, b)
+		return closest.distance_to(global_position) < RADIUS * 0.8
+
+	## Whether any cloud stands between `a` and `b`: locks can't see through smoke.
+	static func screens(tree: SceneTree, a: Vector3, b: Vector3) -> bool:
+		for cloud in tree.get_nodes_in_group("smoke"):
+			if (cloud as SmokeCloud).blocks(a, b):
+				return true
+		return false

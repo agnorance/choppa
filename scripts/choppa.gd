@@ -63,7 +63,10 @@ const GUN_BLOOM := 0.022  ## Extra cone at full heat: bursts beat holding the tr
 const GUN_RECOIL := 1.4  ## m/s per second of firing, against the nose: you feel a long burst.
 const AIM_ASSIST_ANGLE := deg_to_rad(12.0)  ## Horizontal cone that snaps bullets.
 const AIM_ASSIST_PITCH := deg_to_rad(35.0)
-const AIM_ASSIST_RANGE := 160.0
+const AIM_ASSIST_RANGE := 200.0  ## Well inside the guns' reach (Bullet.REACH).
+## The guns are set to cross on the nose line this far ahead, where the sight's pipper
+## sits: side-mounted guns firing parallel would pass either side of a target dead ahead.
+const GUN_CONVERGE := 150.0
 const MAX_HEALTH := 100.0
 ## Crashes cost a share of the hull, whatever the class: nothing below CRASH_DAMAGE_FROM
 ## (m/s into the obstacle), all of it at CRASH_LETHAL. 25 m/s into a wall nearly kills.
@@ -455,6 +458,17 @@ func missile_target() -> Choppa:
 	return _target_in_cone(MISSILE_CONE, MISSILE_RANGE)
 
 
+## Where to shoot from `muzzle` to meet `target`: where it will be when a round gets
+## there (rounds fly at Bullet.SPEED plus our speed along the line), so a crossing
+## target is hit, not the air it just left.
+func lead(target: Choppa, muzzle: Vector3) -> Vector3:
+	var at := target.global_position
+	for k in 3:
+		var speed := Bullet.SPEED + maxf(0.0, velocity.dot((at - muzzle).normalized()))
+		at = target.global_position + target.velocity * (muzzle.distance_to(at) / speed)
+	return at
+
+
 ## Whether a smoke cloud hides this choppa (it can't see out, nobody can lock on).
 func in_smoke() -> bool:
 	for cloud in get_tree().get_nodes_in_group("smoke"):
@@ -478,7 +492,8 @@ func _target_in_cone(cone: float, reach: float) -> Choppa:
 		if to.length() > reach or flat.length() < 0.1:
 			continue
 		var angle := forward.angle_to(flat)
-		if angle < best_angle and absf(atan2(to.y, flat.length())) < AIM_ASSIST_PITCH and not other.in_smoke():
+		if angle < best_angle and absf(atan2(to.y, flat.length())) < AIM_ASSIST_PITCH and not other.in_smoke() \
+				and not Weapons.SmokeCloud.screens(get_tree(), global_position, other.global_position):
 			best = other
 			best_angle = angle
 	return best
@@ -850,9 +865,9 @@ func _shoot() -> void:
 	last_shot_side = _gun_side
 	_gun_side = -_gun_side
 	var target := aim_target()
-	var direction := -global_transform.basis.z
+	var direction := (global_position - global_transform.basis.z * GUN_CONVERGE - muzzle).normalized()
 	if target:
-		direction = (target.global_position - muzzle).normalized()
+		direction = (lead(target, muzzle) - muzzle).normalized()
 	# Bloom: the hotter the barrels, the wider the cone. A fixed spiral rather than random
 	# numbers, so server and client agree on every round.
 	_shots += 1

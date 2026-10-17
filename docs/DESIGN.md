@@ -260,15 +260,18 @@ knockback** (25 hits from full health); in races it only pushes. Items are meant
 the big hitters.
 
 - Rapid fire (12.5 rounds/s, 4 damage each), tracers, rounds stopped by walls.
-- **Snappy but heavy** (owner, 2026-10-17): rounds fly at 380 m/s (about 210 m reach),
-  so hits land as you line up. Every round punches the camera (a short kick and FOV
+- **Snappy but heavy** (owner, 2026-10-17): rounds fly at 380 m/s (about 300 m reach),
+  so hits land as you line up. The guns cross on the nose line 150 m ahead, where the
+  pipper sits, and with aim assist they lead the target (owner: "full on target, I
+  don't hit anything": the rounds went where the target had been). Every round punches the camera (a short kick and FOV
   pulse, scaled by the camera shake setting), a long burst rumbles and drags the
   choppa back a little (recoil), and the spread blooms as the barrels heat up (from
   0.2° cold to about 1.4° hot), so bursts beat holding the trigger. Hot barrels smoke.
   The spread is a fixed spiral, not random, so server and clients agree.
 - A belt of rounds per class (Scout 300, Gunship 400, Heavy 500), refilled at stations.
 - Aim assist (setting, **off by default** on desktop): rounds snap to a choppa inside a
-  12° cone ahead (lock ring on the HUD). Bots use it.
+  12° cone ahead, out to 200 m (brackets on the HUD). Bots use it. Smoke (a 24 m cloud
+  for 12 s) hides whoever is inside it and blocks every lock that would look through it.
 - Overheats after ~6 s of continuous fire (owner: 2.3 s was far too soon), then cools down.
 - Rolling hard dodges bullets.
 
@@ -599,6 +602,10 @@ Apex are entitlements the server grants; offline they can only be previewed
     backend (step 3).
 15. **Ranked, store and Apex** on the backend.
 16. Feel pass on the owner's PC throughout; more arenas and battle variants after.
+17. **Cockpit pass, one class at a time** (owner, 2026-10-17, after the cabin rework): a
+    debug session per helicopter. Known: in the Gunship the nose is in the way of the
+    sight, and in general you see too little from inside (sight lines, seat height,
+    frame and panel heights against the exterior).
 
 Every step comes with tests (owner's rule: so we know where something broke).
 

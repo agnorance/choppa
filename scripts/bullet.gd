@@ -4,7 +4,8 @@ extends Node3D
 ## ray-checks each step, so it can't tunnel through thin walls.
 
 const SPEED := 380.0  ## Fast enough that hits land the moment you see them line up.
-const LIFETIME := 0.55  ## About 210 m of reach.
+const LIFETIME := 0.8  ## About 300 m of reach.
+const REACH := SPEED * LIFETIME
 const KNOCKBACK := 1.2  ## Velocity added to the target per hit.
 const DAMAGE := 4.0
 

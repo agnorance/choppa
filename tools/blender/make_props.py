@@ -19,6 +19,10 @@ portal along X that straddles a container row), lamp_mast (a 28 m floodlight mas
 lighthouse (26 m), tetrapod (a 3.5 m breakwater block), tugboat (22 m along X), barge
 (40 x 14 m, deck at z = 3), pipe_rack (30 m along X, pipes at z = 5.5 and 7.6),
 scrap_pile_1 / _2 (heaps of crushed cars, about 12 m across and 6 m high), buoy.
+Battlefield (Mesa Basin, Slot Canyon): wreck_heli (a crashed helicopter on its side,
+11 m), wreck_truck (a burnt-out army truck, 8 m along X), wreck_tank (a tank hull with
+its turret knocked askew, 7 m), radar_station (a 14 m lattice tower with a dish and a
+cabin), sandbags (a 6 m curved sandbag wall).
 
 Materials are named for the game to swap (Props.materials): wood, wood_dark, rust,
 concrete, metal, dark, hazard, decal, glass, corrugated, lamp.
@@ -34,7 +38,7 @@ from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(__file__))
 import make_choppa as base  # noqa: E402
-from make_choppa import ball, box, cyl, join, ring  # noqa: E402
+from make_choppa import ball, box, cyl, join, ring, tube  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "models", "props", "props.glb")
 
@@ -45,6 +49,7 @@ base.PREVIEW.update({
     "container_red": ((0.45, 0.12, 0.08), 0.3, 0.6), "container_blue": ((0.1, 0.22, 0.42), 0.3, 0.6),
     "container_green": ((0.15, 0.3, 0.18), 0.3, 0.6), "container_orange": ((0.62, 0.3, 0.08), 0.3, 0.6),
     "crane": ((0.78, 0.56, 0.08), 0.3, 0.55), "hull_dark": ((0.12, 0.13, 0.14), 0.3, 0.7),
+    "sand": ((0.62, 0.55, 0.4), 0.0, 0.95),
 })
 
 
@@ -608,13 +613,140 @@ def buoy():
     return join(parts, "buoy")
 
 
+def burnt(parts, rng, count, center, spread, size=(0.6, 0.6, 0.05)):
+    """Scorch flakes and bits of debris strewn round a wreck."""
+    for _ in range(count):
+        p = Vector(center) + Vector((rng.uniform(-spread, spread), rng.uniform(-spread, spread), 0.02))
+        parts.append(base.place(box((0, 0, 0), (rng.uniform(0.2, size[0]), rng.uniform(0.2, size[1]), size[2]),
+                                    "dark"), Matrix.Translation(p) @ Matrix.Rotation(rng.uniform(0, 6.3), 4, "Z")))
+
+
+def wreck_heli():
+    """A crashed helicopter lying on its side: the cabin, the boom broken off and lying
+    beside it, blades bent into the ground, burnt patches."""
+    rng = random.Random(5)
+    parts = []
+    tilt = Matrix.Rotation(math.radians(70), 4, "Y")  # Rolled onto its right side.
+    body = cyl((0, 1.6, 0), (0, -1.4, 0), 1.0, "rust", 18, radius2=0.8)
+    nose = ball((0, 1.6, 0), 1.0, "rust", scale=(1, 0.9, 1), segments=16, rings=8)
+    for o in (body, nose):
+        parts.append(base.place(o, Matrix.Translation((0, 0, 0.95)) @ tilt))
+    parts.append(base.place(ball((0, 2.0, 0.4), 0.7, "dark", scale=(0.9, 0.7, 0.6), segments=12, rings=6),
+                            Matrix.Translation((0, 0, 0.95)) @ tilt))  # The burnt-out canopy hole.
+    parts.append(cyl((0.4, -1.6, 0.6), (1.9, -5.8, 0.4), 0.28, "rust", 12, radius2=0.18))  # Broken boom.
+    parts.append(fin_plate((2.0, -5.9, 0.4)))
+    for k, (a, b) in enumerate((((0.6, 0.0, 1.9), (4.6, 2.5, 0.05)), ((0.6, 0.0, 1.9), (-1.0, -3.8, 0.05)),
+                                ((0.6, 0.0, 1.9), (3.2, -2.6, 1.2)))):
+        parts.append(beam(a, b, 0.12 if k else 0.14, "dark"))  # Bent blades, two in the dirt.
+    parts.append(cyl((0.3, 0.0, 1.6), (0.7, 0.0, 2.1), 0.15, "metal", 10))
+    for side in (-1, 1):  # Skids torn loose.
+        parts.append(beam((side * 1.4 + 0.6, 2.2, 0.08), (side * 1.2 + 0.4, -1.5, 0.08), 0.09, "metal"))
+    burnt(parts, rng, 14, (0.5, 0.0, 0), 4.0)
+    return join(parts, "wreck_heli")
+
+
+def fin_plate(at):
+    return box(at, (0.08, 1.0, 1.1), "rust")
+
+
+def wreck_truck():
+    """A burnt-out army truck along X (cab at +X): cab, flat bed with a torn canvas frame,
+    six wheels, one gone."""
+    rng = random.Random(9)
+    parts = [box((2.7, 0, 1.55), (1.9, 2.4, 1.7), "rust", bevel_width=0.06),
+             box((3.62, 0, 1.25), (0.15, 2.3, 0.9), "dark"),  # Grille.
+             box((2.95, 0, 2.05), (0.9, 2.2, 0.7), "dark"),  # Empty windows.
+             box((-0.9, 0, 1.15), (5.4, 2.5, 0.25), "rust"),
+             box((0.0, 0, 0.75), (7.6, 0.9, 0.35), "dark")]
+    for side in (-1, 1):
+        parts.append(box((-0.9, side * 1.22, 1.6), (5.4, 0.08, 0.7), "rust"))
+        for k in range(4):
+            x = -3.4 + k * 1.6
+            parts.append(beam((x, side * 1.2, 1.3), (x + 0.2, side * 1.1, 2.9), 0.06, "metal"))
+        parts.append(beam((-3.4, side * 1.2, 2.9), (1.6, side * 1.1, 2.6), 0.06, "metal"))
+    for x in (2.6, -1.6, -3.0):
+        for side in (-1, 1):
+            if x == -3.0 and side == 1:
+                continue  # Blown off.
+            parts.append(cyl((x, side * 1.05, 0.55), (x, side * 1.4, 0.55), 0.55, "rubber" if rng.random() < 0.5 else "dark", 16))
+    burnt(parts, rng, 10, (0, 0, 0), 4.5)
+    return join(parts, "wreck_truck")
+
+
+def wreck_tank():
+    """A tank hull with its tracks, the turret knocked askew and the gun pointing down."""
+    rng = random.Random(13)
+    parts = [box((0, 0, 1.05), (6.6, 2.6, 1.1), "rust", bevel_width=0.12),
+             box((2.9, 0, 0.9), (1.0, 2.4, 0.9), "rust", rotation=Matrix.Rotation(math.radians(-25), 4, "Y"))]
+    for side in (-1, 1):
+        parts.append(box((0, side * 1.55, 0.6), (6.9, 0.6, 1.0), "dark", bevel_width=0.2))
+        for k in range(6):
+            parts.append(cyl((-2.6 + k * 1.05, side * 1.25, 0.5), (-2.6 + k * 1.05, side * 1.85, 0.5), 0.42, "metal", 14))
+    turret = [cyl((0, 0, 0), (0, 0, 0.8), 1.35, "rust", 20, radius2=1.1), box((-1.2, 0, 0.4), (1.2, 1.8, 0.7), "rust"),
+              cyl((1.2, 0, 0.4), (4.8, 0, 0.4), 0.13, "rust", 10)]
+    m = Matrix.Translation((-0.3, 0.4, 1.55)) @ Matrix.Rotation(0.7, 4, "Z") @ Matrix.Rotation(math.radians(14), 4, "Y")
+    for o in turret:
+        parts.append(base.place(o, m))
+    burnt(parts, rng, 12, (0, 0, 0), 4.5)
+    return join(parts, "wreck_tank")
+
+
+def radar_station():
+    """An old early-warning radar: a lattice tower with a mesh dish and a feed horn, a
+    cabin at its foot with an aerial and a stair."""
+    parts = []
+    parts += lattice_leg((0, 0, 0), (0, 0, 12), 1.6, "metal", bays=6)
+    parts.append(box((0, 0, 12.1), (3.8, 3.8, 0.25), "metal"))
+    for side in (-1, 1):
+        parts.append(beam((side * 1.9, -1.9, 12.25), (side * 1.9, 1.9, 12.25), 0.05, "metal"))
+        parts.append(beam((side * 1.9, -1.9, 13.2), (side * 1.9, 1.9, 13.2), 0.04, "metal"))
+    # The dish: a curved mesh of ribs on a pedestal, tilted up toward the horizon.
+    dish = []
+    focal = 1.6  # A parabolic dish facing +Y: depth = r^2 / (4 f).
+    for k in range(12):
+        phi = k * math.tau / 12
+        dish.append(tube([Vector((r * math.cos(phi), -0.9 + r * r / (4 * focal), r * math.sin(phi) * 0.6))
+                          for r in [0.2 + 3.0 * j / 6 for j in range(7)]], 0.045, "metal", 6))
+    for r in (1.2, 2.2, 3.2):
+        dish.append(tube([Vector((r * math.cos(phi), -0.9 + r * r / (4 * focal), r * math.sin(phi) * 0.6))
+                          for phi in [math.tau * j / 24 for j in range(25)]], 0.04, "metal", 6))
+    dish.append(beam((0, -0.9, 0), (0, 0.7, 0.0), 0.08, "metal"))  # The feed arm and horn at the focus.
+    dish.append(box((0, 0.75, 0.0), (0.3, 0.3, 0.3), "dark"))
+    for o in dish:
+        parts.append(base.place(o, Matrix.Translation((0, 0, 14.4)) @ Matrix.Rotation(math.radians(-12), 4, "X")))
+    parts.append(cyl((0, 0, 12.2), (0, 0, 14.2), 0.35, "dark", 14))
+    parts.append(box((6.0, 1.0, 1.4), (5.0, 3.2, 2.8), "corrugated", bevel_width=0.04))
+    parts.append(box((6.0, 1.0, 2.9), (5.4, 3.6, 0.2), "rust"))
+    parts.append(box((3.48, 1.0, 1.1), (0.05, 0.9, 1.9), "dark"))
+    parts.append(cyl((7.6, 1.8, 3.0), (7.6, 1.8, 8.0), 0.04, "metal", 6))
+    for k in range(10):  # Stair up the tower.
+        z = 0.6 + k * 1.15
+        parts.append(box((1.3, -1.0 + (k % 2) * 2.0, z), (0.9, 0.5, 0.06), "metal"))
+    return join(parts, "radar_station")
+
+
+def sandbags():
+    """A 6 m curved wall of sandbags, three courses high, staggered."""
+    rng = random.Random(21)
+    parts = []
+    for course in range(3):
+        n = 10 - course
+        for k in range(n):
+            a = math.radians(-35 + (k + 0.5 * (course % 2)) * 70 / 10)
+            x, y = math.sin(a) * 5.0, math.cos(a) * 5.0 - 5.0
+            bag = box((0, 0, 0), (0.62, 0.36, 0.24), "sand", bevel_width=0.1)
+            parts.append(base.place(bag, Matrix.Translation((x, y, 0.13 + course * 0.23)) @
+                                    Matrix.Rotation(-a + rng.uniform(-0.08, 0.08), 4, "Z")))
+    return join(parts, "sandbags")
+
+
 BUILDS = [station_pad, pylon, water_tower, headframe, lambda: shack("shack", 5.0), lambda: shack("shack_long", 9.0),
           trestle, fuel_tank, crates,
           lambda: container("container_red", "container_red"), lambda: container("container_blue", "container_blue"),
           lambda: container("container_green", "container_green"), lambda: container("container_orange", "container_orange"),
           gantry_crane, warehouse, ship_hulk, radio_mast, silo, conveyor, rail_wagon, straddle_carrier, lamp_mast,
           lighthouse, tetrapod, tugboat, barge, pipe_rack, lambda: scrap_pile("scrap_pile_1", 3),
-          lambda: scrap_pile("scrap_pile_2", 11), buoy]
+          lambda: scrap_pile("scrap_pile_2", 11), buoy, wreck_heli, wreck_truck, wreck_tank, radar_station, sandbags]
 
 
 def build():
@@ -641,7 +773,7 @@ if __name__ == "__main__":
                  "crates", "container_red", "container_blue", "container_green", "container_orange", "gantry_crane",
                  "warehouse", "ship_hulk", "radio_mast", "silo", "conveyor", "rail_wagon", "straddle_carrier",
                  "lamp_mast", "lighthouse", "tetrapod", "tugboat", "barge", "pipe_rack", "scrap_pile_1", "scrap_pile_2",
-                 "buoy"]
+                 "buoy", "wreck_heli", "wreck_truck", "wreck_tank", "radar_station", "sandbags"]
         only = args[2:]
         for k, name in enumerate(names):
             if only and name not in only:
@@ -649,7 +781,8 @@ if __name__ == "__main__":
             size = {"pylon": 30, "trestle": 34, "headframe": 22, "water_tower": 17, "gantry_crane": 60,
                     "warehouse": 42, "ship_hulk": 75, "radio_mast": 55, "silo": 32, "conveyor": 42,
                     "rail_wagon": 15, "straddle_carrier": 17, "lamp_mast": 30, "lighthouse": 30, "tugboat": 24,
-                    "barge": 42, "pipe_rack": 32, "scrap_pile_1": 14, "scrap_pile_2": 14}.get(name, 13)
+                    "barge": 42, "pipe_rack": 32, "scrap_pile_1": 14, "scrap_pile_2": 14, "wreck_heli": 14,
+                    "radar_station": 20}.get(name, 13)
             base.VIEWS[name] = ((k * 40.0 + size * 1.1, -size * 1.5, size * 0.75), (k * 40.0, -size * 0.1, size * 0.4))
         base.preview(args[1], list(base.VIEWS))
     else:

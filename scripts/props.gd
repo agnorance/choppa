@@ -88,6 +88,7 @@ static func _apply_materials(mi: MeshInstance3D) -> void:
 		_materials.container_orange = _surface(Color(0.66, 0.33, 0.1), 0.35, 0.6)
 		_materials.crane = _surface(Color(0.95, 0.76, 0.12), 0.3, 0.5)
 		_materials.hull_dark = _surface(Color(0.14, 0.15, 0.16), 0.35, 0.7)
+		_materials.sand = _surface(Color(0.6, 0.53, 0.39), 0.0, 0.95)  # Sandbags.
 	for k in mi.mesh.get_surface_count():
 		var source := mi.mesh.surface_get_material(k)
 		var key := source.resource_name if source else "concrete"

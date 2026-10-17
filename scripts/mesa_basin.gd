@@ -16,6 +16,15 @@ const WATER_LEVEL := -2.5
 const REPAIR_PADS: Array[Vector3] = [Vector3(150.0, 0.0, -150.0)]  # Plus the mesa top and the trench.
 const AMMO_PADS: Array[Vector3] = [Vector3(28.8, 0.0, 124.7), Vector3(-28.8, 0.0, -124.7), Vector3(150.0, 0.0, 45.0)]
 ## Tall rock pillars between the arches: cover in the main fighting ring, and a slalom.
+## Remains of an earlier battle: [prop, x, z, yaw]. A radar post with sandbags in the
+## south, a burnt-out convoy across the north, crashed helicopters here and there. Low
+## cover on open ground, and landmarks.
+const BATTLEFIELD := [
+	["radar_station", 70.0, 228.0, 0.6], ["sandbags", 58.0, 212.0, 0.4], ["sandbags", 84.0, 240.0, 3.4],
+	["wreck_truck", -62.0, -212.0, 0.15], ["wreck_tank", -36.0, -219.0, 0.35], ["wreck_truck", 36.0, -216.0, -0.2],
+	["wreck_truck", 62.0, -207.0, 2.9], ["sandbags", 0.0, -234.0, 0.0],
+	["wreck_heli", -228.0, 70.0, 1.0], ["wreck_heli", 95.0, -42.0, 2.4], ["wreck_heli", -108.0, 214.0, 4.1],
+]
 const PILLAR_ANGLES := [47.0, 107.0, 167.0, 227.0, 287.0, 347.0]
 const PILLAR_RADIUS := 118.0
 
@@ -81,6 +90,10 @@ func _ready() -> void:
 		MapKit.rock(self, "hoodoo_%d" % _rng.randi_range(1, 3), at, _rng.randf() * TAU,
 			_rng.randf_range(0.8, 1.2), MapKit.SANDSTONE.lerp(MapKit.ROCK, _rng.randf() * 0.5))
 
+	for entry: Array in BATTLEFIELD:
+		var x: float = entry[1]
+		var z: float = entry[2]
+		Props.place(self, entry[0], Vector3(x, _ground(x, z) - 0.25, z), entry[3])
 	GameMap.report("basin: rocks", t0)
 	# Bridge over the trench.
 	var trench_x := _trench_center(0.0)
@@ -181,6 +194,9 @@ func _clear_of_structures(at: Vector3) -> bool:
 			return false
 	for s: Vector3 in REPAIR_PADS + AMMO_PADS:
 		if flat.distance_to(Vector2(s.x, s.z)) < 14.0:
+			return false
+	for entry: Array in BATTLEFIELD:
+		if flat.distance_to(Vector2(entry[1], entry[2])) < (16.0 if entry[0] == "radar_station" else 10.0):
 			return false
 	for degrees: float in PILLAR_ANGLES:
 		var angle := deg_to_rad(degrees)

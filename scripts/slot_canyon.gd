@@ -19,6 +19,9 @@ var _detail := FastNoiseLite.new()
 var _rng := RandomNumberGenerator.new()
 
 
+var _wrecks: Array[Vector3] = []  ## Where the battlefield wrecks stand (rocks and trees keep off).
+
+
 func _init() -> void:
 	ceiling = 85.0
 	# Above the mining camp, inside the canyon.
@@ -49,6 +52,7 @@ func _ready() -> void:
 
 	_mining_camp()
 	_crossings()
+	_battlefield()
 	_rocks_and_trees()
 	_stations_and_spawns()
 	_winds()
@@ -118,6 +122,18 @@ func _mining_camp() -> void:
 	_place("fuel_tank", Vector3(c - w * 0.15, 0.0, z + 48.0), 0.5)
 	_place("crates", Vector3(c + w * 0.1, 0.0, z - 8.0), 0.0)
 	_place("crates", Vector3(c - w * 0.3, 0.0, z + 8.0), 1.0)
+
+
+## Wrecks on the canyon floor: a convoy caught in the south, crashed helicopters, a
+## sandbag post at the north end. Only on dry ground clear of the other features.
+func _battlefield() -> void:
+	for entry: Array in [["wreck_truck", -200.0, -0.35, 0.2], ["wreck_tank", -214.0, 0.3, 2.8],
+			["wreck_truck", -228.0, -0.1, 0.1], ["wreck_heli", 0.0, -0.45, 1.4], ["wreck_heli", 165.0, 0.45, 3.6],
+			["wreck_truck", 300.0, -0.35, 1.7], ["sandbags", -340.0, 0.4, 0.0], ["sandbags", -345.0, -0.4, 3.1]]:
+		var at := floor_point(entry[1], entry[2])
+		if at.y > RIVER_LEVEL + 0.5 and not _near_feature(at):
+			_wrecks.append(at)
+			_place(entry[0], at, entry[3])
 
 
 func _crossings() -> void:
@@ -214,6 +230,9 @@ func _spawn_spots() -> Array[Vector3]:
 
 
 func _near_feature(at: Vector3) -> bool:
+	for s: Vector3 in _wrecks:
+		if Vector2(at.x - s.x, at.z - s.z).length() < 10.0:
+			return true
 	for s: Vector3 in _spawn_spots():
 		if Vector2(at.x - s.x, at.z - s.z).length() < 12.0:
 			return true

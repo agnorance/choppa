@@ -4,16 +4,15 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dujcghwhp5eds"
 path.s3tc="res://.godot/imported/grass_albedo.png-04a7e4555aae8789132c0bcc887b21de.s3tc.ctex"
-path.etc2="res://.godot/imported/grass_albedo.png-04a7e4555aae8789132c0bcc887b21de.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/grass_albedo.png"
-dest_files=["res://.godot/imported/grass_albedo.png-04a7e4555aae8789132c0bcc887b21de.s3tc.ctex", "res://.godot/imported/grass_albedo.png-04a7e4555aae8789132c0bcc887b21de.etc2.ctex"]
+dest_files=["res://.godot/imported/grass_albedo.png-04a7e4555aae8789132c0bcc887b21de.s3tc.ctex"]
 
 [params]
 

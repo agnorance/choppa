@@ -75,6 +75,11 @@ func _apply_camo() -> void:
 	_tips.set_shader_parameter("paint_metal", 0.9 if camo == "apex" else 0.15)
 
 
+## The Blender model itself (body, rotors), without the effects, discs and cockpit.
+func airframe_model() -> Node3D:
+	return _parts.get_child(0) as Node3D if _parts and _parts.get_child_count() > 0 else self
+
+
 ## Swaps the model for another airframe's (rebuilds everything the model owns).
 func set_airframe(id: String) -> void:
 	if id == airframe:

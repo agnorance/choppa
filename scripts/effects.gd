@@ -491,3 +491,100 @@ class Explosion extends Node3D:
 		_wave_material.set_shader_parameter("strength", 0.04 * (1.0 - w))
 		if _t > 4.5:
 			queue_free()
+
+
+## What is left of a shot-down choppa: its body, charred, tumbling down from where it
+## blew up, then lying on the ground burning and smoking for half a minute before it
+## fades. Purely visual (no collision), so nobody crashes into a wreck they cannot see
+## coming on a network client.
+class Wreck extends Node3D:
+	const LIFETIME := 30.0
+	const BURN_TIME := 22.0
+	const GRAVITY := 14.0
+	var velocity := Vector3.ZERO
+	var spin := Vector3.ZERO  ## rad/s while it falls.
+	var _t := 0.0
+	var _landed := false
+	var _fire: CPUParticles3D
+	var _smoke: CPUParticles3D
+	var _light: OmniLight3D
+	var _charred: StandardMaterial3D
+
+	## Copies the body meshes of `model` (not the rotors: they flew off) in place.
+	func take_from(model: Node3D) -> void:
+		_charred = StandardMaterial3D.new()
+		_charred.albedo_color = Color(0.06, 0.055, 0.05)
+		_charred.roughness = 0.95
+		_charred.metallic = 0.2
+		for node in model.find_children("*", "MeshInstance3D", true, false):
+			var source := node as MeshInstance3D
+			var name := String(source.name)
+			if name.begins_with("rotor") or name.begins_with("tail_rotor") or not source.is_visible_in_tree():
+				continue
+			if source.mesh == null or source.mesh.get_aabb().size.length() < 1.5:
+				continue  # Small bits: glass glints, effect quads.
+			var copy := MeshInstance3D.new()
+			copy.mesh = source.mesh
+			copy.material_override = _charred
+			add_child(copy)
+			copy.transform = global_transform.affine_inverse() * source.global_transform
+
+	func _ready() -> void:
+		_fire = Effects.puffs(Effects.gradient([
+			Color(1.0, 0.85, 0.4, 0.0), Color(1.0, 0.55, 0.15, 0.9), Color(0.8, 0.25, 0.05, 0.6), Color(0.2, 0.2, 0.2, 0.0),
+		]), 50, 0.8)
+		_fire.direction = Vector3.UP
+		_fire.spread = 35.0
+		_fire.initial_velocity_min = 2.0
+		_fire.initial_velocity_max = 5.0
+		_fire.scale_amount_min = 0.8
+		_fire.scale_amount_max = 2.0
+		_fire.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		_fire.emission_sphere_radius = 1.4
+		add_child(_fire)
+		_smoke = Effects.puffs(Effects.gradient([
+			Color(0.1, 0.1, 0.1, 0.0), Color(0.08, 0.08, 0.08, 0.9), Color(0.14, 0.14, 0.14, 0.8), Color(0.3, 0.3, 0.3, 0.0),
+		]), 70, 6.0, true)
+		_smoke.direction = Vector3.UP
+		_smoke.spread = 12.0
+		_smoke.initial_velocity_min = 3.0
+		_smoke.initial_velocity_max = 5.0
+		_smoke.gravity = Vector3(0.6, 1.5, 0.0)  # A column, leaning a little with the wind.
+		_smoke.scale_amount_min = 3.0
+		_smoke.scale_amount_max = 7.0
+		add_child(_smoke)
+		_light = OmniLight3D.new()
+		_light.light_color = Color(1.0, 0.55, 0.2)
+		_light.light_energy = 3.0
+		_light.omni_range = 9.0
+		_light.position = Vector3.UP * 1.5
+		add_child(_light)
+
+	func _physics_process(delta: float) -> void:
+		_t += delta
+		if not _landed:
+			velocity.y -= GRAVITY * delta
+			var step := velocity * delta
+			var query := PhysicsRayQueryParameters3D.create(global_position, global_position + step + Vector3.DOWN * 1.0)
+			var hit := get_world_3d().direct_space_state.intersect_ray(query)
+			if hit and not hit.collider is Choppa:
+				global_position = hit.position + Vector3.UP * 0.6
+				_landed = true
+				# Settle: keep the heading, nose about level, rolled over on a side if it hit
+				# rolling (a wreck does not stand on its nose).
+				var roll := wrapf(rotation.z, -PI, PI)
+				rotation = Vector3(clampf(wrapf(rotation.x, -PI, PI), -0.25, 0.25), rotation.y,
+					clampf(roll, -1.3, 1.3) if absf(roll) > 0.5 else roll * 0.3)
+			else:
+				global_position += step
+				rotation += spin * delta
+		var burning := clampf(1.0 - (_t - BURN_TIME) / 4.0, 0.0, 1.0)
+		_fire.emitting = burning > 0.2
+		_smoke.emitting = _t < LIFETIME - 6.0
+		_light.light_energy = 3.0 * burning * (0.75 + 0.25 * sin(_t * 23.0) * sin(_t * 7.0))
+		if _t > LIFETIME - 3.0:
+			_charred.albedo_color.a = 0.0
+			scale = Vector3.ONE * maxf(0.01, (LIFETIME - _t) / 3.0)  # Sinks away at the end.
+		if _t > LIFETIME:
+			queue_free()
+

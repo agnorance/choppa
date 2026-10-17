@@ -102,6 +102,7 @@ func _run() -> void:
 		"test_class_card_stats",
 		"test_new_camos_are_earned",
 		"test_death_causes",
+		"test_wreck_falls_and_burns",
 		"test_spawns_are_on_dry_clear_ground",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
@@ -1946,3 +1947,24 @@ func test_death_causes() -> void:
 	await _fly(striker, 2)
 	_check(striker.cause == "rotor strike", "blades in a wall: %s" % striker.cause)
 	_check(BattleHud.how_down("") == "", "unknown stays unknown (network clients)")
+
+
+## A shot-down choppa leaves its charred body: it falls, lands, burns, and is gone later.
+func test_wreck_falls_and_burns() -> void:
+	_ground()
+	var c := _choppa(Vector3(0.0, 25.0, 0.0))
+	c.damage(1000.0, null)
+	var wrecks := _world.get_children().filter(func(n: Node) -> bool: return n is Effects.Wreck)
+	_check(wrecks.size() == 1, "one wreck left behind")
+	if wrecks.is_empty():
+		return
+	var wreck: Effects.Wreck = wrecks[0]
+	_check(wreck.get_child_count() > 3, "it has the body's meshes, %d children" % wreck.get_child_count())
+	for t in 240:
+		await physics_frame
+	_check(wreck._landed and wreck.global_position.y < 3.0, "it came down, y=%.1f" % wreck.global_position.y)
+	_check(wreck._fire.emitting, "and burns")
+	wreck._t = Effects.Wreck.LIFETIME
+	await physics_frame
+	await physics_frame
+	_check(not is_instance_valid(wreck), "gone once it burned out")

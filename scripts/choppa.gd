@@ -669,7 +669,16 @@ func _die(killer: Choppa) -> void:
 func _wreck() -> void:
 	alive = false
 	health = 0.0
+	var falling := velocity
 	velocity = Vector3.ZERO
+	if model.visible or model.is_inside_tree():
+		# What is left falls on and burns where it lands.
+		var wreck := Effects.Wreck.new()
+		get_parent().add_child(wreck)
+		wreck.global_transform = global_transform
+		wreck.take_from(model.airframe_model())
+		wreck.velocity = falling * 0.5 + Vector3.UP * 4.0
+		wreck.spin = Vector3(randf_range(-1.5, 1.5), randf_range(-2.0, 2.0), randf_range(-2.5, 2.5))
 	model.visible = false
 	_shape.set_deferred("disabled", true)
 	var boom := Effects.Explosion.new()

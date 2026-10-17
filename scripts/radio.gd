@@ -61,11 +61,17 @@ static func _play_track(tree: SceneTree, station: Dictionary) -> void:
 	var s: AudioStream = load(path)
 	var looping := tracks.size() == 1 and path.get_file().begins_with("music_")
 	_set_loop(s, looping)
-	Sounds.play_music(tree, "radio:" + path, s, func() -> void:
-		# A track ended: the next one on the same station.
-		if current() == station:
-			_track += 1
-			_play_track(tree, station))
+	# A plain static method, not a lambda: a lambda kept in a static var (its captures
+	# with it) crashed the engine on quit.
+	Sounds.play_music(tree, "radio:" + path, s, Radio._track_ended.bind(tree, station.name))
+
+
+## A track ended: the next one on the same station, if it is still tuned in.
+static func _track_ended(tree: SceneTree, station_name: String) -> void:
+	var station := current()
+	if station.name == station_name:
+		_track += 1
+		_play_track(tree, station)
 
 
 static func _set_loop(s: AudioStream, looping: bool) -> void:

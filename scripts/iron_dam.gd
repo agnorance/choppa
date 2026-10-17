@@ -17,6 +17,7 @@ const CREST := 60.0  ## The dam's top.
 const DAM_HALF := 14.0  ## Half the dam's thickness at the base (the top is thinner).
 const OPENINGS := [-55.0, 0.0, 55.0]  ## x of the spillway openings, 18 m wide, 40..52 m up.
 const STATION_ROOF := 25.0
+const VIADUCT_Z := 228.0
 
 var terrain: Terrain
 var _noise := FastNoiseLite.new()
@@ -53,6 +54,7 @@ func _ready() -> void:
 	_power_station()
 	_lines()
 	_reservoir()
+	_viaduct()
 	_valley()
 	_stations_and_spawns()
 	GameMap.report("dam: built", t0)
@@ -233,6 +235,23 @@ func _lines() -> void:
 	Hazards.power_line(self, across)
 
 
+## An old railway viaduct across the valley: a deck 30 m up on piers 50 m apart, to fly
+## under at speed or hide behind. The river runs under its middle arch.
+func _viaduct() -> void:
+	var stone := Color(0.52, 0.48, 0.42)
+	var w := half_width(VIADUCT_Z) + 20.0
+	MapKit.block(self, Vector3(0.0, 30.0, VIADUCT_Z), Vector3(w * 2.0, 3.0, 9.0), stone)
+	for side in [-1.0, 1.0]:
+		MapKit.block(self, Vector3(0.0, 32.2, VIADUCT_Z + side * 4.2), Vector3(w * 2.0, 1.4, 0.6), stone.darkened(0.1))
+	for x: float in [-100.0, -50.0, 50.0, 100.0]:
+		var g := _ground(x, VIADUCT_Z)
+		MapKit.block(self, Vector3(x, (g + 28.5) * 0.5, VIADUCT_Z), Vector3(7.0, 28.5 - g + 1.0, 8.0), stone)
+		MapKit.block(self, Vector3(x, 27.0, VIADUCT_Z), Vector3(10.0, 2.0, 9.0), stone.darkened(0.08))  # Caps.
+	for k in 8:  # Rails and sleepers along the deck.
+		MapKit.block(self, Vector3(-w + 10.0 + k * w * 2.0 / 8.0, 31.6, VIADUCT_Z), Vector3(w * 2.0 / 8.0 - 4.0, 0.2, 2.6),
+			Color(0.25, 0.22, 0.2))
+
+
 ## Drowned trees standing out of the reservoir, rock islands, pines on the terraces.
 func _reservoir() -> void:
 	var placed := 0
@@ -246,6 +265,9 @@ func _reservoir() -> void:
 	for at: Vector2 in [Vector2(-30.0, -120.0), Vector2(40.0, -200.0), Vector2(-10.0, -280.0), Vector2(55.0, -90.0)]:
 		MapKit.rock(self, "boulder_%d" % _rng.randi_range(1, 4), Vector3(at.x, WATER - 6.0, at.y), _rng.randf() * TAU,
 			_rng.randf_range(5.0, 8.0), MapKit.ROCK)
+	# Rock spires rising out of the lake: tall cover over open water.
+	for spec: Array in [[-50.0, -160.0, 2, 1.5], [62.0, -255.0, 1, 1.6], [10.0, -330.0, 3, 1.4]]:
+		MapKit.rock(self, "hoodoo_%d" % spec[2], Vector3(spec[0], 20.0, spec[1]), spec[0] * 0.1, spec[3], MapKit.ROCK)
 
 
 ## The river valley: a ruined hamlet, wrecks, boulders, pines on the banks.
@@ -282,7 +304,7 @@ func _clear(at: Vector3) -> bool:
 			Vector2(-40.0, 290.0), Vector2(-64.0, 168.0), Vector2(70.0, 300.0)]:
 		if flat.distance_to(p) < 14.0:
 			return false
-	return absf(at.z - 150.0) > 12.0  # Under the line across the valley.
+	return absf(at.z - 150.0) > 12.0 and absf(at.z - VIADUCT_Z) > 12.0  # Under the lines and the viaduct.
 
 
 func _spawn_spots() -> Array[Vector3]:
@@ -301,7 +323,7 @@ func _spawn_spots() -> Array[Vector3]:
 ## rest ammo.
 func _pad_spots() -> Array[Vector3]:
 	return [Vector3(0.0, 0.0, 0.0), Vector3(0.0, 0.0, 52.0), Vector3(-75.0, 0.0, 0.0),
-		Vector3(0.86 * half_width(-215.0), 0.0, -215.0), Vector3(0.0, 0.0, 240.0)]
+		Vector3(0.86 * half_width(-215.0), 0.0, -215.0), Vector3(0.0, 0.0, 262.0)]
 
 
 func _stations_and_spawns() -> void:

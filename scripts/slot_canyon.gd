@@ -52,6 +52,7 @@ func _ready() -> void:
 
 	_mining_camp()
 	_crossings()
+	_spans()
 	_battlefield()
 	_rocks_and_trees()
 	_stations_and_spawns()
@@ -130,6 +131,21 @@ func _mining_camp() -> void:
 
 ## Wrecks on the canyon floor: a convoy caught in the south, crashed helicopters, a
 ## sandbag post at the north end. Only on dry ground clear of the other features.
+## Rock arches fallen across the canyon at its narrows, [z, size]: fly under at speed or
+## climb over and lose the guy behind you.
+const SPANS := [[220.0, 1.45], [-300.0, 1.4], [-130.0, 1.75]]
+
+
+func _spans() -> void:
+	for entry: Array in SPANS:
+		var z: float = entry[0]
+		var slope := (center_x(z + 1.0) - center_x(z - 1.0)) * 0.5
+		var x := center_x(z)
+		var floor_y := minf(_ground(x - half_width(z) * 0.6, z), _ground(x + half_width(z) * 0.6, z))
+		MapKit.rock(self, "arch_%d" % (1 + int(absf(z)) % 2), Vector3(x, floor_y - 3.0, z), atan(slope), entry[1],
+			MapKit.SANDSTONE.lerp(MapKit.ROCK, 0.3))
+
+
 func _battlefield() -> void:
 	for entry: Array in [["wreck_truck", -200.0, -0.35, 0.2], ["wreck_tank", -214.0, 0.3, 2.8],
 			["wreck_truck", -228.0, -0.1, 0.1], ["wreck_heli", 0.0, -0.45, 1.4], ["wreck_heli", 165.0, 0.45, 3.6],
@@ -242,7 +258,7 @@ func _near_feature(at: Vector3) -> bool:
 	for s: Vector3 in _spawn_spots():
 		if Vector2(at.x - s.x, at.z - s.z).length() < 12.0:
 			return true
-	for z: float in [120.0, -60.0, 40.0, -180.0, 260.0, -330.0]:
+	for z: float in [120.0, -60.0, 40.0, -180.0, 260.0, -330.0, 220.0, -300.0, -130.0]:
 		if absf(at.z - z) < (60.0 if z == 120.0 else 14.0):
 			return true
 	for s: Vector3 in _station_spots() + _ammo_spots() + _pillar_spots():

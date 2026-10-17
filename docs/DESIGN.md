@@ -406,6 +406,15 @@ High: eight silos, fifteen floodlight masts, a lighthouse, a tall empty-containe
 depot in the south-west, a freighter in dry dock. The basin got a second freighter,
 four tugs, two container barges and a buoy line: the fast, exposed way across.
 
+### Big cover (2026-10-17, owner: "bigger structures... to fly through or hide behind")
+
+Mesa Basin: two giant natural arches (80 m across, 40 high), one standing in the lake,
+one in the hoodoo field, and three clusters of rock towers in the open. Slot Canyon:
+three rock arches fallen across its narrows, to fly under or climb over. Iron Dam: an
+old railway viaduct across the valley, its deck 30 m up on piers 50 m apart, and rock
+spires rising out of the reservoir. All of it breaks line of sight (and missile locks)
+and gives a fight something to turn around.
+
 ### Iron Dam (2026-10-17)
 
 A river valley shut by a 57 m concrete dam. North: the reservoir, its water 38 m up

@@ -25,6 +25,12 @@ const BATTLEFIELD := [
 	["wreck_truck", 62.0, -207.0, 2.9], ["sandbags", 0.0, -234.0, 0.0],
 	["wreck_heli", -228.0, 70.0, 1.0], ["wreck_heli", 95.0, -42.0, 2.4], ["wreck_heli", -108.0, 214.0, 4.1],
 ]
+## Giant natural arches out on the plains, [x, z, yaw, size]: one standing in the lake,
+## one in the hoodoo field. 80 m across and 40 high, they break missile locks, give a
+## pass to thread at speed and something to circle in a dogfight.
+const GIANT_ARCHES := [[118.0, 122.0, -0.8, 1.8], [96.0, -160.0, 0.5, 1.7]]
+## Towers of rock in clusters, [x, z]: tall cover in the open south and east.
+const SPIRE_CLUSTERS := [[40.0, 160.0], [200.0, -40.0], [-190.0, -60.0]]
 const PILLAR_ANGLES := [47.0, 107.0, 167.0, 227.0, 287.0, 347.0]
 const PILLAR_RADIUS := 118.0
 
@@ -90,6 +96,18 @@ func _ready() -> void:
 		MapKit.rock(self, "hoodoo_%d" % _rng.randi_range(1, 3), at, _rng.randf() * TAU,
 			_rng.randf_range(0.8, 1.2), MapKit.SANDSTONE.lerp(MapKit.ROCK, _rng.randf() * 0.5))
 
+	for entry: Array in GIANT_ARCHES:
+		var x: float = entry[0]
+		var z: float = entry[1]
+		MapKit.rock(self, "arch_%d" % (1 + int(x) % 2), Vector3(x, _ground(x, z) - 2.0, z), entry[2], entry[3],
+			MapKit.SANDSTONE.lerp(MapKit.ROCK, 0.25))
+	for cluster: Array in SPIRE_CLUSTERS:
+		for k in 3:
+			var a: float = k * TAU / 3.0 + cluster[0] * 0.01
+			var x: float = cluster[0] + cos(a) * 14.0
+			var z: float = cluster[1] + sin(a) * 14.0
+			MapKit.rock(self, "hoodoo_%d" % (k + 1), Vector3(x, _ground(x, z) - 4.0, z), a, 1.3 + k * 0.15,
+				MapKit.SANDSTONE.lerp(MapKit.ROCK, 0.4))
 	for entry: Array in BATTLEFIELD:
 		var x: float = entry[1]
 		var z: float = entry[2]
@@ -201,6 +219,12 @@ func _clear_of_structures(at: Vector3) -> bool:
 			return false
 	for entry: Array in BATTLEFIELD:
 		if flat.distance_to(Vector2(entry[1], entry[2])) < (16.0 if entry[0] == "radar_station" else 10.0):
+			return false
+	for entry: Array in GIANT_ARCHES:
+		if flat.distance_to(Vector2(entry[0], entry[1])) < 45.0:
+			return false
+	for cluster: Array in SPIRE_CLUSTERS:
+		if flat.distance_to(Vector2(cluster[0], cluster[1])) < 30.0:
 			return false
 	for degrees: float in PILLAR_ANGLES:
 		var angle := deg_to_rad(degrees)

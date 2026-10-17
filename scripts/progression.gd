@@ -17,7 +17,7 @@ const ASSIST_TIME := 5.0  ## Damage this soon before someone else's kill is an a
 
 ## Who may wear a camo: "level" (needs `level`), "ace" (one Ace star), or an entitlement
 ## id: "hangar", "collector" (also has everything in "hangar"), "apex".
-## pattern: hull shader pattern (0 solid .. 8 checker), colours a..d, finish
+## pattern: hull shader pattern (0 solid .. 8 checker, 9 dazzle, 10 hex), colours a..d, finish
 ## (metal, gloss), wear, and Apex-style seams.
 const CAMOS := {
 	"factory": {"name": "Factory olive", "tier": "level", "level": 1, "pattern": 0,
@@ -26,12 +26,18 @@ const CAMOS := {
 		"colors": [Color(0.78, 0.66, 0.46), Color(0.5, 0.36, 0.22), Color(0.3, 0.23, 0.16), Color(0.9, 0.82, 0.64)]},
 	"woodland": {"name": "Woodland", "tier": "level", "level": 10, "pattern": 1,
 		"colors": [Color(0.38, 0.44, 0.25), Color(0.15, 0.21, 0.11), Color(0.42, 0.29, 0.16), Color(0.05, 0.05, 0.05)]},
+	"dazzle": {"name": "Dazzle", "tier": "level", "level": 15, "pattern": 9,
+		"colors": [Color(0.78, 0.8, 0.8), Color(0.12, 0.14, 0.17), Color(0.36, 0.44, 0.52)]},
 	"tiger": {"name": "Tiger stripe", "tier": "level", "level": 20, "pattern": 2,
 		"colors": [Color(0.56, 0.53, 0.34), Color(0.17, 0.23, 0.11), Color(0.04, 0.04, 0.04)]},
 	"splinter": {"name": "Splinter", "tier": "level", "level": 30, "pattern": 3,
 		"colors": [Color(0.62, 0.58, 0.43), Color(0.29, 0.38, 0.2), Color(0.44, 0.29, 0.17), Color(0.13, 0.15, 0.11)]},
+	"urban": {"name": "Urban", "tier": "level", "level": 25, "pattern": 3,
+		"colors": [Color(0.55, 0.56, 0.57), Color(0.32, 0.33, 0.35), Color(0.18, 0.18, 0.2), Color(0.72, 0.72, 0.7)]},
 	"digital": {"name": "Digital", "tier": "level", "level": 40, "pattern": 4,
 		"colors": [Color(0.6, 0.58, 0.46), Color(0.3, 0.37, 0.22), Color(0.16, 0.16, 0.13), Color(0.76, 0.72, 0.58)]},
+	"hex": {"name": "Hex", "tier": "level", "level": 45, "pattern": 10,
+		"colors": [Color(0.3, 0.33, 0.28), Color(0.2, 0.23, 0.18), Color(0.08, 0.09, 0.08), Color(0.6, 0.45, 0.15)]},
 	"arctic": {"name": "Arctic", "tier": "level", "level": 50, "pattern": 1,
 		"colors": [Color(0.86, 0.87, 0.88), Color(0.62, 0.64, 0.66), Color(0.4, 0.42, 0.45), Color(0.95, 0.95, 0.95)]},
 	"night": {"name": "Night ops", "tier": "level", "level": 60, "pattern": 4,
@@ -62,7 +68,7 @@ const CAMOS := {
 		"metal": 0.95, "gloss": 0.95, "wear": 0.0, "seams": Color(1.0, 0.72, 0.2), "glow": 2.5,
 		"tips": Color(1.0, 0.75, 0.2)},
 }
-const ORDER := ["factory", "desert", "woodland", "tiger", "splinter", "digital", "arctic", "night", "veteran",
+const ORDER := ["factory", "desert", "woodland", "dazzle", "tiger", "urban", "splinter", "digital", "hex", "arctic", "night", "veteran",
 	"centurion", "ace", "racing", "hornet", "sunset", "checker", "chrome", "pearl", "candy", "apex"]
 const PACKS := {
 	"hangar": {"name": "Hangar Pack", "price": "5 EUR"},

@@ -109,6 +109,29 @@ vec3 camo(vec3 p, vec3 base) {
 		vec3 c = floor(q / 0.3);
 		return mod(c.x + c.y + c.z, 2.0) < 1.0 ? base : camo_b;
 	}
+	if (pattern == 9) {
+		// Dazzle: bold bands at clashing angles, a new angle and width in every zone, as
+		// warships wore to break up their outline.
+		vec3 zone = floor(q * 0.45);
+		float h = hash(zone + 0.5);
+		float angle = h * 3.14159;
+		float band = fract(dot(q.zy, vec2(cos(angle), sin(angle))) * (1.1 + h * 1.6) + q.x * 0.3);
+		vec3 col = band < 0.5 ? base : camo_b;
+		return hash(zone + 5.5) > 0.6 ? mix(col, camo_c, step(band, 0.22)) : col;
+	}
+	if (pattern == 10) {
+		// Hex: a honeycomb of 16 cm cells on the side view, a few filled in, dark rims.
+		vec2 uv = vec2(q.z + q.x * 0.5, q.y + q.x * 0.35) / 0.16;
+		vec2 r = vec2(1.0, 1.7320508);
+		vec2 a = mod(uv, r) - r * 0.5;
+		vec2 b = mod(uv - r * 0.5, r) - r * 0.5;
+		vec2 cell = dot(a, a) < dot(b, b) ? a : b;
+		vec2 id = uv - cell;
+		float d = max(abs(cell.x), dot(abs(cell), vec2(0.5, 0.8660254)));
+		vec3 col = hash(vec3(id, 3.0)) > 0.72 ? camo_b : base;
+		col = hash(vec3(id, 7.0)) > 0.93 ? camo_d : col;
+		return mix(col, camo_c, smoothstep(0.44, 0.47, d));
+	}
 	return base;
 }
 

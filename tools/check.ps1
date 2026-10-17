@@ -35,6 +35,10 @@ $shots = [ordered]@{
 	"canyon_battle"   = "--mode=battle --map=canyon --autopilot=bot --frames=600"
 	"online"          = "--menu --online --map=basin --frames=90"
 	"back_to_menu"    = "--mode=battle --map=basin --leave=30 --frames=120"
+	"harbor_yard"     = "--map=harbor --spawn=-140,22,-60,180 --autopilot=hover --frames=60 --dummies=0"
+	"harbor_battle"   = "--mode=battle --map=harbor --autopilot=bot --frames=600"
+	"striker"         = "--map=harbor --airframe=striker --cam=showcase --autopilot=hover --frames=150 --dummies=0"
+	"flares"          = "--map=basin --spawn=0,60,120,0 --autopilot=weapon:flares --cam=showcase --frames=150 --dummies=0"
 }
 foreach ($name in $shots.Keys) {
 	$out = Join-Path $dir "$name.png"

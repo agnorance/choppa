@@ -143,7 +143,7 @@ tools\try.ps1              # lists the scenes
 tools\try.ps1 settings     # straight into a scene: menu, settings, hangar, hangarmax, battle, free, easy, race, cockpit,
                            # lake, damaged, tailrotor, engine, bots, missile, rockets,
                            # gunship, heavy, canyon, canyonbattle, explode,
-                           # online, host, join, lagjoin
+                           # online, host, join, lagjoin, harbor, harborbattle, striker, flares
 tools\check.ps1            # import, all tests, and screenshots of every screen into build\shots\
 ```
 - `--shot=out.png --frames=90`: save a screenshot after 90 ticks and quit.

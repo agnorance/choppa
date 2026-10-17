@@ -116,6 +116,42 @@ func _dam() -> void:
 	for x in range(-120, 121, 30):  # Buttress ribs on the valley face.
 		if absf(float(x)) > 14.0:
 			MapKit.block(self, Vector3(float(x), 18.0, DAM_HALF + 2.0), Vector3(4.0, 36.0, 4.0), stone.darkened(0.05))
+	# Construction joints: dark seams down both faces every 12 m, and the pour lines.
+	var seam := MapKit.material(stone.darkened(0.45))
+	for k in range(-12, 13):
+		var x := k * 12.0
+		for z: float in [-7.05, 7.05, DAM_HALF + 0.05]:
+			var top := CREST if absf(z) < 8.0 else 30.0
+			var bottom := 30.0 if absf(z) < 8.0 else -4.0
+			_seam(Vector3(x, (top + bottom) * 0.5, z), Vector3(0.25, top - bottom, 0.1), seam)
+	for y: float in [8.0, 16.0, 24.0]:
+		_seam(Vector3(0.0, y, DAM_HALF + 0.05), Vector3(300.0, 0.2, 0.1), seam)
+	for y: float in [36.0, 44.0]:
+		_seam(Vector3(0.0, y, 7.05), Vector3(300.0, 0.2, 0.1), seam)
+	# Water pouring out of the openings onto the chutes, spray where it lands.
+	var sheet := StandardMaterial3D.new()
+	sheet.albedo_color = Color(0.85, 0.9, 0.95, 0.45)
+	sheet.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	sheet.roughness = 0.1
+	sheet.cull_mode = BaseMaterial3D.CULL_DISABLED
+	for x: float in OPENINGS:
+		_seam(Vector3(x, 31.0, 9.5), Vector3(16.0, 18.0, 0.05), sheet, Vector3(-0.35, 0.0, 0.0))
+		var spray := Effects.puffs(Effects.gradient([Color(1, 1, 1, 0.0), Color(0.95, 0.97, 1.0, 0.5),
+			Color(0.95, 0.97, 1.0, 0.0)]), 40, 2.5)
+		spray.position = Vector3(x, 23.0, 18.0)
+		spray.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		spray.emission_box_extents = Vector3(7.0, 0.5, 3.0)
+		spray.direction = Vector3(0.0, 1.0, 0.6)
+		spray.spread = 35.0
+		spray.initial_velocity_min = 2.0
+		spray.initial_velocity_max = 5.0
+		spray.scale_amount_min = 3.0
+		spray.scale_amount_max = 6.0
+		add_child(spray)
+	# Lamps along the crest road.
+	for k in 9:
+		var x := -80.0 + k * 20.0
+		Props.place(self, "lamp_mast", Vector3(x, CREST + 0.5, -5.5 if k % 2 == 0 else 5.5), 0.0, 0.3)
 
 
 ## The power station at the dam's foot, three penstocks down the dam face into it, a
@@ -131,6 +167,19 @@ func _power_station() -> void:
 		var at := Vector3(-60.0 + (k % 3) * 9.0, 0.0, 40.0 + (k / 3) * 12.0)
 		Props.place(self, "fuel_tank", Vector3(at.x, _ground(at.x, at.z), at.z), PI * 0.5, 0.9)
 	Props.place(self, "shack_long", Vector3(52.0, _ground(52.0, 44.0), 44.0), 0.0)
+
+
+## A thin mesh with no collision (seams, a water sheet), optionally tilted.
+func _seam(center: Vector3, size: Vector3, material: Material, tilt := Vector3.ZERO) -> void:
+	var mesh := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = size
+	mesh.mesh = box
+	mesh.material_override = material
+	mesh.position = center
+	mesh.rotation = tilt
+	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mesh)
 
 
 ## A solid pipe from a to b (collision included).

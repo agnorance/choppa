@@ -587,11 +587,17 @@ class Gauge extends Node3D:
 		return SWEEP * 0.5 - t * SWEEP
 
 
-## A display page for the glass cockpits: "flight" (attitude, speed and altitude tapes,
-## heading), "radar" (the scope in green) or "systems" (hull and parts, engine, gun, loadout).
+## A display page for the glass cockpits: "flight" (horizon, heading tape, target box,
+## speed, altitude, loadout), "radar" (a plan of who is round you) or "systems" (hull
+## and parts, engine, gun, loadout). Drawn like a real display (owner, after a Wardogs
+## shot): thin pale lines on dark glass, amber and red kept for warnings and threats.
 class Mfd extends Control:
 	const GREEN := Color(0.4, 1.0, 0.45)
 	const AMBER_LINE := Color(1.0, 0.7, 0.2)
+	const LINE := Color(0.78, 0.93, 1.0)  ## The symbology.
+	const DIM := Color(0.78, 0.93, 1.0, 0.45)
+	const GLASS := Color(0.035, 0.055, 0.075)
+	const THREAT := Color(1.0, 0.35, 0.28)
 	var cockpit: Cockpit
 	var page := "flight"
 	var _sweep := 0.0
@@ -601,7 +607,7 @@ class Mfd extends Control:
 		queue_redraw()
 
 	func _draw() -> void:
-		draw_rect(Rect2(Vector2.ZERO, size), Color(0.01, 0.015, 0.02))
+		draw_rect(Rect2(Vector2.ZERO, size), GLASS)
 		if cockpit == null or cockpit.choppa == null:
 			return
 		match page:
@@ -611,90 +617,111 @@ class Mfd extends Control:
 				_draw_systems()
 			_:
 				_draw_flight()
-		draw_rect(Rect2(Vector2.ZERO, size), Color(GREEN, 0.35), false, 3.0)
+		# Soft-key boxes along the bottom edge, as real displays have.
+		for k in 4:
+			var x := 34.0 + k * 76.0
+			draw_rect(Rect2(x, size.y - 22, 22, 14), DIM, false, 1.5)
 
-	func _text(at: Vector2, text: String, font_size := 22, color := GREEN, align := HORIZONTAL_ALIGNMENT_CENTER, width := 120.0) -> void:
+	func _text(at: Vector2, text: String, font_size := 22, color := LINE, align := HORIZONTAL_ALIGNMENT_CENTER, width := 120.0) -> void:
 		var font := UiKit.font("condensed")
 		var x := at.x - (width * 0.5 if align == HORIZONTAL_ALIGNMENT_CENTER else (width if align == HORIZONTAL_ALIGNMENT_RIGHT else 0.0))
 		draw_string(font, Vector2(x, at.y), text, align, width, font_size, color)
 
 	func _draw_flight() -> void:
 		var me := cockpit.choppa
-		var c := size * 0.5
-		# Attitude: sky over ground, rolled by the bank, shifted by the pitch.
+		var c := size * 0.5 + Vector2(0, 8)
+		# Heading tape along the top: ticks every 5 degrees, numbers every 30, a caret.
+		var heading := fposmod(-rad_to_deg(me.heading), 360.0)
+		for k in range(-9, 10):
+			var mark := roundi(heading / 5.0) * 5 + k * 5
+			var x := c.x + (mark - heading) * 4.0
+			if absf(x - c.x) > 120.0:
+				continue
+			draw_line(Vector2(x, 30), Vector2(x, 38 if mark % 10 == 0 else 34), LINE if mark % 10 == 0 else DIM, 1.5)
+			if mark % 30 == 0:
+				_text(Vector2(x, 24), "%02d" % (posmod(mark, 360) / 10), 16, LINE)
+		draw_line(Vector2(c.x, 42), Vector2(c.x - 5, 49), LINE, 1.5)
+		draw_line(Vector2(c.x, 42), Vector2(c.x + 5, 49), LINE, 1.5)
+		# The horizon and a short pitch ladder, as lines only, rolled with the bank.
 		var bank := -me.bank_right()
 		var pitch := me.nose_down()
-		var per_degree := 3.2
-		var shift := Vector2(0.0, -rad_to_deg(pitch) * per_degree).rotated(bank)
+		var per_degree := 3.0
 		var across := Vector2(cos(bank), sin(bank))
 		var down := Vector2(-sin(bank), cos(bank))
-		var mid := c + shift
-		var far := 400.0
-		draw_colored_polygon(PackedVector2Array([mid - across * far, mid + across * far, mid + across * far - down * far,
-			mid - across * far - down * far]), Color(0.05, 0.13, 0.28))
-		draw_colored_polygon(PackedVector2Array([mid - across * far, mid + across * far, mid + across * far + down * far,
-			mid - across * far + down * far]), Color(0.22, 0.13, 0.05))
-		draw_line(mid - across * far, mid + across * far, Color.WHITE, 2.0)
-		for k in range(-4, 5):  # Pitch ladder every 10 degrees.
-			if k == 0:
-				continue
+		var mid := c + Vector2(0.0, -rad_to_deg(pitch) * per_degree).rotated(bank)
+		for k in range(-3, 4):
 			var p := mid - down * k * 10.0 * per_degree
-			var half := 30.0 if k % 2 == 0 else 18.0
-			draw_line(p - across * half, p + across * half, Color(1, 1, 1, 0.8), 2.0)
-		# The aircraft symbol, fixed in the middle.
-		draw_line(c + Vector2(-50, 0), c + Vector2(-16, 0), AMBER_LINE, 4.0)
-		draw_line(c + Vector2(16, 0), c + Vector2(50, 0), AMBER_LINE, 4.0)
-		draw_circle(c, 4.0, AMBER_LINE)
-		# Speed and altitude boxes, the heading on top, climb rate and rotor at the bottom.
-		draw_rect(Rect2(8, c.y - 18, 70, 36), Color(0, 0, 0, 0.8))
-		draw_rect(Rect2(8, c.y - 18, 70, 36), GREEN, false, 2.0)
-		_text(Vector2(43, c.y + 9), "%d" % roundi(me.velocity.length() * 3.6), 26)
-		draw_rect(Rect2(size.x - 78, c.y - 18, 70, 36), Color(0, 0, 0, 0.8))
-		draw_rect(Rect2(size.x - 78, c.y - 18, 70, 36), GREEN, false, 2.0)
-		_text(Vector2(size.x - 43, c.y + 9), "%d" % roundi(me.altitude), 26)
-		var heading := fposmod(-rad_to_deg(me.heading), 360.0)
-		draw_rect(Rect2(0, 0, size.x, 34), Color(0, 0, 0, 0.75))
-		for k in range(-4, 5):
-			var mark := roundi(heading / 10.0) * 10 + k * 10
-			var x := c.x + (mark - heading) * 3.0
-			draw_line(Vector2(x, 26), Vector2(x, 34), GREEN, 2.0)
-			if mark % 30 == 0:
-				_text(Vector2(x, 22), "%02d" % (posmod(mark, 360) / 10), 18)
-		draw_line(Vector2(c.x, 30), Vector2(c.x, 42), AMBER_LINE, 3.0)
-		_text(Vector2(60, size.y - 12), "VS %+.1f" % me.velocity.y, 20)
-		_text(Vector2(size.x - 60, size.y - 12), "NR %d%%" % roundi(me.spool * 100.0), 20)
-		_text(Vector2(c.x, size.y - 12), "ENG ON" if me.engine_on else "ENG OFF", 20, GREEN if me.engine_on else AMBER_LINE)
+			if p.distance_to(c) > 95.0:
+				continue
+			if k == 0:
+				draw_line(p - across * 110.0, p - across * 24.0, LINE, 1.5)
+				draw_line(p + across * 24.0, p + across * 110.0, LINE, 1.5)
+			else:
+				for s: float in [-1.0, 1.0]:
+					draw_line(p + across * s * 20.0, p + across * s * 44.0, DIM, 1.5)
+		# The target box: corner brackets round the boresight, a lock diamond when locked.
+		var box := 42.0
+		var leg := 12.0
+		var lock := me.missile_target() != null
+		var col := THREAT if lock else LINE
+		for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+			var p := c + corner * box
+			draw_line(p, p - Vector2(corner.x, 0) * leg, col, 1.5)
+			draw_line(p, p - Vector2(0, corner.y) * leg, col, 1.5)
+		draw_line(c + Vector2(-8, 0), c + Vector2(8, 0), LINE, 1.5)
+		draw_line(c + Vector2(0, -8), c + Vector2(0, 8), LINE, 1.5)
+		if lock:
+			var d := PackedVector2Array([c + Vector2(0, -16), c + Vector2(16, 0), c + Vector2(0, 16), c + Vector2(-16, 0),
+				c + Vector2(0, -16)])
+			draw_polyline(d, THREAT, 1.5)
+		# Loadout on the left, altitude on the right, speed and climb along the bottom.
+		_text(Vector2(14, c.y - 20), "MSL", 15, DIM, HORIZONTAL_ALIGNMENT_LEFT, 60.0)
+		_text(Vector2(14, c.y), "%02d" % me.ammo.missiles, 18, LINE, HORIZONTAL_ALIGNMENT_LEFT, 60.0)
+		_text(Vector2(14, c.y + 26), "RKT", 15, DIM, HORIZONTAL_ALIGNMENT_LEFT, 60.0)
+		_text(Vector2(14, c.y + 46), "%02d" % me.ammo.rockets, 18, LINE, HORIZONTAL_ALIGNMENT_LEFT, 60.0)
+		var alt := roundi(maxf(me.altitude, 0.0))
+		_text(Vector2(size.x - 14, c.y - 20), "ALT", 15, DIM, HORIZONTAL_ALIGNMENT_RIGHT, 60.0)
+		_text(Vector2(size.x - 14, c.y), "%d" % alt, 18, AMBER_LINE if alt < 6 and me.velocity.y < -4.0 else LINE,
+			HORIZONTAL_ALIGNMENT_RIGHT, 60.0)
+		_text(Vector2(size.x - 14, c.y + 26), "VS", 15, DIM, HORIZONTAL_ALIGNMENT_RIGHT, 60.0)
+		_text(Vector2(size.x - 14, c.y + 46), "%+.1f" % me.velocity.y, 18, LINE, HORIZONTAL_ALIGNMENT_RIGHT, 60.0)
+		_text(Vector2(c.x, size.y - 34), "%d KMH" % roundi(me.velocity.length() * 3.6), 18, LINE)
+		if not me.engine_on:
+			_text(Vector2(c.x, 72), "ENG OFF", 18, AMBER_LINE)
 
 	func _draw_radar() -> void:
 		var me := cockpit.choppa
 		var c := size * 0.5
-		var r := size.x * 0.44
+		var r := size.x * 0.42
 		for k in [0.33, 0.66, 1.0]:
-			draw_arc(c, r * k, 0.0, TAU, 64, Color(GREEN, 0.5), 2.0)
-		for k in 24:
+			draw_arc(c, r * k, 0.0, TAU, 64, DIM, 1.5)
+		draw_line(c - Vector2(r, 0), c + Vector2(r, 0), Color(DIM, 0.25), 1.0)
+		draw_line(c - Vector2(0, r), c + Vector2(0, r), Color(DIM, 0.25), 1.0)
+		for k in 16:  # A faint sweep.
 			var a := _sweep - k * 0.03
-			draw_line(c, c + Vector2(sin(a), -cos(a)) * r, Color(GREEN, 0.6 * (1.0 - k / 24.0)), 3.0)
+			draw_line(c, c + Vector2(sin(a), -cos(a)) * r, Color(LINE, 0.18 * (1.0 - k / 16.0)), 2.0)
 		var to_local := me.facing().inverse()
 		for node in me.get_tree().get_nodes_in_group("stations"):
 			var station := node as ServiceStation
 			var p := _project(to_local * (station.global_position - me.global_position), c, r)
 			if p != Vector2.INF and station.is_ready():
-				draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color(0.5, 0.8, 1.0), false, 2.0)
+				draw_rect(Rect2(p - Vector2(5, 5), Vector2(10, 10)), Color(GREEN, 0.8), false, 1.5)
 		for node in me.get_tree().get_nodes_in_group("choppas"):
 			var other := node as Choppa
 			if other == me or not other.alive:
 				continue
 			var p := _project(to_local * (other.global_position - me.global_position), c, r)
 			if p != Vector2.INF:
-				draw_colored_polygon(PackedVector2Array([p + Vector2(0, -9), p + Vector2(8, 7), p + Vector2(-8, 7)]),
-					Color(1.0, 0.35, 0.25))
+				var tri := PackedVector2Array([p + Vector2(0, -8), p + Vector2(7, 6), p + Vector2(-7, 6), p + Vector2(0, -8)])
+				draw_polyline(tri, THREAT, 2.0)
 		for node in me.get_tree().get_nodes_in_group("missiles"):
 			var p := _project(to_local * ((node as Node3D).global_position - me.global_position), c, r)
 			if p != Vector2.INF:
-				draw_circle(p, 5.0, Color(1.0, 0.9, 0.2))
-		draw_colored_polygon(PackedVector2Array([c + Vector2(0, -10), c + Vector2(7, 8), c + Vector2(-7, 8)]), GREEN)
-		_text(Vector2(50, 26), "TSD", 22)
-		_text(Vector2(size.x - 60, 26), "%d M" % roundi(RadarScreen.RANGE), 20)
+				draw_circle(p, 4.0, AMBER_LINE)
+		draw_polyline(PackedVector2Array([c + Vector2(0, -9), c + Vector2(6, 7), c + Vector2(-6, 7), c + Vector2(0, -9)]),
+			LINE, 2.0)
+		_text(Vector2(40, 26), "TSD", 18)
+		_text(Vector2(size.x - 50, 26), "%d M" % roundi(RadarScreen.RANGE), 16, DIM)
 
 	func _project(local: Vector3, c: Vector2, r: float) -> Vector2:
 		var flat := Vector2(local.x, local.z) / RadarScreen.RANGE
@@ -702,25 +729,26 @@ class Mfd extends Control:
 
 	func _draw_systems() -> void:
 		var me := cockpit.choppa
-		_text(Vector2(size.x * 0.5, 28), "SYSTEMS", 24)
+		_text(Vector2(size.x * 0.5, 28), "SYSTEMS", 18)
 		var rows := [["HULL", me.health / me.max_health], ["ROTOR", 1.0 - me.wear(Choppa.Part.ROTOR)],
 			["TAIL", 1.0 - me.wear(Choppa.Part.TAIL)], ["ENGINE", 1.0 - me.wear(Choppa.Part.ENGINE)],
 			["BOOST", me.boost_meter], ["GUN HEAT", me.heat]]
 		for k in rows.size():
-			var y := 50.0 + k * 38.0
+			var y := 50.0 + k * 36.0
 			var share: float = rows[k][1]
-			_text(Vector2(14, y + 20), rows[k][0], 20, GREEN, HORIZONTAL_ALIGNMENT_LEFT, 100.0)
-			var color := GREEN
+			_text(Vector2(16, y + 18), rows[k][0], 16, DIM, HORIZONTAL_ALIGNMENT_LEFT, 100.0)
+			var color := LINE
 			if k == 5:
-				color = AMBER_LINE if share > 0.7 else GREEN
+				color = AMBER_LINE if share > 0.7 else LINE
 			elif share < 0.3:
-				color = Color(1.0, 0.3, 0.2)
+				color = THREAT
 			elif share < 0.6:
 				color = AMBER_LINE
-			draw_rect(Rect2(118, y + 4, 180, 20), Color(GREEN, 0.15))
-			draw_rect(Rect2(118, y + 4, 180 * clampf(share, 0.0, 1.0), 20), color)
+			draw_rect(Rect2(110, y + 6, 190, 14), DIM, false, 1.5)
+			draw_rect(Rect2(112, y + 8, 186 * clampf(share, 0.0, 1.0), 10), color)
 		var ammo: Dictionary = me.ammo
-		_text(Vector2(size.x * 0.5, 292), "GUN %d   RKT %d   MSL %d   FLR %d" % [ammo.gun, ammo.rockets, ammo.missiles, ammo.flares], 20)
+		_text(Vector2(size.x * 0.5, 280), "GUN %d   RKT %d   MSL %d   FLR %d" % [ammo.gun, ammo.rockets, ammo.missiles, ammo.flares],
+			15, LINE, HORIZONTAL_ALIGNMENT_CENTER, 300.0)
 
 
 ## The radar picture, drawn into a SubViewport: amber phosphor rings, a sweeping beam,

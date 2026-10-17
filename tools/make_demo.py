@@ -51,7 +51,7 @@ CLIPS = [
     ("mule", "Mule: tandem rotors, a flying fortress", 5.0, 3.5,
      "--mode=free --map=harbor --airframe=mule --spawn=-15,12,110,0 --autopilot=hover --cam=orbit --dummies=0"),
     ("shark", "Shark mouth and new camos", 4.0, 0.5,
-     "--mode=free --map=basin --airframe=gunship --camo=shark --spawn=150,6,150,45 --autopilot=hover --cam=showcase --dummies=0"),
+     "--mode=free --map=basin --airframe=gunship --camo=shark --spawn=150,6,150,45 --autopilot=hover --cam=orbit --dummies=0"),
     ("dam", "Iron Dam: a new arena", 6.0, 6.0, "--mode=battle --map=dam --autopilot=bot --cam=side"),
     ("dusk", "Dusk", 4.0, 3.0, "--mode=free --map=dam --time=dusk --spawn=30,30,120,0 --autopilot=hover --cam=orbit --dummies=0"),
     ("night", "Night: searchlights and stars", 6.0, 8.0, "--mode=battle --map=harbor --time=night --autopilot=bot"),

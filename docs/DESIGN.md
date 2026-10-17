@@ -353,6 +353,16 @@ warehouse, three jetties, a repair pad out in the open. A power line spans the w
 at the south end. Containers are MultiMeshes with one box shape per stack, so the
 yard stays cheap. Props from tools/blender/make_props.py.
 
+Second pass (owner, same day: "lacks obstacles... way more, but in a natural way, so
+players can use it tactically"): three layers. Low: a freight line with container
+trains along the back of the west quay, waiting rows under the cranes, scrap heaps in
+the south-east, a tetrapod breakwater half closing the basin's north end. Middle:
+straddle carriers parked over the yard alleys, a walkway between the southern
+warehouses at 8 m, pipe racks, two conveyor bridges at 16 m out of a grain terminal.
+High: eight silos, fifteen floodlight masts, a lighthouse, a tall empty-container
+depot in the south-west, a freighter in dry dock. The basin got a second freighter,
+four tugs, two container barges and a buoy line: the fast, exposed way across.
+
 ### Obstacle kit
 
 - **Power lines** *(exist, `Hazards.power_line`)*: three thin cables between lattice

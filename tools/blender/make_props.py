@@ -12,7 +12,13 @@ Harbour (Rust Harbor): container_red / _blue / _green / _orange (a 40 ft box, 12
 2.44 x 2.6 m, long side along X), gantry_crane (a ship-to-shore crane: portal 24 m
 wide along Y, boom along X at z = 34), warehouse (40 x 24 m, open at both ends and
 with holes in the roof: fly through it), ship_hulk (a 72 m rusting freighter along X),
-radio_mast (a 52 m lattice mast with a beacon).
+radio_mast (a 52 m lattice mast with a beacon), silo (a 30 m grain silo), conveyor (a 40 m
+enclosed belt bridge along X at z = 16..19 on two lattice towers), rail_wagon (a 14 m
+flatcar along X, deck at z = 1.4, for a container on top), straddle_carrier (a 15 m
+portal along X that straddles a container row), lamp_mast (a 28 m floodlight mast),
+lighthouse (26 m), tetrapod (a 3.5 m breakwater block), tugboat (22 m along X), barge
+(40 x 14 m, deck at z = 3), pipe_rack (30 m along X, pipes at z = 5.5 and 7.6),
+scrap_pile_1 / _2 (heaps of crushed cars, about 12 m across and 6 m high), buoy.
 
 Materials are named for the game to swap (Props.materials): wood, wood_dark, rust,
 concrete, metal, dark, hazard, decal, glass, corrugated, lamp.
@@ -20,6 +26,7 @@ Blender +Y becomes Godot -Z, so a prop "facing" +Y faces the game's forward.
 """
 import math
 import os
+import random
 import sys
 
 import bpy
@@ -408,11 +415,206 @@ def radio_mast():
     return join(parts, "radio_mast")
 
 
+def silo():
+    """A 30 m concrete grain silo: a 6 m radius drum, a cone roof, a cage ladder."""
+    parts = [cyl((0, 0, 0), (0, 0, 26), 6.0, "concrete", 40, bevel_width=0.05)]
+    parts.append(cyl((0, 0, 26), (0, 0, 29.5), 6.05, "rust", 40, radius2=1.2))
+    parts.append(cyl((0, 0, 29.5), (0, 0, 30.4), 1.2, "dark", 16))
+    for z in (6, 13, 20, 25.8):
+        parts.append(ring((0, 0, z), (0, 0, 1), 6.04, 0.08, "rust", 40))
+    for sy in (-0.35, 0.35):  # Ladder up the south side.
+        parts.append(beam((sy, -6.25, 0.2), (sy, -6.25, 26.5), 0.07, "metal"))
+    for k in range(52):
+        parts.append(beam((-0.35, -6.25, 0.5 + k * 0.5), (0.35, -6.25, 0.5 + k * 0.5), 0.04, "metal"))
+    for k in range(12):  # The cage round it.
+        z = 3 + k * 2.0
+        parts.append(ring((0, -6.6, z), (0, 0, 1), 0.55, 0.03, "metal", 12))
+    parts.append(box((0, 0, 0.3), (12.6, 12.6, 0.6), "concrete"))
+    return join(parts, "silo")
+
+
+def conveyor():
+    """A 40 m enclosed belt bridge along X (z 16 to 19), on two lattice towers at x = +-15."""
+    parts = [box((0, 0, 17.5), (40, 3.0, 3.0), "corrugated")]
+    for sy in (-1.6, 1.6):  # Truss chords and diagonals along both sides.
+        for z in (16.0, 19.0):
+            parts.append(beam((-20, sy, z), (20, sy, z), 0.3, "rust"))
+        for k in range(10):
+            x0 = -20 + k * 4
+            parts.append(beam((x0, sy, 16.0), (x0 + 4, sy, 19.0), 0.16, "rust"))
+            parts.append(beam((x0, sy, 16.0), (x0, sy, 19.0), 0.16, "rust"))
+    parts.append(box((0, 0, 19.15), (40.4, 3.6, 0.3), "rust"))  # Roof lip.
+    for x in (-15, 15):
+        parts += lattice_leg((x, 0, 0), (x, 0, 16), 1.3, "rust", bays=5)
+        parts.append(box((x, 0, 0.3), (3.4, 3.4, 0.6), "concrete"))
+        parts.append(box((x, 0, 15.8), (3.2, 3.6, 0.4), "rust"))
+    return join(parts, "conveyor")
+
+
+def rail_wagon():
+    """A 14 m container flatcar along X: deck at z = 1.4 on two bogies."""
+    parts = [box((0, 0, 1.2), (14, 2.7, 0.4), "rust")]
+    for sy in (-1.2, 1.2):
+        parts.append(box((0, sy, 0.9), (14, 0.3, 0.5), "dark"))
+    for x in (-5.0, 5.0):
+        parts.append(box((x, 0, 0.75), (2.6, 2.2, 0.5), "dark"))
+        for dx in (-0.8, 0.8):
+            for sy in (-0.75, 0.75):
+                parts.append(cyl((x + dx, sy - 0.08, 0.45), (x + dx, sy + 0.08, 0.45), 0.45, "metal", 16))
+    for x in (-7.2, 7.2):
+        parts.append(box((x, 0, 1.0), (0.6, 0.4, 0.3), "dark"))  # Couplers.
+    return join(parts, "rail_wagon")
+
+
+def straddle_carrier():
+    """A container straddle carrier: four legs 12 m apart along X and 5.6 m across, a
+    15 m high frame, the cab up on one side. It stands over a row of containers."""
+    parts = []
+    for sx in (-6, 6):
+        for sy in (-2.8, 2.8):
+            parts.append(box((sx, sy, 7.0), (0.8, 0.8, 14.0), "crane"))
+            parts.append(cyl((sx - 0.6, sy, 0.6), (sx + 0.6, sy, 0.6), 0.6, "dark", 16))  # Wheels.
+            parts.append(cyl((sx, sy - 0.6, 0.6), (sx, sy + 0.6, 0.6), 0.6, "dark", 16))
+        parts.append(box((sx, 0, 14.4), (1.0, 6.4, 1.0), "crane"))
+    for sy in (-2.8, 2.8):
+        parts.append(box((0, sy, 14.4), (13.0, 1.0, 1.0), "crane"))
+        parts.append(beam((-6, sy, 1.6), (6, sy, 1.6), 0.5, "crane"))
+    parts.append(box((6.6, 2.8, 12.4), (2.2, 2.2, 2.4), "crane"))
+    parts.append(box((7.72, 2.8, 12.8), (0.04, 1.8, 1.2), "glass"))
+    parts.append(box((0, 0, 11.8), (12.2, 2.44, 0.5), "dark"))  # The spreader.
+    parts.append(ball((0, 0, 15.2), 0.3, "lamp", segments=8, rings=4))
+    return join(parts, "straddle_carrier")
+
+
+def lamp_mast():
+    """A 28 m quay floodlight mast with a ring of four lamps."""
+    parts = [cyl((0, 0, 0), (0, 0, 27), 0.5, "metal", 14, radius2=0.22)]
+    parts.append(box((0, 0, 0.5), (1.6, 1.6, 1.0), "concrete"))
+    parts.append(ring((0, 0, 27), (0, 0, 1), 1.2, 0.1, "dark", 20))
+    for k in range(4):
+        a = k * math.pi / 2
+        x, y = math.cos(a) * 1.2, math.sin(a) * 1.2
+        parts.append(box((x, y, 27.6), (0.9, 0.9, 0.5), "dark"))
+        parts.append(box((x, y, 27.33), (0.8, 0.8, 0.04), "lamp"))
+    for k in range(9):  # Climbing rungs.
+        parts.append(beam((-0.3, 0.45, 2 + k * 2.8), (0.3, 0.45, 2 + k * 2.8), 0.05, "metal"))
+    return join(parts, "lamp_mast")
+
+
+def lighthouse():
+    """A 26 m harbour light in red and white bands with a gallery and a lit lantern."""
+    parts = []
+    for k in range(6):
+        z0, z1 = k * 4.0, (k + 1) * 4.0
+        r0, r1 = 4.0 - k * 0.22, 4.0 - (k + 1) * 0.22
+        parts.append(cyl((0, 0, z0), (0, 0, z1), r0, "container_red" if k % 2 == 0 else "concrete", 32, radius2=r1))
+    parts.append(cyl((0, 0, 24), (0, 0, 24.4), 3.6, "dark", 32))
+    parts.append(ring((0, 0, 25.3), (0, 0, 1), 3.5, 0.06, "metal", 32))
+    for k in range(16):
+        a = k * math.tau / 16
+        parts.append(beam((math.cos(a) * 3.5, math.sin(a) * 3.5, 24.4), (math.cos(a) * 3.5, math.sin(a) * 3.5, 25.3), 0.05, "metal"))
+    parts.append(cyl((0, 0, 24.4), (0, 0, 27.4), 1.8, "glass", 16))
+    parts.append(ball((0, 0, 25.9), 0.9, "lamp", segments=12, rings=6))
+    parts.append(cyl((0, 0, 27.4), (0, 0, 29), 1.9, "dark", 16, radius2=0.3))
+    parts.append(box((0, -3.9, 1.3), (1.4, 0.4, 2.4), "dark"))  # Door.
+    return join(parts, "lighthouse")
+
+
+def tetrapod():
+    """A concrete breakwater tetrapod: four stubby cones from a centre, 3.5 m across."""
+    parts = [ball((0, 0, 1.2), 0.9, "concrete", segments=12, rings=6)]
+    dirs = [(0, 0, 1), (0.943, 0, -0.333), (-0.471, 0.816, -0.333), (-0.471, -0.816, -0.333)]
+    for d in dirs:
+        tip = Vector((0, 0, 1.2)) + Vector(d) * 1.9
+        parts.append(cyl((0, 0, 1.2), tip, 0.75, "concrete", 12, radius2=0.45))
+    return join(parts, "tetrapod")
+
+
+def tugboat():
+    """A 22 m harbour tug along X (bow at +X): a hull with tyre fenders, a wheelhouse."""
+    deck = [(-10, -3.6), (6, -3.6), (11, -1.6), (12, 0), (11, 1.6), (6, 3.6), (-10, 3.6)]
+    keel = [(-9.5, -2.6), (5.5, -2.6), (9.5, -1.0), (10.5, 0), (9.5, 1.0), (5.5, 2.6), (-9.5, 2.6)]
+    parts = [prism(keel, deck, 0.0, 3.6, "container_red")]
+    parts.append(prism([(x * 1.01, y * 1.01) for x, y in deck], [(x * 1.01, y * 1.01) for x, y in deck], 3.4, 4.0, "dark"))
+    parts.append(box((-1, 0, 5.5), (7, 5.2, 3.0), "paint"))
+    parts.append(box((0.5, 0, 8.0), (4.5, 4.6, 2.0), "paint"))
+    for sy in (-2.32, 2.32):
+        parts.append(box((0.5, sy, 8.2), (3.6, 0.04, 0.9), "glass"))
+    parts.append(box((2.77, 0, 8.2), (0.04, 3.6, 0.9), "glass"))
+    parts.append(cyl((-3.5, 0, 7), (-3.5, 0, 10.5), 0.7, "dark", 12))
+    parts.append(cyl((1, 0, 9), (1, 0, 13), 0.12, "metal", 6))
+    for k in range(8):  # Tyre fenders along the sides.
+        x = -8 + k * 2
+        for sy in (-3.7, 3.7):
+            parts.append(ring((x, sy, 2.6), (0, 1, 0), 0.45, 0.18, "dark", 12))
+    return join(parts, "tugboat")
+
+
+def barge():
+    """A 40 x 14 m flat deck barge (deck at z = 3), rusty, with a low coaming."""
+    parts = [box((0, 0, 1.5), (40, 14, 3.0), "rust", bevel_width=0.2)]
+    for sy in (-6.8, 6.8):
+        parts.append(box((0, sy, 3.3), (40, 0.3, 0.6), "dark"))
+    for sx in (-19.8, 19.8):
+        parts.append(box((sx, 0, 3.3), (0.3, 14, 0.6), "dark"))
+    for x in (-16, 16):
+        for sy in (-5.5, 5.5):
+            parts.append(cyl((x, sy, 3.0), (x, sy, 3.7), 0.3, "metal", 10))  # Bitts.
+    return join(parts, "barge")
+
+
+def pipe_rack():
+    """A 30 m pipe bridge along X: portals every 6 m, four pipes on top, two below."""
+    parts = []
+    for k in range(6):
+        x = -15 + k * 6
+        for sy in (-2, 2):
+            parts.append(beam((x, sy, 0), (x, sy, 7.0), 0.4, "rust"))
+        for z in (5.0, 7.0):
+            parts.append(beam((x, -2.2, z), (x, 2.2, z), 0.4, "rust"))
+        parts.append(box((x, 0, 0.25), (1.0, 5.0, 0.5), "concrete"))
+    for k, sy in enumerate((-1.5, -0.5, 0.5, 1.5)):
+        r = 0.45 if k % 2 == 0 else 0.3
+        parts.append(cyl((-16, sy, 7.2 + r), (16, sy, 7.2 + r), r, "metal" if k % 2 else "rust", 16))
+    for sy in (-1.0, 1.0):
+        parts.append(cyl((-16, sy, 5.55), (16, sy, 5.55), 0.35, "dark", 14))
+    return join(parts, "pipe_rack")
+
+
+def scrap_pile(name, seed):
+    """A heap of crushed cars round a rusty mound, about 12 m across and 6 m high."""
+    rng = random.Random(seed)
+    parts = [cyl((0, 0, 0), (0, 0, 3.2), 6.0, "rust", 14, radius2=2.0)]
+    paints = ["container_red", "container_blue", "container_green", "rust", "rust", "dark"]
+    for k in range(34):
+        a = rng.uniform(0, math.tau)
+        r = rng.uniform(0.0, 5.2)
+        z = max(0.4, 3.2 * (1 - r / 6.0)) + rng.uniform(0.0, 1.8)
+        car = box((0, 0, 0), (rng.uniform(3.2, 4.4), rng.uniform(1.6, 1.9), rng.uniform(0.6, 1.2)),
+                  paints[rng.randrange(len(paints))], bevel_width=0.08)
+        rot = (Matrix.Rotation(rng.uniform(0, math.tau), 4, "Z") @ Matrix.Rotation(rng.uniform(-0.6, 0.6), 4, "X")
+               @ Matrix.Rotation(rng.uniform(-0.4, 0.4), 4, "Y"))
+        base.place(car, Matrix.Translation((math.cos(a) * r, math.sin(a) * r, z)) @ rot)
+        parts.append(car)
+    return join(parts, name)
+
+
+def buoy():
+    """A red channel buoy: a float, a cage and a lamp."""
+    parts = [cyl((0, 0, -0.6), (0, 0, 1.0), 1.3, "container_red", 20, radius2=1.1)]
+    parts.append(cyl((0, 0, 1.0), (0, 0, 3.2), 0.5, "container_red", 12, radius2=0.25))
+    parts.append(ring((0, 0, 1.0), (0, 0, 1), 1.15, 0.1, "dark", 20))
+    parts.append(ball((0, 0, 3.4), 0.25, "lamp", segments=8, rings=4))
+    return join(parts, "buoy")
+
+
 BUILDS = [station_pad, pylon, water_tower, headframe, lambda: shack("shack", 5.0), lambda: shack("shack_long", 9.0),
           trestle, fuel_tank, crates,
           lambda: container("container_red", "container_red"), lambda: container("container_blue", "container_blue"),
           lambda: container("container_green", "container_green"), lambda: container("container_orange", "container_orange"),
-          gantry_crane, warehouse, ship_hulk, radio_mast]
+          gantry_crane, warehouse, ship_hulk, radio_mast, silo, conveyor, rail_wagon, straddle_carrier, lamp_mast,
+          lighthouse, tetrapod, tugboat, barge, pipe_rack, lambda: scrap_pile("scrap_pile_1", 3),
+          lambda: scrap_pile("scrap_pile_2", 11), buoy]
 
 
 def build():
@@ -437,13 +639,17 @@ if __name__ == "__main__":
         base.VIEWS.clear()
         names = ["station_pad", "pylon", "water_tower", "headframe", "shack", "shack_long", "trestle", "fuel_tank",
                  "crates", "container_red", "container_blue", "container_green", "container_orange", "gantry_crane",
-                 "warehouse", "ship_hulk", "radio_mast"]
+                 "warehouse", "ship_hulk", "radio_mast", "silo", "conveyor", "rail_wagon", "straddle_carrier",
+                 "lamp_mast", "lighthouse", "tetrapod", "tugboat", "barge", "pipe_rack", "scrap_pile_1", "scrap_pile_2",
+                 "buoy"]
         only = args[2:]
         for k, name in enumerate(names):
             if only and name not in only:
                 continue
             size = {"pylon": 30, "trestle": 34, "headframe": 22, "water_tower": 17, "gantry_crane": 60,
-                    "warehouse": 42, "ship_hulk": 75, "radio_mast": 55}.get(name, 13)
+                    "warehouse": 42, "ship_hulk": 75, "radio_mast": 55, "silo": 32, "conveyor": 42,
+                    "rail_wagon": 15, "straddle_carrier": 17, "lamp_mast": 30, "lighthouse": 30, "tugboat": 24,
+                    "barge": 42, "pipe_rack": 32, "scrap_pile_1": 14, "scrap_pile_2": 14}.get(name, 13)
             base.VIEWS[name] = ((k * 40.0 + size * 1.1, -size * 1.5, size * 0.75), (k * 40.0, -size * 0.1, size * 0.4))
         base.preview(args[1], list(base.VIEWS))
     else:

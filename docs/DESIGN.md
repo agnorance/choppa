@@ -608,7 +608,16 @@ Apex are entitlements the server grants; offline they can only be previewed
     roof, few posts and none in front of the sight, the panel low. Done so far: the Heavy
     (framed canopies, no centre post, the windscreen on its own rail) and the Gunship
     (the gunner sits low so the pilot sees over him, panel lower, framed tandem canopy).
-    Still to go: the Striker and the Mule, and how much you see from inside in general.
+    Then all four non-scout classes were detailed to the Little Bird's level (2026-10-17):
+    riveted panels, louvres, intakes and suppressors, sensors, antennas, lights, steps,
+    numbers and roundels, crack spots on every canopy.
+    **Cockpit rule (owner: "visibility is everything, nothing right in front; if a lot is
+    in the way from the normal seat, build it like sitting at the window")**: from the eye,
+    the window 30 degrees either side of ahead and from 12 below to 22 above the horizon
+    stays clear but for the sight; instruments only in the bottom third. make_cockpit.py
+    casts rays across that window and refuses to export a cockpit that blocks it; posts
+    are moved out (or laid out from the eye with `eye_post`) rather than the rule bent.
+    Displays draw thin pale lines on dark glass, Wardogs style.
 
 Every step comes with tests (owner's rule: so we know where something broke).
 

@@ -146,15 +146,23 @@ def roof_cap(c, r, e_top, material="paint"):
     return roof
 
 
-def cabin(c, r, e_top, posts, sill=-0.38, sill_from=0.25, bar=0.013):
+def cabin(c, r, e_top, posts, sill=-0.38, sill_from=0.25, bar=0.013, screen=None):
     """A closed canopy frame on the ellipsoid (c, r): a solid roof above e_top with a rail
     round its edge, posts at the azimuths `posts` running from the sill up into that rail
-    (none stop in mid-air), and a sill rail down each side from `sill_from` back."""
+    (none stop in mid-air), and a sill rail down each side from `sill_from` back. With
+    `screen`, the windscreen has its own bottom rail at that elevation (just over the
+    glare shield) across the front, and the front posts stand on it rather than diving
+    into the instrument panel."""
     parts = [roof_cap(c, r, e_top)]
     ring = [cp.ell(c, r, 2 * math.pi * k / 48, e_top) for k in range(49)]
     parts.append(tube(ring, bar * 1.2))
+    if screen is not None:
+        parts.append(cp.frame_member(c, r, -sill_from, screen, sill_from, screen, bar, 20))
     for a in posts:
-        parts.append(cp.frame_member(c, r, a, sill + (0.06 if abs(a) < 1.0 else 0.0), a, e_top, bar, 14))
+        foot = sill + (0.06 if abs(a) < 1.0 else 0.0)
+        if screen is not None and abs(a) < sill_from:
+            foot = screen
+        parts.append(cp.frame_member(c, r, a, foot, a, e_top, bar, 14))
     for side in (-1, 1):
         parts.append(cp.frame_member(c, r, side * sill_from, sill, side * 2.9, sill, bar, 18))
     return parts
@@ -384,7 +392,10 @@ def build_heavy():
     shell.append(cyl((0, 1.45, -0.66), (0, 1.38, -0.52), 0.03, "dark", 12))
     # The pilot's canopy: flat windscreen panes, a post, side blisters, the rear ring.
     # A closed cabin: a solid roof, every post running from the sill into its rail.
-    frame += cabin(c_pilot, r, 0.95, [0.0, -0.62, 0.62, -1.35, 1.35, -2.1, 2.1], sill=-0.38, sill_from=0.3, bar=0.013)
+    # No centre post: it would stand right in front of the sight. The windscreen sits on
+    # its own rail over the glare shield; the side sills start behind the panel.
+    frame += cabin(c_pilot, r, 0.95, [-0.62, 0.62, -1.35, 1.35, -2.1, 2.1], sill=-0.38, sill_from=1.0, bar=0.013,
+                   screen=-0.15)
     for side in (-1, 1):
         frame.append(cp.frame_member(c_pilot, r, side * 0.18, -0.15, side * 0.32, 0.05, 0.006, 4))  # Wipers.
         frame.append(cp.frame_member(c_gunner, rg, side * 0.5, -0.2, side * 0.4, 1.3, 0.011, 10))

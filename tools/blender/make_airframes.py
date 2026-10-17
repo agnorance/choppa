@@ -315,7 +315,7 @@ def build_heavy():
     parts += framed_canopy((0, 2.85, 0.05), (0.55, 0.85, 0.5), -0.25, 1.3, 1.6, [0.0, -0.5, 0.5, -1.1, 1.1], [0.55])
     # The pilot's shell outside stands a little prouder than the one the seat sees, so it
     # reads over the shoulders of the body.
-    parts += framed_canopy((0, 1.8, 0.72), (0.66, 0.95, 0.58), -0.38, 0.95, 2.1, [0.0, -0.62, 0.62, -1.35, 1.35])
+    parts += framed_canopy((0, 1.8, 0.72), (0.66, 0.95, 0.58), -0.38, 0.95, 2.1, [-0.62, 0.62, -1.35, 1.35])
     # Bolted armour: big plates over the flanks and belly, rivet rows.
     for side in (-1, 1):
         for y0, y1, z, h in ((2.3, 0.4, -0.35, 0.8), (0.3, -1.6, -0.25, 1.0)):

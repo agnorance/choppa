@@ -148,6 +148,11 @@ func _dam() -> void:
 		spray.scale_amount_min = 3.0
 		spray.scale_amount_max = 6.0
 		add_child(spray)
+		# The roar of the falling water: the wind loop, slowed down to a rush.
+		var roar := Node3D.new()
+		roar.position = Vector3(x, 24.0, 16.0)
+		add_child(roar)
+		Sounds.loop_on(roar, "wind_loop", 2.0, 0.7).pitch_scale = 0.55
 	# Lamps along the crest road, clear of the two pads up there (a rotor would hit them).
 	for k in 9:
 		var x := -80.0 + k * 20.0

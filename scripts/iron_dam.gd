@@ -148,9 +148,11 @@ func _dam() -> void:
 		spray.scale_amount_min = 3.0
 		spray.scale_amount_max = 6.0
 		add_child(spray)
-	# Lamps along the crest road.
+	# Lamps along the crest road, clear of the two pads up there (a rotor would hit them).
 	for k in 9:
 		var x := -80.0 + k * 20.0
+		if absf(x) < 14.0 or absf(x + 75.0) < 14.0:
+			continue
 		Props.place(self, "lamp_mast", Vector3(x, CREST + 0.5, -5.5 if k % 2 == 0 else 5.5), 0.0, 0.3)
 
 

@@ -274,7 +274,7 @@ func _build() -> void:
 	add_child(_tail_smoke)
 	_fire = Effects.puffs(Effects.gradient([
 		Color(1.0, 0.85, 0.4, 0.0), Color(1.0, 0.55, 0.15, 0.9), Color(0.8, 0.25, 0.05, 0.6), Color(0.2, 0.2, 0.2, 0.0),
-	]), 40, 0.7)
+	]), 40, 0.7, false, true)
 	_fire.position = _rotor.position * Vector3(1.0, 0.75, 1.0) + Vector3(0.0, 0.0, 0.6)
 	_fire.direction = Vector3.UP
 	_fire.spread = 25.0

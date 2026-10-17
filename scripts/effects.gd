@@ -5,7 +5,9 @@ extends RefCounted
 
 
 ## Camera-facing soft puffs. `colors` fade over each particle's life.
-static func puffs(colors: Gradient, amount: int, lifetime: float, dense := false) -> CPUParticles3D:
+## `glows`: fire and flame keep their light at night; other unshaded wisps (dust, spray,
+## trails) dim with the time of day, or they would shine in the dark.
+static func puffs(colors: Gradient, amount: int, lifetime: float, dense := false, glows := false) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
 	p.amount = amount
 	p.lifetime = lifetime
@@ -18,6 +20,9 @@ static func puffs(colors: Gradient, amount: int, lifetime: float, dense := false
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL if dense else BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.vertex_color_use_as_albedo = true
+	if not dense and not glows:
+		var dim: float = MapKit.TIMES[MapKit.time_of_day()].get("unlit", 1.0)
+		m.albedo_color = Color(dim, dim, dim)
 	# BILLBOARD_PARTICLES loses the per-particle scale on the Compatibility renderer.
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	m.billboard_keep_scale = true
@@ -389,7 +394,7 @@ class Explosion extends Node3D:
 		var fire := Effects.puffs(Effects.gradient([
 			Color(1.0, 0.85, 0.45, 1.0), Color(1.0, 0.42, 0.06, 0.95), Color(0.45, 0.16, 0.04, 0.85),
 			Color(0.12, 0.1, 0.09, 0.5), Color(0.1, 0.1, 0.1, 0.0),
-		]), 46, 1.5)
+		]), 46, 1.5, false, true)
 		fire.one_shot = true
 		fire.explosiveness = 0.92
 		fire.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
@@ -532,7 +537,7 @@ class Wreck extends Node3D:
 	func _ready() -> void:
 		_fire = Effects.puffs(Effects.gradient([
 			Color(1.0, 0.85, 0.4, 0.0), Color(1.0, 0.55, 0.15, 0.9), Color(0.8, 0.25, 0.05, 0.6), Color(0.2, 0.2, 0.2, 0.0),
-		]), 50, 0.8)
+		]), 50, 0.8, false, true)
 		_fire.direction = Vector3.UP
 		_fire.spread = 35.0
 		_fire.initial_velocity_min = 2.0

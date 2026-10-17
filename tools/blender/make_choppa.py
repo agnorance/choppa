@@ -281,6 +281,23 @@ def empty(name, location):
     return e
 
 
+# --- cabin and tail cone -----------------------------------------------------------
+
+# Tail cone and engine deck behind the egg:
+# (y, half width, z of the widest line, z top, z bottom, top exponent, bottom exponent)
+TAIL_CONE = [
+    (0.55, 0.6, 0.3, 1.0, -0.62, 2.6, 2.4),
+    (0.0, 0.7, 0.35, 1.18, -0.55, 3.2, 2.6),
+    (-0.6, 0.64, 0.4, 1.16, -0.3, 3.2, 2.5),
+    (-1.2, 0.48, 0.45, 1.05, 0.02, 2.8, 2.4),
+    (-1.8, 0.3, 0.5, 0.85, 0.26, 2.5, 2.2),
+    (-2.3, 0.17, 0.56, 0.73, 0.4, 2.2, 2.2),
+    (-2.35, 0.16, 0.56, 0.72, 0.41, 2.2, 2.2),
+]
+BOOM_START = -2.3
+BOOM_END = -5.5
+
+
 def boom_axis(y):
     """Centre and radius of the tail boom at y."""
     t = (y - BOOM_START) / (BOOM_END - BOOM_START)

@@ -198,17 +198,20 @@ func _show_results() -> void:
 		UiKit.ACCENT if won else UiKit.TEXT))
 	box.add_child(UiKit.rule())
 	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 44)
+	grid.columns = 5
+	grid.add_theme_constant_override("h_separation", 38)
 	grid.add_theme_constant_override("v_separation", 6)
 	box.add_child(grid)
-	for header in ["", "Pilot", "Kills", "Deaths"]:
+	for header in ["", "Pilot", "Helicopter", "Kills", "Deaths"]:
 		grid.add_child(UiKit.caption(header, 13))
 	var place := 1
 	for pilot in battle.standings():
 		var color := pilot.team_color.lightened(0.35)
 		grid.add_child(UiKit.label("%d" % place, 24, UiKit.MUTED, "condensed"))
 		grid.add_child(UiKit.label(pilot.pilot_name, 24, color, "condensed"))
+		var heli := UiKit.label(Airframe.spec(pilot.airframe).name, 20, UiKit.MUTED, "condensed")
+		heli.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		grid.add_child(heli)
 		grid.add_child(UiKit.label(str(battle.kills_of(pilot)), 24, color, "condensed"))
 		grid.add_child(UiKit.label(str(battle.deaths_of(pilot)), 24, color, "condensed"))
 		place += 1

@@ -92,6 +92,38 @@ def wall(x, y0, y1, z0, z1, ribs=4):
     return parts
 
 
+def reflex_sight(top, arm_x):
+    """The gunsight every class flies with: a round glass in a hood ring dead ahead of the
+    eye, on a squat lamp housing, held by a bracket arm bolted to the coaming at arm_x.
+    It stands just beyond the coaming's top edge `top` and is sized by its distance so it
+    looks the same from every seat: the HUD draws the reticle to fit its glass (Hud.SIGHT_ANGLE).
+    Places mount_sight at the glass."""
+    dist = top.y + 0.03
+    ring = 0.077 * dist
+    k = ring / 0.046
+    house_z = -ring - 0.032 * k
+    parts = [cyl((0, dist, top.z - 0.02), (0, dist, house_z), 0.012 * k, "metal", 10)]
+    parts.append(cp.prim("cylinder", "dark", location=(0, dist, house_z), vertices=28, radius=0.036 * k,
+                         depth=0.03 * k, bevel_width=0.006 * k))
+    parts.append(cp.prim("cylinder", "screen", location=(0, dist, house_z + 0.016 * k), vertices=28, radius=0.024 * k,
+                         depth=0.003))
+    parts.append(cyl((0.03 * k, dist, house_z), (0.046 * k, dist, house_z), 0.009 * k, "metal", 12))  # Brightness knob.
+    parts.append(cp.prim("torus", "dark", location=(0, dist, 0.0), rotation=(math.pi / 2, 0, 0), major_radius=ring,
+                         minor_radius=0.0045 * k, major_segments=40, minor_segments=8, scale=(1, 1, 2.6)))
+    parts.append(cp.prim("cylinder", "glass", location=(0, dist, 0.0), rotation=(math.pi / 2 - 0.3, 0, 0),
+                         vertices=32, radius=ring - 0.003, depth=0.002))
+    for side in (-1, 1):  # The hood's feet on the housing.
+        parts.append(box((side * 0.03 * k, dist, (house_z - ring) / 2 + 0.006), (0.008 * k, 0.02 * k, ring - house_z - 0.03 * k),
+                         "dark", rotation=(0, side * -0.6, 0)))
+    side = 1 if arm_x > 0 else -1
+    parts.append(box((arm_x / 2 + side * 0.02, dist, house_z), (abs(arm_x), 0.018, 0.014), "metal", bevel_width=0.003))
+    parts.append(box((arm_x, dist, (house_z + top.z) / 2), (0.03, 0.03, house_z - top.z + 0.03), "dark", bevel_width=0.004))
+    for f in (0.25, 0.6, 0.95):  # Bolts along the arm.
+        parts.append(cyl((arm_x * f, dist - 0.012, house_z), (arm_x * f, dist - 0.018, house_z), 0.006, "metal", 8))
+    cp.empty("mount_sight", (0, dist, 0.0))
+    return parts
+
+
 def kick_wall(panel, half_w, half_h, floor_z, inset=0.04):
     """Closes the tub under the panel: a wall from the panel's bottom edge down to the
     floor, the panel's width (the exterior is hidden from the seat, so any gap there
@@ -153,23 +185,7 @@ def build_scout():
         shell += cp.knob(low, 0.05, y, 0.02, 0.009)
     shell += cp.switch_field(low, 0.24, 0.06, 5, 2, 0.032, 0.06, guards={(0, 4)})
     shell += cp.breakers(low, 0.24, -0.1, 7, 2)
-    # Gunsight on a post above the coaming, its glass dead ahead of the eye.
-    top = panel.at(0, hh + 0.01, 0.05) + Vector((0, 0, 0.02))
-    # A reflector sight head: the lamp housing low, out of the line of sight, and its
-    # combiner glass leaning away at 35 degrees in a thin frame.
-    shell.append(cyl(top, (0, 0.6, -0.15), 0.013, "metal", 10))
-    shell.append(box((0, 0.6, -0.125), (0.11, 0.1, 0.05), "dark", bevel_width=0.008))
-    shell.append(box((0, 0.6, -0.098), (0.08, 0.07, 0.006), "screen"))  # The lens window.
-    shell.append(box((0, 0.535, -0.13), (0.1, 0.03, 0.04), "rubber", bevel_width=0.01))  # Crash pad.
-    shell.append(cyl((0.055, 0.6, -0.125), (0.072, 0.6, -0.125), 0.011, "dark", 14))  # Dimmer knob.
-    tilt = math.radians(-35)
-    up = Vector((0, -math.sin(tilt), math.cos(tilt)))
-    glass_at = Vector((0, 0.6, -0.045))
-    shell.append(box(glass_at, (0.1, 0.003, 0.1), "glass", rotation=(tilt, 0, 0)))
-    for side in (-1, 1):  # Short side cheeks and a rim along the top edge.
-        shell.append(box(glass_at + Vector((side * 0.052, 0, 0)), (0.006, 0.008, 0.1), "metal", rotation=(tilt, 0, 0)))
-    shell.append(box(glass_at + up * 0.05, (0.11, 0.008, 0.006), "metal", rotation=(tilt, 0, 0)))
-    cp.empty("mount_sight", (0, 0.6, 0.0))
+    shell += reflex_sight(panel.at(0, hh, 0.0), 0.34)
     # Side consoles with switch fields and breakers.
     for side in (-1, 1):
         shell.append(box((side * 0.56, 0.1, -0.73), (0.22, 0.76, 0.26), "paint", rotation=(0, side * 0.2, 0),
@@ -189,7 +205,7 @@ def build_scout():
     shell += cp.seat(0, -0.05, -0.72, 0.5, 0.62)
     shell += bulkhead(-0.42, -0.62, 0.62, -1.0, 0.22)
     shell += cp.extinguisher(-0.5, -0.25, -0.98, (0, 0, 1))
-    shell += cp.compass((0.3, 0.6, -0.07), hanging=False)  # On the coaming, clear of the view ahead.
+    shell += cp.compass((-0.36, 0.6, -0.07), hanging=False)  # On the coaming, clear of the view ahead.
     # The canopy frame (the inside of the exterior's members) and the tub walls.
     off = lambda pts: [p - eye for p in pts]  # noqa: E731
     frame.append(tube(off(shared.sill_points(-0.03, 30)), 0.03))
@@ -231,9 +247,8 @@ def build_gunship():
     panel.mount("beacon", 0.25, 0.2, 0.09)
     shell += nixies(Panel(panel.at(0.2, 0.225, 0.04), tilt=-55.0), 0.0, 0.0)
     shell += cp.wiring([(0.2, 0.5, -0.5), (0.25, 0.45, -0.75), (0.28, 0.2, -0.95)], 4)
-    # The head-up symbology floats ahead (helmet sight style): reticle and HUD mounts.
-    cp.empty("mount_sight", (0, 0.9, 0.0))
-    cp.empty("mount_hud", (0, 0.9, 0.0))
+    shell += reflex_sight(panel.at(0, 0.18, 0.0), 0.3)
+    cp.empty("mount_hud", (0, 0.9, 0.0))  # The helmet symbology floats further out.
     # Ahead and below: the gunner's blast shield, his seat back and helmet rest.
     shell += cp.seat(0, 0.95, -0.98, 0.42, 0.62, armoured=True, harness=False)
     # The gunner up front: the top of his helmet and its sight mount over the glare shield.
@@ -304,11 +319,7 @@ def build_heavy():
     shell += cp.annunciators(panel, -0.44, 0.0, 2, 6)
     shell += lamps_row(panel, -0.2, 0.235, 0.06, 0.06)
     panel.mount("beacon", 0.38, 0.235, 0.07)
-    # The reflector sight on the coaming, dead ahead.
-    shell.append(box((0, 0.5, -0.12), (0.08, 0.08, 0.06), "dark", bevel_width=0.008))
-    shell.append(cp.prim("cube", "glass", location=(0, 0.5, -0.04), rotation=(math.radians(20), 0, 0),
-                         scale=(0.05, 0.003, 0.045)))
-    cp.empty("mount_sight", (0, 0.5, 0.0))
+    shell += reflex_sight(panel.at(0, 0.21, 0.0), 0.36)
     # Overhead panel facing down at the pilot, side consoles crowded with switches.
     over = Panel((0, 0.05, 0.4), tilt=72.0)
     shell += cp.subpanel(over, 0, 0, 0.42, 0.26, -0.012)
@@ -383,14 +394,7 @@ def build_striker():
     panel.mount("beacon", pilot + 0.17, 0.215, 0.09)
     shell += nixies(Panel(panel.at(-pilot, 0.235, 0.04), tilt=-55.0), 0.0, 0.0)
     shell += cp.annunciators(panel, -0.03, -0.13, 4, 2, 0.022, 0.012)
-    # The head-up display: a combiner glass on its frame over the coaming, dead ahead.
-    base = Vector((0, 0.5, -0.11))
-    shell.append(box(base, (0.16, 0.12, 0.05), "dark", bevel_width=0.01))
-    for side in (-1, 1):
-        shell.append(box(base + Vector((side * 0.075, 0, 0.09)), (0.012, 0.02, 0.15), "dark"))
-    shell.append(cp.prim("cube", "glass", location=base + Vector((0, 0.01, 0.12)), rotation=(math.radians(22), 0, 0),
-                         scale=(0.07, 0.002, 0.065)))
-    cp.empty("mount_sight", (0, 0.62, 0.0))
+    shell += reflex_sight(panel.at(pilot, 0.17, 0.0), 0.3)
     cp.empty("mount_hud", (0, 0.62, 0.0))
     # Centre console between the seats: a keypad, throttle levers, switches.
     console = Panel((mid, 0.25, -0.55), tilt=-70.0)
@@ -461,7 +465,7 @@ def build_mule():
     panel.mount("beacon", pilot + 0.2, 0.215, 0.095)
     shell += nixies(Panel(panel.at(0.0, 0.235, 0.05), tilt=-55.0), 0.0, 0.0)
     shell += ordnance(Panel(panel.at(-0.3, 0.235, 0.05), tilt=-55.0), 0.0, 0.0)
-    cp.empty("mount_sight", (0, 0.9, 0.0))
+    shell += reflex_sight(panel.at(pilot, 0.17, 0.0), -0.3)
     cp.empty("mount_hud", (0, 0.9, 0.0))
     # The overhead console: switch fields and breakers across the roof.
     over = Panel((mid, 0.05, 0.47), tilt=74.0)

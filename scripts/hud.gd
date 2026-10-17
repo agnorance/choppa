@@ -31,6 +31,7 @@ var _callout: Label
 var _callout_time := 0.0
 var _hit_flash := 0.0
 const HUD_GREEN := Color(0.5, 1.0, 0.45, 0.95)  ## The cockpit sight's phosphor.
+const SIGHT_ANGLE := 0.075  ## Half the sight glass's width as seen from the eye, radians.
 var _bracketed: Choppa  ## The target the brackets are on, and since when.
 var _bracket_time := 0.0
 var _controls: Control
@@ -285,7 +286,45 @@ func _draw_crosshair() -> void:
 		ahead = target.global_position  # The guns snap onto it.
 	if camera.is_position_behind(ahead):
 		return
-	_draw_pipper(camera.unproject_position(ahead), HUD_GREEN if cockpit else Color(UiKit.TEXT, 0.92))
+	if cockpit:
+		_draw_sight(camera.unproject_position(ahead))
+	else:
+		_draw_pipper(camera.unproject_position(ahead), Color(UiKit.TEXT, 0.92))
+
+
+## From the seat: a fine reflex-sight reticle that sits inside the sight's glass. A thin
+## ring with ticks and a dot, glowing like phosphor; it opens up as the barrels heat,
+## goes amber when rounds run low and red on a hit.
+func _draw_sight(c: Vector2) -> void:
+	# The glass is about 4.5 degrees across from the eye; size the picture to fit in it.
+	var px := tan(SIGHT_ANGLE) / tan(deg_to_rad(camera.fov) * 0.5) * get_viewport().get_visible_rect().size.y * 0.5
+	var rounds := float(choppa.ammo.gun) / maxf(1.0, choppa.full_ammo("gun"))
+	var color := HUD_GREEN
+	if rounds < 0.2:
+		color = UiKit.ACCENT
+	if choppa.overheated or (choppa.heat > 0.85 and fmod(choppa.clock, 0.3) < 0.18):
+		color = UiKit.ACCENT
+	if _hit_flash > 0.0:
+		color = UiKit.DANGER
+	var r := px * (0.62 + choppa.heat * 0.25)
+	_glow_arc(c, r, 0.0, TAU, color, 1.3)
+	for d: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
+		_glow_line(c + d * r * 0.35, c + d * r * 0.72, color, 1.3)
+		_glow_line(c + d * r, c + d * (r + px * 0.12), color, 1.3)
+	_crosshair.draw_circle(c, 3.2, Color(color, 0.25))
+	_crosshair.draw_circle(c, 1.5, color)
+	if choppa.heat > 0.01:  # Gun heat: a short arc creeping round the bottom of the ring.
+		_glow_arc(c, r + px * 0.2, PI * 0.5 - PI * 0.4 * choppa.heat, PI * 0.5 + PI * 0.4 * choppa.heat, Color(color, 0.8), 1.6)
+
+
+func _glow_line(a: Vector2, b: Vector2, color: Color, width: float) -> void:
+	_crosshair.draw_line(a, b, Color(color, 0.18), width + 3.0, true)
+	_crosshair.draw_line(a, b, color, width, true)
+
+
+func _glow_arc(c: Vector2, radius: float, from: float, to: float, color: Color, width: float) -> void:
+	_crosshair.draw_arc(c, radius, from, to, 48, Color(color, 0.18), width + 3.0, true)
+	_crosshair.draw_arc(c, radius, from, to, 48, color, width, true)
 
 
 func _draw_pipper(c: Vector2, white: Color) -> void:
@@ -314,7 +353,7 @@ func _draw_pipper(c: Vector2, white: Color) -> void:
 	if hit:  # Hit marker: crisp diagonal ticks just outside the bloom.
 		for d: Vector2 in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
 			var n := d.normalized()
-			_line(c + n * (r + 4.0), c + n * (r + 12.0), Color.WHITE if white != HUD_GREEN else UiKit.DANGER, 2.2)
+			_line(c + n * (r + 4.0), c + n * (r + 12.0), Color.WHITE, 2.2)
 
 
 func _draw_brackets(at: Vector2, target: Choppa, locked: bool) -> void:

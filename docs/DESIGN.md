@@ -390,6 +390,18 @@ High: eight silos, fifteen floodlight masts, a lighthouse, a tall empty-containe
 depot in the south-west, a freighter in dry dock. The basin got a second freighter,
 four tugs, two container barges and a buoy line: the fast, exposed way across.
 
+### Iron Dam (2026-10-17)
+
+A river valley shut by a 57 m concrete dam. North: the reservoir, its water 38 m up
+and close under the crest, drowned trees and rock islands, narrow shore terraces with
+spawns and an ammo pad. The dam: a thick base and a thinner upper wall with three
+spillway openings (18 m wide, 40 to 52 m up) to fly through from lake to valley, the
+crest road with a repair pad in the middle and an ammo pad, gate towers at both ends.
+South: the old river bed, the power station at the dam's foot (repair pad on its roof)
+with three penstock pipes down the dam face and a tank yard, one transmission line down
+the valley and one strung across it, a ruined hamlet, wrecks, a radar post. High and
+exposed over the lake, or low and fast along the river: the routes cross at the dam.
+
 ### Obstacle kit
 
 - **Power lines** *(exist, `Hazards.power_line`)*: three thin cables between lattice

@@ -16,7 +16,7 @@ tab, download it from **Artifacts**, unzip and run `choppa.exe`.
 
 ## Modes
 
-Pick a map in the menu (Mesa Basin, Slot Canyon, Rust Harbor or Test Range), then:
+Pick a map in the menu (Mesa Basin, Slot Canyon, Rust Harbor, Iron Dam or Test Range), then:
 
 - **Battle vs 3 bots** (Easy / Normal / Hard on the title screen): free-for-all. First to 8 kills, or the leader after 5 minutes.
   You respawn 3 s after being shot down, with a short spawn shield and a full loadout.

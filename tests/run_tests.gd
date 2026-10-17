@@ -73,6 +73,7 @@ func _run() -> void:
 		"test_wind_pushes_choppas",
 		"test_bots_battle_in_canyon",
 		"test_bots_battle_in_harbor",
+		"test_bots_battle_at_the_dam",
 		"test_level_curve",
 		"test_camo_unlock_rules",
 		"test_battle_xp_and_profile",
@@ -528,6 +529,11 @@ func test_bots_battle_in_canyon() -> void:
 ## Rust Harbor: container alleys, cranes and warehouses must not trap the bots.
 func test_bots_battle_in_harbor() -> void:
 	await _bot_battle(RustHarbor.new())
+
+
+## Iron Dam: the dam wall, its openings and the lines across the valley.
+func test_bots_battle_at_the_dam() -> void:
+	await _bot_battle(IronDam.new())
 
 
 ## Four fighter bots for two minutes on `map`: they must move, fight, use rockets and

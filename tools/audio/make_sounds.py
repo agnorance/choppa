@@ -401,7 +401,7 @@ SOUNDS = {
     "missile_launch": missile_launch, "pickup": pickup, "rocket_launch": rocket_launch, "flares": flares,
     "station_service": station_service, "station_done": station_done, "cable_strike": cable_strike,
     "wind_loop": wind_loop, "hit_marker": hit_marker, "part_hit": part_hit,
-    "music_menu_loop": music_menu, "music_battle_loop": music_battle,
+    # Music: tools/audio/make_music.py (stereo OGG).
 }
 
 if __name__ == "__main__":

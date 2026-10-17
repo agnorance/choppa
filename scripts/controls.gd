@@ -29,6 +29,7 @@ var _bindings := {
 	"aim_up": [KEY_DOWN],
 	"aim_down": [KEY_UP],
 	"engine": [KEY_I, JOY_BUTTON_DPAD_UP],
+	"radio": [KEY_N, JOY_BUTTON_DPAD_RIGHT],
 	"boost": [KEY_SHIFT, JOY_BUTTON_LEFT_SHOULDER],
 	"fire": [KEY_CTRL, "mouse:%d" % MOUSE_BUTTON_LEFT, [JOY_AXIS_TRIGGER_RIGHT, 1.0]],
 	"rockets": ["mouse:%d" % MOUSE_BUTTON_RIGHT, [JOY_AXIS_TRIGGER_LEFT, 1.0]],
@@ -69,6 +70,7 @@ static func cheat_sheet(mouse: bool, mouse_yaws := false, easy := false) -> Arra
 	rows.append_array([
 		["Afterburner", ["Shift"]],
 		["Engine on / off", ["I"]],
+		["Radio station", ["N"]],
 		["Fire", ["LMB", "Ctrl"]],
 		["Rockets", ["RMB"]],
 		["Missile", ["F"]],

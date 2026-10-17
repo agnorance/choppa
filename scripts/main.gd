@@ -265,7 +265,7 @@ func _rivals(player_slot: int) -> Array[Choppa]:
 
 
 func _start_race() -> void:
-	Sounds.music(get_tree(), "battle")
+	Radio.play(get_tree())
 	var field: Array[Choppa] = [choppa]
 	field.append_array(_rivals(RACE_GRID_SLOT))
 	race = Race.new()
@@ -285,7 +285,7 @@ func _start_race() -> void:
 
 
 func _start_battle() -> void:
-	Sounds.music(get_tree(), "battle")
+	Radio.play(get_tree())
 	var field: Array[Choppa] = [choppa]
 	# Spread out: rivals take evenly spaced spawn points around the arena.
 	var rivals := ONLINE_SEATS - 1 if net_role == "host" else 3
@@ -471,7 +471,7 @@ func _on_welcomed(info: Dictionary, connecting: CanvasLayer) -> void:
 		field.append(_new_choppa(r.name, r.color, spawns[k % spawns.size()], k == info.seat, r.airframe, r.camo))
 	choppa = field[info.seat]
 	_player_view()
-	Sounds.music(get_tree(), "battle")
+	Radio.play(get_tree())
 	battle = Battle.new()
 	add_child(battle)
 	battle.setup(field, spawns, int(info.kills))
@@ -543,6 +543,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			choppa.spawn_on_ground(map.spawn_points[0])
 	elif event.is_action_pressed("toggle_help"):
 		hud.toggle_help()
+	elif event.is_action_pressed("radio"):
+		hud.callout(Radio.next_station(get_tree()))
 	elif event.is_action_pressed("pause"):
 		_toggle_pause()
 

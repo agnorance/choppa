@@ -16,9 +16,12 @@ const MUSIC_FADE := 1.2  ## Seconds to fade one track out and the next in.
 const LIBRARY := "res://assets/sounds/library/"  ## Recorded sounds, preferred when present.
 const STAND_INS := "res://assets/sounds/"
 
-## Sound name -> [folder, number of numbered takes (0: a single name.wav)]. Only paths
-## and numbers, so nothing here keeps a stream alive past exit.
+const FORMATS := [".wav", ".ogg", ".mp3"]
+
+## Sound name -> [folder, takes (0: a single file), extension]. Only paths and numbers,
+## so nothing here keeps a stream alive past exit.
 static var _takes := {}
+static var _music_done: Callable  ## Called when a non-looping music track ends.
 static var _music: AudioStreamPlayer
 static var _music_track := ""
 
@@ -34,12 +37,18 @@ static func stream(sound_name: String) -> AudioStream:
 	var source := _source(sound_name)
 	var folder: String = source[0]
 	var takes: int = source[1]
-	var path := folder + sound_name + ".wav"
+	var ext: String = source[2]
+	var path := folder + sound_name + ext
 	if takes > 0:
-		path = "%s%s_%d.wav" % [folder, sound_name, randi_range(1, takes)]
+		path = "%s%s_%d%s" % [folder, sound_name, randi_range(1, takes), ext]
 	var s: AudioStream = load(path)
-	if sound_name.ends_with("_loop") and s is AudioStreamWAV:
-		_make_loop(s as AudioStreamWAV)
+	if sound_name.ends_with("_loop"):
+		if s is AudioStreamWAV:
+			_make_loop(s as AudioStreamWAV)
+		elif s is AudioStreamOggVorbis:
+			(s as AudioStreamOggVorbis).loop = true
+		elif s is AudioStreamMP3:
+			(s as AudioStreamMP3).loop = true
 	return s
 
 
@@ -51,13 +60,18 @@ static func _take_count(sound_name: String) -> int:
 ## stand-ins; and how many takes it has there.
 static func _source(sound_name: String) -> Array:
 	if not _takes.has(sound_name):
-		var found := [STAND_INS, 0]
-		for folder in [LIBRARY, STAND_INS]:
-			var count := 0
-			while ResourceLoader.exists("%s%s_%d.wav" % [folder, sound_name, count + 1]):
-				count += 1
-			if count > 0 or ResourceLoader.exists(folder + sound_name + ".wav"):
-				found = [folder, count]
+		var found := [STAND_INS, 0, ".wav"]
+		for folder: String in [LIBRARY, STAND_INS]:
+			var hit := false
+			for ext: String in FORMATS:
+				var count := 0
+				while ResourceLoader.exists("%s%s_%d%s" % [folder, sound_name, count + 1, ext]):
+					count += 1
+				if count > 0 or ResourceLoader.exists(folder + sound_name + ext):
+					found = [folder, count, ext]
+					hit = true
+					break
+			if hit:
 				break
 		_takes[sound_name] = found
 	return _takes[sound_name]
@@ -132,27 +146,37 @@ static func loop_on(parent: Node3D, sound_name: String, volume_db := 0.0, reach 
 	return player
 
 
-## Plays a music loop (assets/sounds/music_<name>_loop.wav) on the Music bus, or fades
+## Plays a music loop (assets/sounds/music_<name>_loop.ogg or .wav) on the Music bus, or fades
 ## the music out with "". A new track fades in after the old one fades out. Keeps
 ## playing across scene reloads; the same track is not restarted.
 static func music(tree: SceneTree, track: String) -> void:
+	play_music(tree, track, null if track == "" else stream("music_%s_loop" % track))
+
+
+## Plays `next` as the music (the old track fades out first), or fades out with null.
+## `key` names it, so asking again for what is playing does nothing. `done` is called
+## when a track that does not loop ends (the radio's next track).
+static func play_music(tree: SceneTree, key: String, next: AudioStream, done := Callable()) -> void:
 	if _music == null or not is_instance_valid(_music):
 		_music = AudioStreamPlayer.new()
 		_music.bus = MUSIC_BUS if AudioServer.get_bus_index(MUSIC_BUS) >= 0 else "Master"
 		_music.volume_db = MUSIC_DB
+		_music.finished.connect(func() -> void:
+			if _music_done.is_valid():
+				_music_done.call())
 		tree.root.add_child.call_deferred(_music)
 		_music_track = ""
-	if track == _music_track:
+	if key == _music_track:
 		return
-	_music_track = track
+	_music_track = key
+	_music_done = done
 	var player := _music
 	var fade := tree.create_tween().bind_node(tree.root)
 	if player.playing:
 		fade.tween_property(player, "volume_db", -40.0, MUSIC_FADE * 0.5)
-	if track == "":
+	if next == null:
 		fade.tween_callback(player.stop)
 		return
-	var next := stream("music_%s_loop" % track)
 	fade.tween_callback(func() -> void:
 		player.stream = next
 		player.volume_db = -40.0

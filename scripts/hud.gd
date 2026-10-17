@@ -283,6 +283,11 @@ func _draw_crosshair() -> void:
 			_crosshair.draw_line(c + d * 9.0, c + d * 17.0, UiKit.TEXT, 2.0, true)
 
 
+## A message in the middle of the screen for a moment (e.g. the radio station).
+func callout(text: String) -> void:
+	_show_callout(text, UiKit.TEXT)
+
+
 func _show_callout(text: String, color: Color) -> void:
 	_callout.text = text
 	_callout.add_theme_color_override("font_color", color)

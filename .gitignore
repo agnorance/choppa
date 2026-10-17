@@ -20,3 +20,5 @@ __pycache__/
 .claude/settings.local.json
 # Recorded library sounds: the licence forbids sharing the files, and the repo is public.
 assets/sounds/library/
+# Radio stations: royalty-free tracks whose licences forbid sharing the files.
+assets/music/library/

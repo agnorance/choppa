@@ -22,6 +22,15 @@ The game uses recorded library sounds (owner's decision: synthesis sounded cheap
 4. Re-import, run the tests, ask the owner to judge it in the game.
 5. Python runs without `-I` here: numpy is in the user site-packages.
 
+## Music and the radio
+
+- `tools/audio/make_music.py` synthesizes the techno (CHOPPA FM, the built-in radio
+  station) and the menu track as stereo OGG loops (numpy + ffmpeg). Check the mix with
+  the band-energy printout idea in its history: laptop speakers need mids and highs.
+- `scripts/radio.gd`: stations are CHOPPA FM, one per folder in
+  `assets/music/library/<Station>/` (royalty-free mp3/ogg/wav, git-ignored), and off.
+  N switches in a match; the choice is Settings "radio_station".
+
 ## Synthesized stand-ins
 
 Sounds without a recipe are synthesized by `tools/audio/make_sounds.py` (numpy, no

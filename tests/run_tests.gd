@@ -77,6 +77,7 @@ func _run() -> void:
 		"test_wrecking_a_part_tells_the_shooter_and_shows",
 		"test_loops_loop_and_takes_are_counted",
 		"test_music_crossfades_between_tracks",
+		"test_radio_stations_cycle",
 		"test_classes_feel_apart",
 		"test_cold_start_spools_up_before_lift",
 		"test_engine_key_toggles_and_off_sinks",
@@ -1138,9 +1139,9 @@ func test_every_sound_exists_and_loops_loop() -> void:
 	for name: String in used:
 		var found := ResourceLoader.exists("res://assets/sounds/%s.wav" % name) or Sounds._take_count(name) > 0
 		_check(found, "%s.wav (or %s_1.wav ...) exists (used in %s)" % [name, name, used[name]])
-	for track in ["menu", "battle"]:
-		var stream := Sounds.stream("music_%s_loop" % track) as AudioStreamWAV
-		_check(stream != null and stream.loop_mode == AudioStreamWAV.LOOP_FORWARD, "music %s loops" % track)
+	for track in ["menu", "techno"]:
+		var stream := Sounds.stream("music_%s_loop" % track) as AudioStreamOggVorbis
+		_check(stream != null and stream.loop, "music %s loops" % track)
 	for name in ["rotor_loop", "engine_loop", "boost_loop", "missile_loop", "warning_loop", "wind_loop"]:
 		_check((Sounds.stream(name) as AudioStreamWAV).loop_mode == AudioStreamWAV.LOOP_FORWARD, "%s loops" % name)
 
@@ -1455,15 +1456,15 @@ func test_music_crossfades_between_tracks() -> void:
 	for t in 120:
 		await process_frame
 	_check(Sounds._music.playing and Sounds._music.stream.resource_path.contains("menu"), "the menu music plays")
-	Sounds.music(self, "battle")
+	Sounds.music(self, "techno")
 	for t in 20:
 		await process_frame
-	_check(Sounds._music.volume_db < Sounds.MUSIC_DB - 3.0 or Sounds._music.stream.resource_path.contains("battle"),
+	_check(Sounds._music.volume_db < Sounds.MUSIC_DB - 3.0 or Sounds._music.stream.resource_path.contains("techno"),
 		"the menu music fades out first")
 	for t in 200:
 		await process_frame
-	_check(Sounds._music.stream.resource_path.contains("battle") and is_equal_approx(Sounds._music.volume_db, Sounds.MUSIC_DB),
-		"then the battle music plays at full level, %.1f dB" % Sounds._music.volume_db)
+	_check(Sounds._music.stream.resource_path.contains("techno") and is_equal_approx(Sounds._music.volume_db, Sounds.MUSIC_DB),
+		"then the techno plays at full level, %.1f dB" % Sounds._music.volume_db)
 	Sounds.music(self, "")
 	for t in 120:
 		await process_frame
@@ -1576,3 +1577,21 @@ func test_classes_feel_apart() -> void:
 	var heavy := Airframe.spec(Airframe.HEAVY)
 	_check(scout.spool < heavy.spool and scout.fire < heavy.fire and scout.guns < heavy.guns,
 		"the scout starts and fires faster, the heavy hits harder per round")
+
+
+## The radio: CHOPPA FM first, off last; N cycles through and the choice is kept.
+func test_radio_stations_cycle() -> void:
+	var saved: int = Settings.value("radio_station")
+	var all := Radio.stations()
+	_check(all[0].name == Radio.BUILT_IN and all[-1].name == Radio.OFF, "built in first, off last: %s" % [all.map(func(s: Dictionary) -> String: return s.name)])
+	Settings.set_value("radio_station", 0)
+	Radio.play(self)
+	for t in 100:
+		await process_frame
+	_check(Sounds._music.playing and Sounds._music.stream.resource_path.contains("techno"), "CHOPPA FM plays the techno")
+	var seen := []
+	for k in all.size():
+		seen.append(Radio.next_station(self))
+	_check(seen[-1] == "RADIO  ·  " + Radio.BUILT_IN and seen.has(Radio.OFF), "round the dial and back: %s" % [seen])
+	Settings.set_value("radio_station", saved)
+	Sounds.music(self, "")

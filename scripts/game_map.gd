@@ -22,7 +22,7 @@ static func report(what: String, started_msec: int) -> void:
 
 ## Display names and ids of all maps, for the menu.
 static func catalog() -> Array:
-	return [["MESA BASIN", "basin"], ["SLOT CANYON", "canyon"], ["TEST RANGE", "range"]]
+	return [["MESA BASIN", "basin"], ["SLOT CANYON", "canyon"], ["RUST HARBOR", "harbor"], ["TEST RANGE", "range"]]
 
 
 static func create(map_id: String) -> GameMap:
@@ -31,4 +31,6 @@ static func create(map_id: String) -> GameMap:
 			return TestRange.new()
 		"canyon":
 			return SlotCanyon.new()
+		"harbor":
+			return RustHarbor.new()
 	return MesaBasin.new()

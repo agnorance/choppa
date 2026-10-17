@@ -324,6 +324,17 @@ placement. Every map has service stations.
 - Later: **Quarry** (terraced pit, cranes, conveyor bridge), **Dam** (spillway tunnels,
   pylons and power lines), **Ruined Town** (streets as corridors, towers, a hangar).
 
+### Rust Harbor (2026-10-17, owner: "lots of obstacles for manoeuvring and cool fights")
+
+A derelict port between two concrete quays, hills all round. West quay: a maze of
+container stacks one to four high (alleys to thread, stacks to hop, a clearing with a
+repair pad in the middle), five gantry cranes with their booms over the water, three
+warehouses open at both ends (fly through; one ammo pad sits inside one). In the
+basin: a moored freighter and a sunk one. East quay: fuel tanks, a radio mast, a
+warehouse, three jetties, a repair pad out in the open. A power line spans the water
+at the south end. Containers are MultiMeshes with one box shape per stack, so the
+yard stays cheap. Props from tools/blender/make_props.py.
+
 ### Obstacle kit
 
 - **Power lines** *(exist, `Hazards.power_line`)*: three thin cables between lattice

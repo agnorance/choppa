@@ -8,6 +8,11 @@ Props: station_pad (service station helipad and mast), pylon (power-line tower, 
 cable arms at z = 26 and x = +-4.5), water_tower, headframe (mine shaft tower with its
 sheave wheel), shack, shack_long, trestle (a 32 m timber bridge span along X, deck at
 z = 12), fuel_tank, crates.
+Harbour (Rust Harbor): container_red / _blue / _green / _orange (a 40 ft box, 12.2 x
+2.44 x 2.6 m, long side along X), gantry_crane (a ship-to-shore crane: portal 24 m
+wide along Y, boom along X at z = 34), warehouse (40 x 24 m, open at both ends and
+with holes in the roof: fly through it), ship_hulk (a 72 m rusting freighter along X),
+radio_mast (a 52 m lattice mast with a beacon).
 
 Materials are named for the game to swap (Props.materials): wood, wood_dark, rust,
 concrete, metal, dark, hazard, decal, glass, corrugated, lamp.
@@ -30,6 +35,9 @@ base.PREVIEW.update({
     "wood": ((0.45, 0.32, 0.2), 0.0, 0.85), "wood_dark": ((0.25, 0.17, 0.11), 0.0, 0.9),
     "rust": ((0.42, 0.2, 0.1), 0.4, 0.8), "concrete": ((0.55, 0.54, 0.5), 0.0, 0.9),
     "corrugated": ((0.5, 0.48, 0.44), 0.6, 0.6),
+    "container_red": ((0.45, 0.12, 0.08), 0.3, 0.6), "container_blue": ((0.1, 0.22, 0.42), 0.3, 0.6),
+    "container_green": ((0.15, 0.3, 0.18), 0.3, 0.6), "container_orange": ((0.62, 0.3, 0.08), 0.3, 0.6),
+    "crane": ((0.78, 0.56, 0.08), 0.3, 0.55), "hull_dark": ((0.12, 0.13, 0.14), 0.3, 0.7),
 })
 
 
@@ -240,8 +248,171 @@ def crates():
     return join(parts, "crates")
 
 
+def container(name, paint):
+    """A 40 ft shipping container: ribbed sides, corner posts, door bars at the +X end."""
+    L, W, H = 12.2, 2.44, 2.6
+    parts = [box((0, 0, H / 2), (L - 0.1, W - 0.12, H - 0.1), paint)]
+    for k in range(30):  # Corrugation on the long sides.
+        x = -L / 2 + 0.3 + k * (L - 0.6) / 29
+        for side in (-1, 1):
+            parts.append(box((x, side * (W / 2 - 0.04), H / 2), (0.14, 0.08, H - 0.3), paint))
+    for k in range(5):  # And the roof.
+        parts.append(box((-L / 2 + 1.2 + k * (L - 2.4) / 4, 0, H - 0.03), (0.2, W - 0.3, 0.06), paint))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            parts.append(box((sx * (L / 2 - 0.1), sy * (W / 2 - 0.1), H / 2), (0.2, 0.2, H), "dark"))
+    for sy in (-0.55, -0.2, 0.2, 0.55):  # Locking bars on the doors.
+        parts.append(cyl((L / 2 + 0.02, sy, 0.25), (L / 2 + 0.02, sy, H - 0.25), 0.03, "metal", 6))
+    parts.append(box((L / 2 + 0.01, 0, H / 2), (0.02, 0.04, H - 0.4), "dark"))
+    return join(parts, name)
+
+
+def gantry_crane():
+    """Ship-to-shore crane: a portal on four legs (24 m apart along Y, 16 m along X), a
+    machinery house, and a long boom along X at z = 34 with a trolley and its cables."""
+    parts = []
+    for sx in (-8, 8):
+        for sy in (-12, 12):
+            parts.append(beam((sx, sy, 0), (sx * 0.8, sy, 30), 1.0, "crane"))
+            parts.append(box((sx, sy, 0.6), (2.4, 1.6, 1.2), "dark"))  # Bogies on the rail.
+        parts.append(beam((sx, -12, 14), (sx, 12, 14), 0.8, "crane"))  # Portal cross beams.
+        parts.append(beam((sx * 0.8, -12, 30), (sx * 0.8, 12, 30), 1.0, "crane"))
+        parts.append(beam((sx, -12, 0.5), (sx * 0.8, 12, 30), 0.35, "crane"))  # Diagonal bracing.
+    for sy in (-12, 12):
+        parts.append(beam((-8, sy, 14), (8, sy, 14), 0.8, "crane"))
+        parts.append(beam((-6.4, sy, 30), (6.4, sy, 30), 1.0, "crane"))
+    # Boom: two girders from x = -22 (backreach) to +40 (over the water).
+    for sy in (-2.2, 2.2):
+        parts.append(beam((-22, sy, 34), (40, sy, 34), 1.4, "crane"))
+        for k in range(16):
+            x0 = -22 + k * 62 / 16
+            parts.append(beam((x0, sy, 33.3), (x0 + 62 / 16, sy, 35.3), 0.18, "crane"))
+    for k in range(9):
+        x = -22 + k * 62 / 8
+        parts.append(beam((x, -2.2, 34), (x, 2.2, 34), 0.3, "crane"))
+    # A-frame and stays holding the boom.
+    for sy in (-2.2, 2.2):
+        parts.append(beam((-2, sy, 30), (0, sy, 46), 0.7, "crane"))
+        parts.append(beam((0, sy, 46), (38, sy, 35), 0.25, "metal"))
+        parts.append(beam((0, sy, 46), (-20, sy, 35), 0.25, "metal"))
+    parts.append(box((-14, 0, 37.5), (9, 6, 6), "crane"))  # Machinery house.
+    parts.append(box((-14, -3.02, 38.5), (6, 0.04, 1.2), "glass"))
+    parts.append(box((6, 0, 31.6), (3.2, 3.6, 2.6), "crane"))  # Operator cab.
+    parts.append(box((6, 0, 31.4), (3.0, 3.62, 1.0), "glass"))
+    # Trolley over the water, cables down to a spreader.
+    parts.append(box((24, 0, 32.5), (4, 5, 1.6), "dark"))
+    for sy in (-1.6, 1.6):
+        parts.append(cyl((24, sy, 31.7), (24, sy, 18), 0.06, "metal", 6))
+    parts.append(box((24, 0, 17.6), (12.2, 2.6, 0.6), "crane"))
+    parts.append(ball((0, 0, 47), 0.4, "light_red", segments=10, rings=6))
+    return join(parts, "gantry_crane")
+
+
+def warehouse():
+    """A big shed, 40 m along X by 24 m, open at both ends to fly through, with the roof
+    panels partly gone (holes to drop through) and steel portal frames inside."""
+    L, W, H = 40.0, 24.0, 12.0
+    parts = []  # No floor of its own: it stands on the quay, and a pad can sit inside.
+    frames = 6
+    for k in range(frames):
+        x = -L / 2 + 2 + k * (L - 4) / (frames - 1)
+        for sy in (-1, 1):
+            parts.append(beam((x, sy * W / 2, 0), (x, sy * W / 2, H), 0.5, "rust"))
+            parts.append(beam((x, sy * W / 2, H), (x, 0, H + 4), 0.45, "rust"))
+    for sy in (-1, 1):  # Long walls of corrugated sheet, a gap low down for doors.
+        for k in range(10):
+            x = -L / 2 + 2 + k * (L - 4) / 10 + (L - 4) / 20
+            if k in (3, 6):
+                parts.append(box((x, sy * W / 2, H * 0.75), ((L - 4) / 10 - 0.1, 0.12, H * 0.5), "corrugated"))
+            else:
+                parts.append(box((x, sy * W / 2, H / 2), ((L - 4) / 10 - 0.1, 0.12, H), "corrugated"))
+    # Roof panels on both slopes; a few are missing.
+    import math as _m
+    slope = _m.atan2(4.0, W / 2)
+    missing = {(1, -1), (2, 1), (4, -1)}
+    for k in range(5):
+        x = -L / 2 + 2 + k * (L - 4) / 5 + (L - 4) / 10
+        for sy in (-1, 1):
+            if (k, sy) in missing:
+                continue
+            panel = box((0, 0, 0), ((L - 4) / 5 - 0.2, _m.hypot(W / 2, 4.0), 0.12), "corrugated")
+            base.place(panel, Matrix.Translation((x, sy * W / 4, H + 2)) @ Matrix.Rotation(-sy * slope, 4, "X"))
+            parts.append(panel)
+    # Crane rail along the inside, crates and a forklift-sized block for cover.
+    for sy in (-1, 1):
+        parts.append(beam((-L / 2 + 2, sy * (W / 2 - 1.5), H - 1.5), (L / 2 - 2, sy * (W / 2 - 1.5), H - 1.5), 0.5, "crane"))
+    parts.append(box((-6, -5, 1.2), (6, 3, 2.4), "wood"))
+    parts.append(box((8, 6, 1.0), (4, 2.5, 2.0), "wood_dark"))
+    return join(parts, "warehouse")
+
+
+def prism(bottom, top, z0, z1, material):
+    """A solid from a bottom outline at z0 to a top outline at z1 (same point count)."""
+    n = len(bottom)
+    verts = [(x, y, z0) for x, y in bottom] + [(x, y, z1) for x, y in top]
+    faces = [list(range(n))[::-1], list(range(n, 2 * n))]
+    for k in range(n):
+        faces.append([k, (k + 1) % n, n + (k + 1) % n, n + k])
+    mesh = bpy.data.meshes.new("prism")
+    mesh.from_pydata(verts, [], faces)
+    mesh.materials.append(base.mat(material))
+    o = bpy.data.objects.new("prism", mesh)
+    bpy.context.collection.objects.link(o)
+    return o
+
+
+def ship_hulk():
+    """A rusting freighter, 72 m along X (bow at +X), 13 m wide, deck at z = 9, with open
+    cargo holds, a superstructure aft and a funnel. It sits on the harbour bed."""
+    # The hull: one body, a flared pointed bow, narrower at the keel than at the deck.
+    deck = [(-34, -6.5), (22, -6.5), (30, -4.6), (37, 0), (30, 4.6), (22, 6.5), (-34, 6.5)]
+    keel = [(-33, -5.2), (21, -5.2), (27, -3.4), (31, 0), (27, 3.4), (21, 5.2), (-33, 5.2)]
+    parts = [prism(keel, deck, 0.0, 9.0, "hull_dark")]
+    band = [(x * 1.004, y * 1.01) for x, y in keel]
+    parts.append(prism(band, [(x * 1.004, y * 1.01) for x, y in keel], 0.0, 2.4, "rust"))  # Waterline rust.
+    for x in (-18, -4, 10):  # Open holds with coamings.
+        parts.append(box((x, 0, 8.95), (10, 9, 0.2), "dark"))
+        for sy in (-1, 1):
+            parts.append(box((x, sy * 4.6, 9.6), (10.4, 0.3, 1.2), "rust"))
+        for sx in (-1, 1):
+            parts.append(box((x + sx * 5.1, 0, 9.6), (0.3, 9.2, 1.2), "rust"))
+    parts.append(box((-29, 0, 15), (10, 12, 12), "paint"))  # Superstructure aft.
+    for z in (12, 15.5, 19):
+        parts.append(box((-23.98, 0, z), (0.05, 10, 1.0), "glass"))
+    parts.append(box((-29, 0, 21.4), (11, 14, 0.4), "rust"))  # Bridge wings.
+    parts.append(cyl((-31, 0, 21.4), (-31, 0, 28), 1.6, "rust", 16))
+    parts.append(box((-31, 0, 28.2), (3.4, 3.4, 0.4), "dark"))
+    for x in (-12, 4):  # Derrick posts.
+        parts.append(cyl((x, 0, 9), (x, 0, 20), 0.5, "rust", 12))
+        parts.append(beam((x, 0, 12), (x + 9, 0, 17), 0.35, "rust"))
+    return join(parts, "ship_hulk")
+
+
+def radio_mast():
+    """A 52 m triangular lattice mast in red and white bands, with a beacon on top."""
+    parts = []
+    corners = [(1.0, 0.0), (-0.5, 0.87), (-0.5, -0.87)]
+    for k in range(13):
+        z0, z1 = k * 4.0, (k + 1) * 4.0
+        paint = "marking_red" if k % 2 == 0 else "concrete"
+        for i, (x, y) in enumerate(corners):
+            nx, ny = corners[(i + 1) % 3]
+            parts.append(beam((x, y, z0), (x, y, z1), 0.12, paint))
+            parts.append(beam((x, y, z0), (nx, ny, z1), 0.05, paint))
+            parts.append(beam((x, y, z1), (nx, ny, z1), 0.05, paint))
+    parts.append(box((0, 0, 0.4), (3.0, 3.0, 0.8), "concrete"))
+    for z in (26, 52):
+        parts.append(ball((0, 0, z + 0.4), 0.35, "light_red", segments=10, rings=6))
+    parts.append(box((0.6, 0.9, 40), (0.2, 1.2, 2.0), "metal"))  # Antenna panels.
+    parts.append(box((-0.9, -0.3, 44), (1.2, 0.2, 2.0), "metal"))
+    return join(parts, "radio_mast")
+
+
 BUILDS = [station_pad, pylon, water_tower, headframe, lambda: shack("shack", 5.0), lambda: shack("shack_long", 9.0),
-          trestle, fuel_tank, crates]
+          trestle, fuel_tank, crates,
+          lambda: container("container_red", "container_red"), lambda: container("container_blue", "container_blue"),
+          lambda: container("container_green", "container_green"), lambda: container("container_orange", "container_orange"),
+          gantry_crane, warehouse, ship_hulk, radio_mast]
 
 
 def build():
@@ -265,9 +436,14 @@ if __name__ == "__main__":
         base.GROUND_Z = 0.0
         base.VIEWS.clear()
         names = ["station_pad", "pylon", "water_tower", "headframe", "shack", "shack_long", "trestle", "fuel_tank",
-                 "crates"]
+                 "crates", "container_red", "container_blue", "container_green", "container_orange", "gantry_crane",
+                 "warehouse", "ship_hulk", "radio_mast"]
+        only = args[2:]
         for k, name in enumerate(names):
-            size = {"pylon": 30, "trestle": 34, "headframe": 22, "water_tower": 17}.get(name, 13)
+            if only and name not in only:
+                continue
+            size = {"pylon": 30, "trestle": 34, "headframe": 22, "water_tower": 17, "gantry_crane": 60,
+                    "warehouse": 42, "ship_hulk": 75, "radio_mast": 55}.get(name, 13)
             base.VIEWS[name] = ((k * 40.0 + size * 1.1, -size * 1.5, size * 0.75), (k * 40.0, -size * 0.1, size * 0.4))
         base.preview(args[1], list(base.VIEWS))
     else:

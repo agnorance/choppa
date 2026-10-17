@@ -68,6 +68,7 @@ func _run() -> void:
 		"test_power_line_wrecks_a_rotor",
 		"test_wind_pushes_choppas",
 		"test_bots_battle_in_canyon",
+		"test_bots_battle_in_harbor",
 		"test_level_curve",
 		"test_camo_unlock_rules",
 		"test_battle_xp_and_profile",
@@ -502,6 +503,11 @@ func test_bots_battle_in_arena() -> void:
 
 func test_bots_battle_in_canyon() -> void:
 	await _bot_battle(SlotCanyon.new())
+
+
+## Rust Harbor: container alleys, cranes and warehouses must not trap the bots.
+func test_bots_battle_in_harbor() -> void:
+	await _bot_battle(RustHarbor.new())
 
 
 ## Four fighter bots for two minutes on `map`: they must move, fight, use rockets and

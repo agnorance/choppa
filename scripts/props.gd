@@ -44,6 +44,22 @@ static func place(parent: Node3D, prop_name: String, at: Vector3, yaw := 0.0, si
 	return root
 
 
+## A copy of the prop's mesh with the game's materials baked into its surfaces, for
+## MultiMeshes (many of the same prop, e.g. containers), or null when it is not built.
+static func mesh_for(prop_name: String) -> Mesh:
+	var source := _mesh(prop_name)
+	if source == null:
+		return null
+	var probe := MeshInstance3D.new()
+	probe.mesh = source
+	_apply_materials(probe)
+	var copy := source.duplicate() as ArrayMesh
+	for k in copy.get_surface_count():
+		copy.surface_set_material(k, probe.get_surface_override_material(k))
+	probe.free()
+	return copy
+
+
 static func _mesh(prop_name: String) -> Mesh:
 	if _meshes.is_empty():
 		if not ResourceLoader.exists(PATH):
@@ -65,6 +81,13 @@ static func _apply_materials(mi: MeshInstance3D) -> void:
 		_materials.rust = _surface(Color(0.45, 0.22, 0.11), 0.45, 0.75)
 		_materials.concrete = _surface(Color(0.58, 0.56, 0.52), 0.0, 0.95)
 		_materials.corrugated = _surface(Color(0.52, 0.5, 0.46), 0.65, 0.55)
+		# Harbour paint: sun-faded container colours, crane yellow, a dark ship hull.
+		_materials.container_red = _surface(Color(0.5, 0.15, 0.1), 0.35, 0.6)
+		_materials.container_blue = _surface(Color(0.12, 0.25, 0.42), 0.35, 0.6)
+		_materials.container_green = _surface(Color(0.17, 0.32, 0.2), 0.35, 0.6)
+		_materials.container_orange = _surface(Color(0.66, 0.33, 0.1), 0.35, 0.6)
+		_materials.crane = _surface(Color(0.95, 0.76, 0.12), 0.3, 0.5)
+		_materials.hull_dark = _surface(Color(0.14, 0.15, 0.16), 0.35, 0.7)
 	for k in mi.mesh.get_surface_count():
 		var source := mi.mesh.surface_get_material(k)
 		var key := source.resource_name if source else "concrete"

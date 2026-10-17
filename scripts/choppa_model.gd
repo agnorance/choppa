@@ -38,6 +38,10 @@ var _downwash_material: ShaderMaterial
 var _dust_colors: Gradient
 var _spray_colors: Gradient
 var _cracks: Array[MeshInstance3D] = []
+const ROTOR_DB := -4.0
+const ENGINE_DB := -8.0
+const BOOST_DB := -6.0
+const INSIDE_DB := -9.0  ## Own rotor, guns and afterburner from the cockpit.
 var _rotor_sound: AudioStreamPlayer3D
 var _engine_sound: AudioStreamPlayer3D
 var _boost_sound: AudioStreamPlayer3D
@@ -154,11 +158,11 @@ func _build() -> void:
 
 	if not silent:
 		# Rotor slap carries furthest; the engine and boost roar are closer up.
-		_rotor_sound = Sounds.loop_on(self, "rotor_loop", -4.0, 1.4)
+		_rotor_sound = Sounds.loop_on(self, "rotor_loop", ROTOR_DB, 1.4)
 		_rotor_sound.position = _rotor.position
-		_engine_sound = Sounds.loop_on(self, "engine_loop", -8.0)
+		_engine_sound = Sounds.loop_on(self, "engine_loop", ENGINE_DB)
 		_engine_sound.position = _rotor.position * Vector3(1.0, 0.6, 1.0)
-		_boost_sound = Sounds.loop_on(self, "boost_loop", -6.0)
+		_boost_sound = Sounds.loop_on(self, "boost_loop", BOOST_DB)
 		_boost_sound.position = _engine_sound.position + Vector3(0.0, 0.0, 1.0)
 		_boost_sound.stream_paused = true
 	if own and pilot and not pilot.restocked.is_connected(_on_restocked):
@@ -284,15 +288,22 @@ func update_pose(c: Choppa, delta: float) -> void:
 	_rotor_sound.stream_paused = not c.alive
 	_engine_sound.stream_paused = not c.alive
 	_boost_sound.stream_paused = not c.is_boosting() or not c.alive
+	# In the cockpit the listener sits right at the rotor and the guns: without this they
+	# play at full volume (owner: "inside is way too loud"). The engine whine stays more.
+	var inside := cockpit_view != null and cockpit_view.reticle.visible
+	_rotor_sound.volume_db = ROTOR_DB + (INSIDE_DB if inside else 0.0)
+	_engine_sound.volume_db = ENGINE_DB + (INSIDE_DB * 0.55 if inside else 0.0)
+	_boost_sound.volume_db = BOOST_DB + (INSIDE_DB if inside else 0.0)
+	var gun_db := (0.0 if own else -3.0) + (INSIDE_DB if inside else 0.0)
 	if c.last_shot_time != _last_shot and c.last_shot_time > _last_shot:
 		_last_shot = c.last_shot_time
 		_burst += 1
 		var muzzle := global_transform * (_flashes[1 if c.last_shot_side > 0.0 else 0].position)
-		Sounds.play_at(get_tree().current_scene, "gun", muzzle, -3.0 if own else -6.0, randf_range(0.94, 1.06))
+		Sounds.play_at(get_tree().current_scene, "gun", muzzle, gun_db, randf_range(0.94, 1.06))
 	elif _burst > 0 and c.clock - c.last_shot_time > Choppa.GUN_INTERVAL * 1.6:
 		# The burst ended: its sound rolls on over the terrain. Longer bursts, a bigger tail.
 		Sounds.play_at(get_tree().current_scene, "gun_tail", global_position,
-			(-6.0 if own else -9.0) + minf(_burst, 12.0) * 0.25, randf_range(0.95, 1.05), 1.5)
+			gun_db - 4.0 + minf(_burst, 12.0) * 0.25, randf_range(0.95, 1.05), 1.5)
 		_burst = 0
 
 	_parts.visible = c.invulnerable <= 0.0 or fmod(c.invulnerable, 0.2) > 0.08

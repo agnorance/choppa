@@ -263,5 +263,54 @@
     ],
     "loudness": -16,
     "fade_out": 0.3
+  },
+  "hit_marker": {
+    "_note": "Your rounds landing: a crisp metal tick (owner: the synthesized one was bad).",
+    "takes": [
+      {
+        "file": "Pole Position - The Metal Hit Sweeteners Library/Spade - HIT - Drumstick - Ring - Mute.wav",
+        "start": 0.055,
+        "length": 0.14,
+        "pitch": 1.5
+      },
+      {
+        "file": "Pole Position - The Metal Hit Sweeteners Library/Spade - HIT - Drumstick - Ring - Mute.wav",
+        "start": 2.335,
+        "length": 0.14,
+        "pitch": 1.5
+      },
+      {
+        "file": "Pole Position - The Metal Hit Sweeteners Library/Spade - HIT - Drumstick - Ring - Mute.wav",
+        "start": 4.425,
+        "length": 0.14,
+        "pitch": 1.5
+      },
+      {
+        "file": "Pole Position - The Metal Hit Sweeteners Library/Spade - HIT - Drumstick - Ring - Mute.wav",
+        "start": 6.525,
+        "length": 0.14,
+        "pitch": 1.5
+      }
+    ],
+    "loudness": -15,
+    "highpass": 700,
+    "fade_out": 0.07
+  },
+  "part_hit": {
+    "_note": "You wrecked a part: a heavy iron clank.",
+    "takes": [
+      {
+        "file": "Pole Position - The Metal Hit Sweeteners Library/Iron - Thick - HIT - Hammer.wav",
+        "start": 1.79,
+        "length": 0.7
+      },
+      {
+        "file": "Pole Position - The Metal Hit Sweeteners Library/Iron - Thick - HIT - Hammer.wav",
+        "start": 5.35,
+        "length": 0.7
+      }
+    ],
+    "loudness": -14,
+    "fade_out": 0.3
   }
 }

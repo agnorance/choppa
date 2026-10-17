@@ -175,6 +175,17 @@ def gun():
     return lowpass(crack + body + punch + thump + clack + tail, 7000.0)
 
 
+def gun_tail():
+    """What rolls on after a burst stops: a low boom echoing off the terrain."""
+    s = 1.6
+    n = int(s * RATE)
+    echo = np.zeros(n)
+    for at, gain in [(0.0, 1.0), (0.12, 0.5), (0.31, 0.3), (0.55, 0.18)]:
+        place(echo, lowpass(noise(0.5), 700.0) * env(0.5, 0.004, 0.18), at, gain)
+    rumble = sine(s, np.geomspace(90.0, 45.0, n)) * env(s, 0.01, 0.35) * 0.5
+    return lowpass(echo + rumble, 2500.0) * 0.8
+
+
 def explosion():
     """A big boom: crack, roaring fireball, sub-bass thump, debris crackle."""
     s = 3.0
@@ -385,7 +396,7 @@ def music_battle():
 
 SOUNDS = {
     "rotor_loop": rotor_loop, "engine_loop": engine_loop, "boost_loop": boost_loop,
-    "missile_loop": missile_loop, "warning_loop": warning_loop, "gun": gun, "explosion": explosion,
+    "missile_loop": missile_loop, "warning_loop": warning_loop, "gun": gun, "gun_tail": gun_tail, "explosion": explosion,
     "impact_metal": impact_metal, "impact_dirt": impact_dirt, "splash": splash,
     "missile_launch": missile_launch, "pickup": pickup, "rocket_launch": rocket_launch, "flares": flares,
     "station_service": station_service, "station_done": station_done, "cable_strike": cable_strike,

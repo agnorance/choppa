@@ -1,3 +1,267 @@
 {
-  "_about": "Game sounds cut from recorded libraries; see import_sounds.py. Paths are relative to CHOPPA_SFX."
+  "_about": "Game sounds cut from recorded libraries; see import_sounds.py. Paths are relative to the library (sound/Z_keep). First pass 2026-10-17 from the owner's Pixabay picks and the Sonniss GDC bundles.",
+  "gun": {
+    "_note": "Single 50-cal rounds cut out of bursts, each up to the next shot.",
+    "takes": [
+      {
+        "file": "pixabay/freesound_community-066507_heavy-machine-gun-50-caliber-39762.mp3",
+        "start": 0.15,
+        "length": 0.11
+      },
+      {
+        "file": "pixabay/freesound_community-066507_heavy-machine-gun-50-caliber-39762.mp3",
+        "start": 0.386,
+        "length": 0.11
+      },
+      {
+        "file": "pixabay/freesound_community-066507_heavy-machine-gun-50-caliber-39762.mp3",
+        "start": 0.622,
+        "length": 0.11
+      },
+      {
+        "file": "pixabay/freesound_community-066507_heavy-machine-gun-50-caliber-39762.mp3",
+        "start": 0.862,
+        "length": 0.11
+      },
+      {
+        "file": "pixabay/freesound_community-066507_heavy-machine-gun-50-caliber-39762.mp3",
+        "start": 1.094,
+        "length": 0.11
+      },
+      {
+        "file": "pixabay/freesound_community-066507_heavy-machine-gun-50-caliber-39762.mp3",
+        "start": 1.326,
+        "length": 0.11
+      },
+      {
+        "file": "pixabay/freesound_community-066496_heavy-machine-gun-50-caliber-28243.mp3",
+        "start": 0.266,
+        "length": 0.11
+      },
+      {
+        "file": "pixabay/freesound_community-066496_heavy-machine-gun-50-caliber-28243.mp3",
+        "start": 0.498,
+        "length": 0.11
+      },
+      {
+        "file": "pixabay/freesound_community-066496_heavy-machine-gun-50-caliber-28243.mp3",
+        "start": 0.734,
+        "length": 0.11
+      },
+      {
+        "file": "pixabay/freesound_community-066496_heavy-machine-gun-50-caliber-28243.mp3",
+        "start": 1.206,
+        "length": 0.11
+      }
+    ],
+    "loudness": -14.5,
+    "fade_out": 0.012,
+    "highpass": 50
+  },
+  "gun_tail": {
+    "_note": "The last round of a burst with its full tail, played when the trigger is released.",
+    "takes": [
+      {
+        "file": "pixabay/freesound_community-066507_heavy-machine-gun-50-caliber-39762.mp3",
+        "start": 1.782,
+        "length": 2.2
+      },
+      {
+        "file": "pixabay/freesound_community-066496_heavy-machine-gun-50-caliber-28243.mp3",
+        "start": 1.778,
+        "length": 2.2
+      }
+    ],
+    "loudness": -18,
+    "fade_out": 0.6,
+    "highpass": 40
+  },
+  "rotor_loop": {
+    "takes": [
+      {
+        "file": "pixabay/freesound_community-helicopter-blades-64590.mp3",
+        "start": 12.0,
+        "length": 3.0
+      }
+    ],
+    "loop": true,
+    "crossfade": 0.6,
+    "loudness": -16
+  },
+  "engine_loop": {
+    "_note": "Turbine whine from a jet engine at steady power.",
+    "takes": [
+      {
+        "file": "pixabay/derrickmckinnon-starting-of-jet-engine-286108.mp3",
+        "start": 50.0,
+        "length": 4.0
+      }
+    ],
+    "loop": true,
+    "crossfade": 0.8,
+    "loudness": -15
+  },
+  "boost_loop": {
+    "takes": [
+      {
+        "file": "344 Audio - Air Designed/AEROJet_Blast Off Clean_344 Audio_Air Designed.wav",
+        "start": 4.5,
+        "length": 2.5
+      }
+    ],
+    "loop": true,
+    "crossfade": 0.6,
+    "loudness": -14.5
+  },
+  "rocket_launch": {
+    "takes": [
+      {
+        "file": "344 Audio - Air Designed/AEROJet_Blast Off Clean_344 Audio_Air Designed.wav",
+        "start": 3.55,
+        "length": 1.1,
+        "pitch": 1.4
+      }
+    ],
+    "loudness": -18,
+    "fade_in": 0.01,
+    "fade_out": 0.45
+  },
+  "explosion": {
+    "takes": [
+      {
+        "file": "DavidDumais - Explosion SFX Pack/EXPLReal_Medium Realistic Explosion 15_DDUMAIS_NONE.wav",
+        "start": 0.0,
+        "length": 2.4
+      },
+      {
+        "file": "DavidDumais - Explosion SFX Pack/DESTRCrsh_Designed Car Explosion With Metal Breaking And Glass Shattering  06_DDUMAIS_NONE.wav",
+        "start": 0.0,
+        "length": 4.0
+      },
+      {
+        "file": "Pole Position - The Warfare 2 Library/Tank Mine - EXPLOSION - Mounted on Metal Beam - DISTANT - AMBEO BLD.wav",
+        "start": 0.78,
+        "length": 4.0
+      },
+      {
+        "file": "Pole Position - The Warfare 2 Library/RPG - FIRING AND IMPACT - Through Car Roof Hit Metal - XY - MKH8040.wav",
+        "start": 0.54,
+        "length": 3.0
+      }
+    ],
+    "loudness": -14.5,
+    "fade_out": 0.8
+  },
+  "impact_metal": {
+    "_note": "Hammer hits on thick iron and an oil barrel, pitched up to bullet size.",
+    "takes": [
+      {
+        "file": "Pole Position - The Metal Hit Sweeteners Library/Iron - Thick - HIT - Hammer.wav",
+        "start": 0.0,
+        "length": 0.5,
+        "pitch": 1.4
+      },
+      {
+        "file": "Pole Position - The Metal Hit Sweeteners Library/Iron - Thick - HIT - Hammer.wav",
+        "start": 1.79,
+        "length": 0.5,
+        "pitch": 1.4
+      },
+      {
+        "file": "Pole Position - The Metal Hit Sweeteners Library/Iron - Thick - HIT - Hammer.wav",
+        "start": 3.58,
+        "length": 0.5,
+        "pitch": 1.4
+      },
+      {
+        "file": "Pole Position - The Metal Hit Sweeteners Library/Iron - Thick - HIT - Hammer.wav",
+        "start": 5.35,
+        "length": 0.5,
+        "pitch": 1.4
+      },
+      {
+        "file": "Pole Position - The Metal Hit Sweeteners Library/Oil Barrel - HIT - Hammer - Take 2.wav",
+        "start": 0.0,
+        "length": 0.5,
+        "pitch": 1.25
+      },
+      {
+        "file": "Pole Position - The Metal Hit Sweeteners Library/Oil Barrel - HIT - Hammer - Take 2.wav",
+        "start": 2.14,
+        "length": 0.5,
+        "pitch": 1.25
+      },
+      {
+        "file": "Pole Position - The Metal Hit Sweeteners Library/Oil Barrel - HIT - Hammer - Take 2.wav",
+        "start": 4.57,
+        "length": 0.5,
+        "pitch": 1.25
+      }
+    ],
+    "loudness": -17,
+    "fade_out": 0.15
+  },
+  "impact_dirt": {
+    "takes": [
+      {
+        "file": "BluezoneCorp - Stone Impact/Bluezone_BC0297_stone_impact_015.wav",
+        "start": 0.0,
+        "length": 0.4,
+        "pitch": 1.1
+      },
+      {
+        "file": "BluezoneCorp - Stone Impact/Bluezone_BC0297_stone_impact_015.wav",
+        "start": 0.25,
+        "length": 0.4,
+        "pitch": 1.1
+      },
+      {
+        "file": "BluezoneCorp - Stone Impact/Bluezone_BC0297_stone_impact_041.wav",
+        "start": 0.0,
+        "length": 0.4,
+        "pitch": 1.1
+      },
+      {
+        "file": "BluezoneCorp - Stone Impact/Bluezone_BC0297_stone_impact_041.wav",
+        "start": 0.23,
+        "length": 0.4,
+        "pitch": 1.1
+      },
+      {
+        "file": "BluezoneCorp - Stone Impact/Bluezone_BC0297_stone_impact_041.wav",
+        "start": 0.47,
+        "length": 0.4,
+        "pitch": 1.1
+      }
+    ],
+    "loudness": -16,
+    "fade_out": 0.12,
+    "lowpass": 7000
+  },
+  "splash": {
+    "takes": [
+      {
+        "file": "pixabay/alex_jauk-water-splash-147014.mp3",
+        "start": 0.12,
+        "length": 0.9
+      },
+      {
+        "file": "pixabay/freesound_community-splash-by-blaukreuz-6261.mp3",
+        "start": 0.0,
+        "length": 1.6
+      },
+      {
+        "file": "pixabay/universfield-water-splash-229315.mp3",
+        "start": 0.1,
+        "length": 1.3
+      },
+      {
+        "file": "pixabay/universfield-water-splash-02-352021.mp3",
+        "start": 0.13,
+        "length": 2.5
+      }
+    ],
+    "loudness": -16,
+    "fade_out": 0.3
+  }
 }

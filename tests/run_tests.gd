@@ -1439,7 +1439,8 @@ func test_gun_spread_blooms_with_heat() -> void:
 func test_loops_loop_and_takes_are_counted() -> void:
 	var rotor := Sounds.stream("rotor_loop") as AudioStreamWAV
 	_check(rotor != null and rotor.loop_mode != AudioStreamWAV.LOOP_DISABLED, "the rotor loops")
-	_check(Sounds._take_count("gun") == 0 and Sounds.stream("gun") != null, "a single gun file plays")
+	_check(Sounds._take_count("hit_marker") == 0 and Sounds.stream("hit_marker") != null, "a sound without takes plays its one file")
+	_check(Sounds.stream("gun") != null and Sounds.stream("gun_tail") != null, "the gun and its tail play, recorded or stand-in")
 	_check(Sounds._take_count("no_such_sound") == 0, "no takes of a missing sound")
 
 

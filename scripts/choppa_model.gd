@@ -42,6 +42,7 @@ var _rotor_sound: AudioStreamPlayer3D
 var _engine_sound: AudioStreamPlayer3D
 var _boost_sound: AudioStreamPlayer3D
 var _last_shot := -10.0
+var _burst := 0  ## Rounds in the current burst, for the tail when it ends.
 
 
 var airframe := Airframe.SCOUT  ## Which model to wear; see Airframe.TABLE.
@@ -285,8 +286,14 @@ func update_pose(c: Choppa, delta: float) -> void:
 	_boost_sound.stream_paused = not c.is_boosting() or not c.alive
 	if c.last_shot_time != _last_shot and c.last_shot_time > _last_shot:
 		_last_shot = c.last_shot_time
+		_burst += 1
 		var muzzle := global_transform * (_flashes[1 if c.last_shot_side > 0.0 else 0].position)
 		Sounds.play_at(get_tree().current_scene, "gun", muzzle, -3.0 if own else -6.0, randf_range(0.94, 1.06))
+	elif _burst > 0 and c.clock - c.last_shot_time > Choppa.GUN_INTERVAL * 1.6:
+		# The burst ended: its sound rolls on over the terrain. Longer bursts, a bigger tail.
+		Sounds.play_at(get_tree().current_scene, "gun_tail", global_position,
+			(-6.0 if own else -9.0) + minf(_burst, 12.0) * 0.25, randf_range(0.95, 1.05), 1.5)
+		_burst = 0
 
 	_parts.visible = c.invulnerable <= 0.0 or fmod(c.invulnerable, 0.2) > 0.08
 	if cockpit_view:  # Blinks with the hull in chase view; always there from the seat.

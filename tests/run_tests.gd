@@ -106,6 +106,7 @@ func _run() -> void:
 		"test_wreck_falls_and_burns",
 		"test_time_of_day",
 		"test_kill_cam_watches_the_killer",
+		"test_gunsight_brackets_the_target",
 		"test_spawns_are_on_dry_clear_ground",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
@@ -261,6 +262,30 @@ func test_bullets_knock_target_back() -> void:
 	_check(hits.size() >= 8, "scored hits, got %d" % hits.size())
 	_check(hits.all(func(t: Choppa) -> bool: return t == target), "hit the target")
 	_check(target.velocity.z < -0.2, "pushed away from shooter, v=%s" % target.velocity)
+
+
+## Owner: "make the aim thingy look cooler". The gunsight brackets the choppa the guns
+## snap onto, in the chase view and from the seat (where it turns phosphor green).
+func test_gunsight_brackets_the_target() -> void:
+	var shooter := _choppa(Vector3(0.0, 10.0, 0.0))
+	var target := _choppa(Vector3(4.0, 14.0, -50.0))
+	var camera := ChaseCamera.new()
+	camera.target = shooter
+	_world.add_child(camera)
+	camera.make_current()
+	# Loaded at run time: hud.gd uses the Controls autoload, which a --script run only
+	# has once the tests are running.
+	var hud: Node = load("res://scripts/hud.gd").new(shooter)
+	hud.set("camera", camera)
+	_world.add_child(hud)
+	for first_person: bool in [false, true]:
+		camera.first_person = first_person
+		hud.set("_bracketed", null)
+		for k in 4:
+			await process_frame
+		_check(hud.get("_bracketed") == target, "brackets on the target (first person %s)" % first_person)
+	hud.free()
+	camera.free()
 
 
 func test_aim_assist_hits_target_above() -> void:

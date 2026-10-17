@@ -416,14 +416,15 @@ def extinguisher(x, y, z, axis=(0, 0, 1)):
     return parts
 
 
-def compass(location):
-    """The whiskey compass: a little round case on a bracket."""
+def compass(location, hanging=True):
+    """The whiskey compass: a little round case on a bracket (hung from the frame, or
+    standing on the coaming)."""
     loc = Vector(location)
     return [prim("cylinder", "dark", location=loc, rotation=(math.pi / 2, 0, 0), vertices=20, radius=0.032, depth=0.04,
                  bevel_width=0.004),
             prim("cylinder", "placard", location=loc + Vector((0, -0.021, 0)), rotation=(math.pi / 2, 0, 0), vertices=20,
                  radius=0.024, depth=0.002),
-            prim("cube", "dark", location=loc + Vector((0, 0.02, 0.04)), scale=(0.008, 0.008, 0.03))]
+            prim("cube", "dark", location=loc + Vector((0, 0.02, 0.04 if hanging else -0.04)), scale=(0.008, 0.008, 0.03))]
 
 
 def wiring(points, count=4, spread=0.012):

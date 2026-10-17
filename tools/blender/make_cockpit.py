@@ -155,13 +155,20 @@ def build_scout():
     shell += cp.breakers(low, 0.24, -0.1, 7, 2)
     # Gunsight on a post above the coaming, its glass dead ahead of the eye.
     top = panel.at(0, hh + 0.01, 0.05) + Vector((0, 0, 0.02))
-    shell.append(cyl(top, (0, 0.6, -0.13), 0.013, "metal", 10))
-    shell.append(cp.prim("cylinder", "dark", location=(0, 0.6, -0.11), vertices=24, radius=0.045, depth=0.04,
-                         bevel_width=0.008))
-    shell.append(cp.prim("torus", "brass", location=(0, 0.6, -0.09), major_radius=0.045, minor_radius=0.006,
-                         major_segments=28, minor_segments=6))
-    for side in (-1, 1):
-        shell.append(cyl((side * 0.04, 0.6, -0.09), (side * 0.04, 0.6, 0.06), 0.005, "metal", 6))
+    # A reflector sight head: the lamp housing low, out of the line of sight, and its
+    # combiner glass leaning away at 35 degrees in a thin frame.
+    shell.append(cyl(top, (0, 0.6, -0.15), 0.013, "metal", 10))
+    shell.append(box((0, 0.6, -0.125), (0.11, 0.1, 0.05), "dark", bevel_width=0.008))
+    shell.append(box((0, 0.6, -0.098), (0.08, 0.07, 0.006), "screen"))  # The lens window.
+    shell.append(box((0, 0.535, -0.13), (0.1, 0.03, 0.04), "rubber", bevel_width=0.01))  # Crash pad.
+    shell.append(cyl((0.055, 0.6, -0.125), (0.072, 0.6, -0.125), 0.011, "dark", 14))  # Dimmer knob.
+    tilt = math.radians(-35)
+    up = Vector((0, -math.sin(tilt), math.cos(tilt)))
+    glass_at = Vector((0, 0.6, -0.045))
+    shell.append(box(glass_at, (0.1, 0.003, 0.1), "glass", rotation=(tilt, 0, 0)))
+    for side in (-1, 1):  # Short side cheeks and a rim along the top edge.
+        shell.append(box(glass_at + Vector((side * 0.052, 0, 0)), (0.006, 0.008, 0.1), "metal", rotation=(tilt, 0, 0)))
+    shell.append(box(glass_at + up * 0.05, (0.11, 0.008, 0.006), "metal", rotation=(tilt, 0, 0)))
     cp.empty("mount_sight", (0, 0.6, 0.0))
     # Side consoles with switch fields and breakers.
     for side in (-1, 1):
@@ -182,7 +189,7 @@ def build_scout():
     shell += cp.seat(0, -0.05, -0.72, 0.5, 0.62)
     shell += bulkhead(-0.42, -0.62, 0.62, -1.0, 0.22)
     shell += cp.extinguisher(-0.5, -0.25, -0.98, (0, 0, 1))
-    shell += cp.compass((0, 0.55, 0.36))
+    shell += cp.compass((0.3, 0.6, -0.07), hanging=False)  # On the coaming, clear of the view ahead.
     # The canopy frame (the inside of the exterior's members) and the tub walls.
     off = lambda pts: [p - eye for p in pts]  # noqa: E731
     frame.append(tube(off(shared.sill_points(-0.03, 30)), 0.03))

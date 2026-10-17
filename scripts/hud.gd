@@ -30,6 +30,9 @@ var _crosshair: Control
 var _callout: Label
 var _callout_time := 0.0
 var _hit_flash := 0.0
+const HUD_GREEN := Color(0.5, 1.0, 0.45, 0.95)  ## The cockpit sight's phosphor.
+var _bracketed: Choppa  ## The target the brackets are on, and since when.
+var _bracket_time := 0.0
 var _controls: Control
 var _flight: Array[Control] = []  ## Hidden in the cockpit view.
 
@@ -256,31 +259,103 @@ func _process(delta: float) -> void:
 		_callout.modulate.a = clampf(_callout_time / 0.4, 0.0, 1.0)
 
 
-## A small cross where your guns point, or a ring around the locked-on target.
+## The gunsight: a pipper whose segments spread as the barrels heat (the bloom), with
+## thin gauges round it for gun heat (left) and rounds left (right); corner brackets
+## close in on the target the guns are on, with its name and range, and go red with a
+## turning diamond when a missile can lock. Everything has a dark edge so it reads
+## against a bright sky.
 func _draw_crosshair() -> void:
 	if camera == null or not choppa.alive:
 		return
-	var color := UiKit.DANGER if _hit_flash > 0.0 else Color(UiKit.TEXT, 0.9)
 	var target := choppa.aim_target()
-	if target:
-		if not camera.is_position_behind(target.global_position):
-			var at := camera.unproject_position(target.global_position)
-			_crosshair.draw_arc(at, 30.0, 0.0, TAU, 48, color if _hit_flash > 0.0 else UiKit.ACCENT, 2.0, true)
-			for d: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
-				_crosshair.draw_line(at + d * 30.0, at + d * 38.0, color, 2.0, true)
-		return
-	if camera is ChaseCamera and (camera as ChaseCamera).first_person:
-		return  # The gunsight in the cockpit is the crosshair.
+	var lock: Choppa = choppa.missile_target() if choppa.ammo.missiles > 0 else null
+	var boxed := target if target else lock  # The guns' target, else the missile's.
+	if boxed != _bracketed:
+		_bracketed = boxed
+		_bracket_time = 0.0
+	if boxed and not camera.is_position_behind(boxed.global_position):
+		_draw_brackets(camera.unproject_position(boxed.global_position), boxed, lock == boxed)
+	var cockpit := camera is ChaseCamera and (camera as ChaseCamera).first_person
 	var ahead := choppa.global_position - choppa.global_transform.basis.z * 80.0
+	if cockpit:
+		# The sight is collimated: its picture sits at infinity along the boresight, so it
+		# stays put on the world however the head moves (free look swings it away).
+		ahead = camera.global_position - choppa.global_transform.basis.z * 400.0
+	if target:
+		ahead = target.global_position  # The guns snap onto it.
 	if camera.is_position_behind(ahead):
 		return
-	var c := camera.unproject_position(ahead)
-	for d: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
-		_crosshair.draw_line(c + d * 5.0, c + d * 13.0, color, 1.5, true)
-	if _hit_flash > 0.0:
-		# Hit marker: four short diagonal ticks around the cross.
+	_draw_pipper(camera.unproject_position(ahead), HUD_GREEN if cockpit else Color(UiKit.TEXT, 0.92))
+
+
+func _draw_pipper(c: Vector2, white: Color) -> void:
+	var hit := _hit_flash > 0.0
+	var color := UiKit.DANGER if hit else white
+	var r := 10.0 + choppa.heat * 16.0  # The bloom, roughly as wide as the spread.
+	_dot(c, 1.8, color)
+	for k in 4:  # Four arcs on the diagonals, open at the cardinal points.
+		var mid := PI * 0.25 + k * PI * 0.5
+		_arc(c, r, mid - 0.45, mid + 0.45, color, 1.6)
+	for d: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.DOWN]:
+		_line(c + d * (r + 5.0), c + d * (r + 12.0), color, 1.6)
+	# Heat on the left, rounds on the right: thin arcs on a faint track.
+	var track := Color(1, 1, 1, 0.16)
+	var gauge := 34.0
+	var heat_color := white.lerp(UiKit.ACCENT, smoothstep(0.3, 0.7, choppa.heat))
+	if choppa.overheated or choppa.heat > 0.85:
+		heat_color = UiKit.DANGER if fmod(choppa.clock, 0.3) < 0.18 else UiKit.ACCENT
+	_crosshair.draw_arc(c, gauge, PI * 0.72, PI * 1.28, 24, track, 2.0, true)
+	if choppa.heat > 0.01:
+		_arc(c, gauge, PI * 1.28 - PI * 0.56 * choppa.heat, PI * 1.28, heat_color, 2.4)
+	var rounds := float(choppa.ammo.gun) / maxf(1.0, choppa.full_ammo("gun"))
+	_crosshair.draw_arc(c, gauge, -PI * 0.28, PI * 0.28, 24, track, 2.0, true)
+	if rounds > 0.0:
+		_arc(c, gauge, PI * 0.28 - PI * 0.56 * rounds, PI * 0.28, UiKit.ACCENT if rounds < 0.2 else Color(white, 0.7), 2.4)
+	if hit:  # Hit marker: crisp diagonal ticks just outside the bloom.
 		for d: Vector2 in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
-			_crosshair.draw_line(c + d * 9.0, c + d * 17.0, UiKit.TEXT, 2.0, true)
+			var n := d.normalized()
+			_line(c + n * (r + 4.0), c + n * (r + 12.0), Color.WHITE if white != HUD_GREEN else UiKit.DANGER, 2.2)
+
+
+func _draw_brackets(at: Vector2, target: Choppa, locked: bool) -> void:
+	_bracket_time += get_process_delta_time()
+	var size := lerpf(64.0, 34.0, smoothstep(0.0, 0.25, _bracket_time))  # Closing in.
+	var color := UiKit.DANGER if locked else UiKit.ACCENT
+	var leg := size * 0.45
+	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+		var p := at + corner * size
+		_line(p, p - Vector2(corner.x, 0.0) * leg, color, 2.0)
+		_line(p, p - Vector2(0.0, corner.y) * leg, color, 2.0)
+	if locked:  # A turning diamond and the word.
+		var a := choppa.clock * 2.5
+		var pts := PackedVector2Array()
+		for k in 5:
+			pts.append(at + Vector2.from_angle(a + k * PI * 0.5) * (size * 0.62))
+		_crosshair.draw_polyline(pts, Color(0, 0, 0, 0.5), 4.0, true)
+		_crosshair.draw_polyline(pts, color, 2.0, true)
+	var font := UiKit.font("condensed")
+	var label := "%s  %d m%s" % [target.pilot_name.to_upper(), roundi(choppa.global_position.distance_to(target.global_position)),
+		"  ·  LOCK" if locked else ""]
+	var width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+	var spot := at + Vector2(-width * 0.5, size + 20.0)
+	_crosshair.draw_string_outline(font, spot, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 4, Color(0, 0, 0, 0.6))
+	_crosshair.draw_string(font, spot, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, color)
+
+
+# Sight primitives with a dark edge under them.
+func _line(a: Vector2, b: Vector2, color: Color, width: float) -> void:
+	_crosshair.draw_line(a, b, Color(0, 0, 0, 0.45), width + 2.0, true)
+	_crosshair.draw_line(a, b, color, width, true)
+
+
+func _arc(c: Vector2, radius: float, from: float, to: float, color: Color, width: float) -> void:
+	_crosshair.draw_arc(c, radius, from, to, 16, Color(0, 0, 0, 0.45), width + 2.0, true)
+	_crosshair.draw_arc(c, radius, from, to, 16, color, width, true)
+
+
+func _dot(c: Vector2, radius: float, color: Color) -> void:
+	_crosshair.draw_circle(c, radius + 1.0, Color(0, 0, 0, 0.45))
+	_crosshair.draw_circle(c, radius, color)
 
 
 ## What a part is called on this choppa: a coaxial one has a tail, not a tail rotor.

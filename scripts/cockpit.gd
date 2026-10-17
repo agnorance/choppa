@@ -294,41 +294,21 @@ func _build_lamp(mount: Node3D, color: Color, text: String) -> StandardMaterial3
 	return m
 
 
-## Green collimator reticle on the gunsight glass: ring, four ticks, centre dot.
-## It sits dead ahead of the eye, so it lines up with where the guns point.
+## The gunsight's picture is drawn by the HUD (Hud._draw_pipper, in green from the
+## seat): a collimated sight sits at infinity, so it is a screen overlay along the
+## boresight. Here only the faint glow of the combiner glass, so the glass reads lit.
 func _build_reticle(mount: Node3D) -> void:
 	var glow := StandardMaterial3D.new()
 	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	glow.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	glow.albedo_color = Color(0.45, 1.6, 0.35)
-	glow.no_depth_test = true
-	var ring := TorusMesh.new()
-	ring.inner_radius = 0.0225
-	ring.outer_radius = 0.0245
-	ring.rings = 48
-	ring.ring_segments = 4
-	var ring_mesh := MeshInstance3D.new()
-	ring_mesh.mesh = ring
-	ring_mesh.material_override = glow
-	ring_mesh.rotation_degrees.x = 90.0
-	mount.add_child(ring_mesh)
-	for k in 4:
-		var tick := MeshInstance3D.new()
-		var bar := BoxMesh.new()
-		bar.size = Vector3(0.0016, 0.011, 0.0005)
-		tick.mesh = bar
-		tick.material_override = glow
-		var a := k * PI * 0.5
-		tick.position = Vector3(sin(a), cos(a), 0.0) * 0.031
-		tick.rotation.z = -a
-		mount.add_child(tick)
-	var dot := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.0016
-	sphere.height = 0.0032
-	dot.mesh = sphere
-	dot.material_override = glow
-	mount.add_child(dot)
+	glow.albedo_color = Color(0.04, 0.12, 0.03)
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.09, 0.09)
+	var sheen := MeshInstance3D.new()
+	sheen.mesh = quad
+	sheen.material_override = glow
+	sheen.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mount.add_child(sheen)
 
 
 func _set_lamp(lamp_name: String, on: bool) -> void:
@@ -365,7 +345,7 @@ func _build_mfd(mount: Node3D, page: String) -> void:
 ## Head-up display numbers round the reticle: speed left, altitude right, heading above,
 ## loadout below. Green like the reticle; they show only from the seat.
 func _build_hud(mount: Node3D) -> void:
-	for spot: Vector3 in [Vector3(-0.07, 0.0, 0.0), Vector3(0.07, 0.0, 0.0), Vector3(0.0, 0.055, 0.0), Vector3(0.0, -0.055, 0.0)]:
+	for spot: Vector3 in [Vector3(-0.11, 0.0, 0.0), Vector3(0.11, 0.0, 0.0), Vector3(0.0, 0.08, 0.0), Vector3(0.0, -0.07, 0.0)]:
 		var label := _label(mount, "", 40, Color(0.45, 1.6, 0.35), spot)
 		label.pixel_size = 0.00035
 		label.no_depth_test = true

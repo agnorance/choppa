@@ -30,6 +30,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import make_choppa as base  # noqa: E402
 
 from make_choppa import ball, box, cyl, empty, fin, join, loft, ring, tube, wing  # noqa: E402
+from make_cockpit import STRIKER_POSTS, eye_post  # noqa: E402  (the cockpit's posts, framed the same outside)
 
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "models", "choppa")
 
@@ -175,12 +176,13 @@ def ell(c, r, a, e):
     return Vector(c) + Vector((r[0] * math.cos(e) * math.sin(a), r[1] * math.cos(e) * math.cos(a), r[2] * math.sin(e)))
 
 
-def framed_canopy(c, r, sill, roof, rear, posts, rails=(), bar=0.022):
+def framed_canopy(c, r, sill, roof, rear, posts, rails=(), bar=0.022, eye_posts=(), eye=None):
     """A canopy the way the Little Bird's cabin is made: one ellipsoid shell, glass only
     between the sill and the roof and ahead of the rear posts (azimuth +-rear), painted
     elsewhere, the cut lines on the mesh's own edges so the glass edge is clean; frame
     bars over every edge of the glass, the posts at `posts` and rails at the elevations
-    `rails`."""
+    `rails`. `eye_posts` are bearings from `eye`, laid out as the cockpit lays them out
+    (make_cockpit.eye_post)."""
     steps_a = sorted(set([round(-math.pi + 2 * math.pi * k / 48, 5) for k in range(48)] + [round(-rear, 5), round(rear, 5)]))
     steps_e = sorted(set([round(-math.pi / 2 + math.pi * k / 24, 5) for k in range(1, 24)] + [round(sill, 5), round(roof, 5)]))
     bm = bmesh.new()
@@ -217,6 +219,10 @@ def framed_canopy(c, r, sill, roof, rear, posts, rails=(), bar=0.022):
         parts.append(line(a, sill, a, roof, 12))
     for e in rails:
         parts.append(line(-rear, e, rear, e, 32))
+    for bearing in eye_posts:
+        points = eye_post(c, out, bearing, sill, roof, origin=Vector(eye))
+        if len(points) > 1:
+            parts.append(tube(points, bar, "paint", 8))
     return parts
 
 
@@ -677,6 +683,105 @@ def build_heavy():
 
 # --- the striker -------------------------------------------------------------------
 
+STRIKER_BODY = [
+    (3.35, 0.1, -0.2, -0.1, -0.3, 2.0, 2.0),
+    (3.0, 0.45, -0.25, 0.25, -0.65, 2.2, 2.4),
+    (2.3, 0.72, -0.2, 0.55, -0.82, 2.5, 2.8),
+    (1.1, 0.78, -0.12, 0.8, -0.86, 2.8, 3.2),
+    (-0.2, 0.74, -0.05, 0.95, -0.8, 2.8, 3.0),
+    (-1.3, 0.6, 0.1, 0.95, -0.55, 2.6, 2.6),
+    (-2.1, 0.38, 0.3, 0.8, -0.15, 2.4, 2.2),
+    (-2.6, 0.24, 0.42, 0.68, 0.18, 2.2, 2.2),
+]
+STRIKER_CANOPY = ((0, 2.15, 0.42), (0.7, 1.05, 0.5))
+STRIKER_EYE = Vector((-0.36, 2.0, 0.62))  # The pilot sits on the left (make_cockpit.py).
+
+
+def striker_nose():
+    """A radar dome on the nose tip, the sight ball under the chin, wire cutters, pitots."""
+    parts = []
+    dome = Vector((0, 3.3, -0.2))
+    parts.append(ball(dome, 0.2, "paint", scale=(1, 1.35, 0.95), segments=24, rings=12))
+    parts.append(ring(dome + Vector((0, -0.12, 0)), (0, 1, 0), 0.2, 0.015, "dark", 24))
+    sight = Vector((0, 3.0, -0.72))
+    parts.append(cyl(sight + Vector((0, 0, 0.1)), sight + Vector((0, 0, 0.2)), 0.08, "dark", 16))
+    parts.append(ball(sight, 0.15, "paint", segments=20, rings=10))
+    parts.append(cyl(sight + Vector((0, 0.11, 0.02)), sight + Vector((0, 0.15, 0.02)), 0.07, "glass", 16))
+    parts.append(box(sight + Vector((0, 0.13, -0.06)), (0.1, 0.02, 0.04), "dark", bevel_width=0.005))
+    for side in (-1, 1):
+        p, n = base.surface(side, 2.85, -0.25, 0.0)
+        parts.append(cyl(p, p + Vector((side * 0.1, 0.32, 0.02)), 0.012, "metal", 6))
+    parts += wire_cutter((0, 3.15, 0.3), (0, 0.6, 1), 0.25)
+    return parts
+
+
+def striker_skin():
+    parts = []
+    for side in (-1, 1):
+        parts += base.plate(side, 2.7, 1.6, -0.65, -0.3)  # Nose avionics bay.
+        parts += base.plate(side, 1.2, 0.2, -0.7, -0.3)  # Under the cockpit.
+        parts += base.plate(side, 0.0, -1.2, 0.35, 0.8)  # Engine bay.
+        parts += base.plate(side, -1.4, -2.4, 0.3, 0.6, bolt_step=0.09)  # Tail cone.
+        parts.append(box((side * 0.76, 0.7, -0.35), (0.04, 1.6, 0.5), "paint", bevel_width=0.015))  # Armour.
+        parts += rivets((side * 0.79, 0.0, -0.12), (side * 0.79, 1.4, -0.12), 8)
+        parts += louvres(side, -0.1, -1.0, 0.2, 8, 0.15)
+        parts += handholds(side, [(1.0, -0.75), (0.85, -0.4), (0.7, 0.0)])
+        # The crew doors' hinge line and latch under the canopy sill.
+        parts.append(box(ell(STRIKER_CANOPY[0], (0.72, 1.07, 0.52), side * 1.5, -0.3), (0.03, 0.12, 0.03), "brass",
+                         bevel_width=0.008))
+    return parts
+
+
+def striker_engines():
+    parts, exhausts = [], []
+    for side in (-1, 1):
+        p, ex = engine_pod(side, 0.6, 0.4, -1.4, 0.95, 0.27)
+        parts += p
+        exhausts.append(ex)
+        parts.append(ball((side * 0.6, 0.46, 0.95), 0.24, "metal", scale=(1, 0.5, 1), segments=18, rings=9))  # Dust guard.
+        for k in range(5):
+            a = math.pi * k / 5
+            parts.append(ring((side * 0.6, 0.47, 0.95), (math.cos(a), 0, math.sin(a)), 0.24, 0.007, "dark", 18))
+        sup = Vector((side * 0.82, -1.5, 1.0))  # Suppressor, its mouth turned up and out.
+        parts.append(box(sup, (0.26, 0.42, 0.26), "dark", rotation=Matrix.Rotation(side * -0.3, 4, "Z"), bevel_width=0.04))
+        parts.append(box(sup + Vector((side * 0.06, -0.05, 0.11)), (0.18, 0.3, 0.04), "exhaust",
+                         rotation=Matrix.Rotation(side * -0.3, 4, "Z"), bevel_width=0.01))
+        parts += rivets((side * 0.87, 0.2, 0.95), (side * 0.87, -1.2, 0.95), 8)
+    # The coaxial mast: a fairing, the shaft, and the links between the two hubs.
+    parts.append(cyl((0, -0.3, 0.98), (0, -0.3, 1.42), 0.26, "paint", 24, radius2=0.16, bevel_width=0.02))
+    parts.append(cyl((0, -0.3, 1.42), (0, -0.3, 2.42), 0.08, "metal", 16))
+    parts.append(cyl((0, -0.3, 1.82), (0, -0.3, 2.02), 0.14, "paint", 20, bevel_width=0.02))
+    for k in range(3):
+        a = 2 * math.pi * k / 3 + 0.3
+        p = Vector((0.12 * math.cos(a), -0.3 + 0.12 * math.sin(a), 0))
+        parts.append(cyl(p + Vector((0, 0, 1.96)), p + Vector((0, 0, 2.3)), 0.012, "metal", 6))
+    for k in range(8):
+        a = 2 * math.pi * k / 8
+        parts.append(ball((0.24 * math.cos(a), -0.3 + 0.24 * math.sin(a), 1.02), 0.013, "metal", segments=6, rings=3))
+    parts += blade_antenna((0, 0.5, 0.92), 0.16)
+    parts += blade_antenna((0, -2.0, 0.78), 0.14)
+    parts += beacon((0, -1.6, 0.92))
+    return parts, exhausts
+
+
+def striker_weapons():
+    parts, pods = [], []
+    for side in (-1, 1):
+        parts.append(stub_wing(side, (0.7, 0.2, -0.1), (2.05, 0.1, -0.2), 0.9, 0.62))
+        parts += rivets((side * 0.85, 0.42, -0.06), (side * 1.95, 0.3, -0.16), 7)
+        parts.append(box((side * 1.35, 0.15, -0.32), (0.06, 0.45, 0.3), "dark", bevel_width=0.015))
+        pod = Vector((side * 1.35, 0.3, -0.6))
+        parts += rocket_pod(pod, 1.25, 0.21)
+        pods.append(pod + Vector((0, 0.68, 0)))
+        parts += missile_rail((side * 1.95, 0.05, -0.38), 1.3)
+        parts.append(box((side * 2.06, -0.15, -0.16), (0.08, 0.3, 0.12), "dark", bevel_width=0.012))  # Dispenser.
+    parts += nav_lights((-2.08, 0.1, -0.12), (2.08, 0.1, -0.12))
+    turret, tips = chin_turret((0, 2.6, -0.82), 2, 1.05)
+    parts += turret
+    parts.append(ring((0, 2.6, -0.58), (0, 0, 1), 0.22, 0.022, "metal", 24))
+    return parts, pods, tips
+
+
 def build_striker():
     """A coaxial attack helicopter (a Ka-52 in spirit): side-by-side cockpit under a wide
     canopy, two counter-rotating rotors on one mast and no tail rotor (the game spins
@@ -686,47 +791,21 @@ def build_striker():
     s = 1.15
     ground = -1.15 * s
     base.GROUND_Z = ground
-    body = loft("fuselage", [
-        (3.35, 0.1, -0.2, -0.1, -0.3, 2.0, 2.0),
-        (3.0, 0.45, -0.25, 0.25, -0.65, 2.2, 2.4),
-        (2.3, 0.72, -0.2, 0.55, -0.82, 2.5, 2.8),
-        (1.1, 0.78, -0.12, 0.8, -0.86, 2.8, 3.2),
-        (-0.2, 0.74, -0.05, 0.95, -0.8, 2.8, 3.0),
-        (-1.3, 0.6, 0.1, 0.95, -0.55, 2.6, 2.6),
-        (-2.1, 0.38, 0.3, 0.8, -0.15, 2.4, 2.2),
-        (-2.6, 0.24, 0.42, 0.68, 0.18, 2.2, 2.2),
-    ], "paint", count=40)
-    base.HULL.append(body)
+    body = loft("fuselage", STRIKER_BODY, "paint", count=40)
+    sub = body.modifiers.new("subsurf", "SUBSURF")
+    sub.levels = 1
+    base.apply_all(body)
+    use_hull(body, STRIKER_BODY)
     parts = [body]
-    # Wide side-by-side canopy and its frame.
-    parts.append(ball((0, 2.15, 0.42), 1.0, "glass", scale=(0.7, 1.05, 0.5), segments=32, rings=16))
-    parts.append(ring((0, 1.25, 0.45), (0, 1, 0), 0.62, 0.03, "paint", 28))
-    parts.append(tube([(0, 3.1, 0.05), (0, 2.6, 0.62), (0, 1.9, 0.88), (0, 1.2, 0.9)], 0.03, "paint", 10))
-    for side in (-1, 1):
-        parts.append(box((side * 0.76, 0.7, -0.35), (0.04, 1.6, 0.5), "paint", bevel_width=0.015))
-        parts += rivets((side * 0.79, 0.0, -0.12), (side * 0.79, 1.4, -0.12), 8)
-    # Shoulder engines, the coaxial mast with two hubs, a fairing between them.
-    exhausts = []
-    for side in (-1, 1):
-        p, ex = engine_pod(side, 0.6, 0.4, -1.4, 0.95, 0.27)
-        parts += p
-        exhausts.append(ex)
-    parts.append(cyl((0, -0.3, 0.98), (0, -0.3, 1.42), 0.26, "paint", 24, radius2=0.16, bevel_width=0.02))
-    parts.append(cyl((0, -0.3, 1.42), (0, -0.3, 2.42), 0.08, "metal", 16))
-    parts.append(cyl((0, -0.3, 1.82), (0, -0.3, 2.02), 0.14, "paint", 20, bevel_width=0.02))
-    # Stub wings: rocket pods inboard, missile rails outboard.
-    pods = []
-    for side in (-1, 1):
-        parts.append(stub_wing(side, (0.7, 0.2, -0.1), (2.05, 0.1, -0.2), 0.9, 0.62))
-        parts.append(box((side * 1.35, 0.15, -0.32), (0.06, 0.45, 0.3), "dark", bevel_width=0.015))
-        pod = Vector((side * 1.35, 0.3, -0.6))
-        parts += rocket_pod(pod, 1.25, 0.21)
-        pods.append(pod + Vector((0, 0.68, 0)))
-        parts += missile_rail((side * 1.95, 0.05, -0.38), 1.3)
-        parts.append(ball((side * 2.07, 0.1, -0.18), 0.04, "light_green" if side > 0 else "light_red", segments=10,
-                          rings=5))
-    turret, tips = chin_turret((0, 2.6, -0.82), 2, 1.05)
-    parts += turret
+    # The wide canopy, framed with the posts the cockpit shows (STRIKER_POSTS, laid out
+    # from the pilot's eye).
+    parts += framed_canopy(*STRIKER_CANOPY, -0.38, 1.2, 2.45, [], bar=0.02, eye_posts=STRIKER_POSTS, eye=STRIKER_EYE)
+    parts += striker_nose()
+    parts += striker_skin()
+    engines, exhausts = striker_engines()
+    parts += engines
+    weapons, pods, tips = striker_weapons()
+    parts += weapons
     # Tail boom with twin fins and a stabiliser; no tail rotor.
     parts.append(cyl((0, -2.4, 0.5), (0, -6.4, 0.75), 0.24, "paint", 24, radius2=0.12))
     for k in range(4):
@@ -739,14 +818,24 @@ def build_striker():
         tip_ = end + Vector((side * 1.0, 0.1, 0))
         parts.append(fin([(0.3, -0.35), (-0.35, -0.3), (-0.55, 0.85), (-0.15, 0.95)], tip_, 0.06))
         parts.append(ball(tip_ + Vector((0, -0.45, 0.9)), 0.04, "light_red", segments=10, rings=5))
+        for z in (-0.1, 0.4):  # Rudder hinges.
+            parts.append(cyl(tip_ + Vector((-0.04, -0.4, z)), tip_ + Vector((0.04, -0.4, z)), 0.015, "metal", 6))
+    parts.append(cyl((0, -2.5, 0.72), (0, -6.0, 0.86), 0.04, "paint", 12, radius2=0.03))  # Cable duct on the boom.
     # Wheels: two main legs under the wings and a nose wheel.
     for side in (-1, 1):
         hub = Vector((side * 0.95, -0.3, ground + 0.28))
         parts.append(tube([(side * 0.7, -0.3, -0.7), (side * 0.92, -0.3, -0.95), hub], 0.055, "metal", 12))
+        parts.append(cyl((side * 0.72, -0.1, -0.62), hub + Vector((0, 0.08, 0.22)), 0.035, "metal", 10))
         parts += wheel(hub, 0.28, 0.18)
     nose = Vector((0, 2.3, ground + 0.22))
     parts.append(tube([(0, 2.3, -0.85), nose], 0.05, "metal", 12))
     parts += wheel(nose, 0.22, 0.12)
+    lamp = Vector((0, 1.8, -0.87))
+    parts.append(cyl(lamp + Vector((0, 0, 0.06)), lamp, 0.08, "dark", 18, bevel_width=0.01))
+    parts.append(cyl(lamp, lamp + Vector((0, 0.01, -0.01)), 0.07, "lamp", 18))
+    for side in (-1, 1):
+        parts.append(number("08", side, 1.0, 0.05, 0.24, body))
+        parts += roundel(side, -1.95, 0.08, 0.12, body)
     body = join(parts, "body")
     base.activate(body)
     bpy.ops.object.shade_smooth_by_angle(angle=math.radians(35))
@@ -754,13 +843,16 @@ def build_striker():
     upper.name = "rotor_upper"
     rotor(3, Vector((0, -0.3, 1.86)), 1.86, 1.0)
     empty("tail_rotor", (end.x, end.y, end.z))
-    empty("eye", (-0.36, 2.0, 0.62))  # The pilot sits on the left (make_cockpit.py).
+    empty("eye", tuple(STRIKER_EYE))
     empty("muzzle_l", tips[0])
     empty("muzzle_r", tips[-1])
     empty("pod_l", pods[0])
     empty("pod_r", pods[1])
     empty("exhaust_l", exhausts[0])
     empty("exhaust_r", exhausts[1])
+    c, r = STRIKER_CANOPY
+    crack_spots([(c, r, 1.2, 0.3), (c, r, -1.3, 0.4), (c, r, 0.5, 0.5), (c, r, -0.6, 0.25), (c, r, 1.6, 0.6),
+                 (c, r, -1.7, 0.6), (c, r, 0.1, 0.75), (c, r, -0.2, 0.4)])
 
 
 def build_mule():

@@ -1920,6 +1920,8 @@ func test_class_card_stats() -> void:
 	_check(full.size() == Airframe.STATS.size(), "some class tops every stat: %s" % [full])
 	_check(full.Speed == Airframe.SCOUT and full.Agility == Airframe.SCOUT, "the scout is fastest and quickest: %s" % [full])
 	_check(full.Armour == Airframe.MULE, "the Mule is the toughest: %s" % [full])
+	for entry: Array in GameMap.catalog():
+		_check(GameMap.blurb(entry[1]) != "", "%s has a line on the title screen" % entry[0])
 	var card := ClassCard.new()
 	card.show_class(Airframe.MULE)
 	_check(card._name.text == "MULE" and card._values.Ordnance.text == "R0 M4 F6", "the card shows the Mule")

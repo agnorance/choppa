@@ -55,12 +55,12 @@ func _ready() -> void:
 	_home.add_theme_constant_override("separation", 4)
 	root.add_child(_home)
 
-	_home.add_child(UiKit.logo(360.0))
+	_home.add_child(UiKit.logo(330.0))
 	_home.add_child(UiKit.caption("Get to the choppa!", 16, UiKit.ACCENT))
 	if notice != "":
 		_home.add_child(UiKit.label(notice, 16, UiKit.DANGER))
 		notice = ""
-	_home.add_child(_gap(10))
+	_home.add_child(_gap(4))
 
 	var maps := GameMap.catalog()
 	var names := PackedStringArray()
@@ -73,8 +73,12 @@ func _ready() -> void:
 	_home.add_child(_gap(4))
 	var map_row := SettingRow.new("MAP", names, map_index)
 	map_row.custom_minimum_size = Vector2(380, 46)
-	map_row.changed.connect(func(i: int) -> void: map_index = i)
+	var map_line := UiKit.label(GameMap.blurb(maps[map_index][1]), 14, UiKit.MUTED)
+	map_row.changed.connect(func(i: int) -> void:
+		map_index = i
+		map_line.text = GameMap.blurb(maps[i][1]))
 	_home.add_child(map_row)
+	_home.add_child(map_line)
 	var class_row := SettingRow.new("HELICOPTER", Airframe.names(), Settings.choice("airframe"))
 	class_row.custom_minimum_size = Vector2(380, 46)
 	class_row.changed.connect(func(i: int) -> void:

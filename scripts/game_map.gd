@@ -21,6 +21,17 @@ static func report(what: String, started_msec: int) -> void:
 
 
 ## Display names and ids of all maps, for the menu.
+## One line about a map, for the title screen.
+static func blurb(map_id: String) -> String:
+	return {
+		"basin": "A mesa with crossing tunnels, arches, a trench and a lake.",
+		"canyon": "A winding slot canyon: a river, a mining camp, bridges to dodge.",
+		"harbor": "A derelict port: container alleys, cranes, ships, a lighthouse.",
+		"dam": "A valley shut by a dam: fly through its spillways, mind the lines.",
+		"range": "The test range: rings, a race course, room to practise.",
+	}.get(map_id, "")
+
+
 static func catalog() -> Array:
 	return [["MESA BASIN", "basin"], ["SLOT CANYON", "canyon"], ["RUST HARBOR", "harbor"], ["IRON DAM", "dam"],
 		["TEST RANGE", "range"]]

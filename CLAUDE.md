@@ -24,7 +24,10 @@ call: they merge on GitHub (with "Create a merge commit").
 Done so far: load times, the UI, two flight models, the damage model, helicopter
 classes, service stations with a loadout, Slot Canyon, PC only, polish, the
 progression foundation, internet multiplayer steps 1 and 2 (host, dedicated server,
-direct connect; `NetGame`). Plan (DESIGN.md "Milestones"): a cloud server (owner
+direct connect; `NetGame`), recorded sound and the radio, five classes (Scout, Gunship,
+Heavy, Striker, Mule) with their own cockpits, realistic crash damage and wrecks, flight
+assists and rebindable keys, Rust Harbor and Iron Dam, time of day, the brand set, the
+demo video tool. Plan (DESIGN.md "Milestones"): a cloud server (owner
 picks the provider), the backend, then ranked, store and the Apex skin. Every feature gets tests (owner's rule). Each session: check `git log` and the roadmap, then confirm the next step.
 
 ## Commands

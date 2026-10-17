@@ -100,6 +100,7 @@ func _run() -> void:
 		"test_brand_assets",
 		"test_mule_has_two_rotors",
 		"test_class_card_stats",
+		"test_new_camos_are_earned",
 		"test_spawns_are_on_dry_clear_ground",
 		"test_replay_is_deterministic",
 		"test_net_client_predicts_and_server_agrees",
@@ -1914,3 +1915,14 @@ func test_class_card_stats() -> void:
 	card.show_class(Airframe.MULE)
 	_check(card._name.text == "MULE" and card._values.Ordnance.text == "R0 M4 F6", "the card shows the Mule")
 	card.free()
+
+
+## The shark mouth, flecktarn, rust and carbon camos: earned by level, in the hangar
+## order, each class knows where its nose is for the mouth.
+func test_new_camos_are_earned() -> void:
+	for id in ["shark", "flecktarn", "rust", "carbon"]:
+		_check(Progression.CAMOS.has(id) and Progression.CAMOS[id].tier == "level", "%s is earned by level" % id)
+		_check(Progression.ORDER.has(id), "%s is in the hangar" % id)
+	for id: String in Airframe.ORDER:
+		var nose: Array = Airframe.spec(id).nose
+		_check(nose.size() == 3 and nose[0] < -2.0 and nose[2] > 0.5, "%s has its nose for nose art: %s" % [id, nose])

@@ -105,6 +105,9 @@ func _build() -> void:
 	materials.marking_red = _hull(color, Vector2(1.35, 0.75))
 	_paint = materials.paint
 	_tips = materials.hazard
+	var nose: Array = Airframe.spec(airframe).nose
+	for k in 3:
+		_paint.set_shader_parameter(["nose_tip", "nose_y", "nose_len"][k], nose[k])
 	_apply_camo()
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D"):
 		for k in mesh.mesh.get_surface_count():

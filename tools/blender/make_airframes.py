@@ -441,13 +441,14 @@ def build_mule():
     # The cockpit: a flat windscreen, side windows, chin windows, a centre post.
     tilt = Matrix.Rotation(math.radians(-42), 4, "X")
     for side in (-1, 1):
-        parts.append(box((side * 0.46, 4.5, 0.42), (0.82, 0.05, 0.62), "glass", rotation=tilt @ Matrix.Rotation(side * 0.2, 4, "Y")))
-        parts.append(box((side * 0.46, 4.49, 0.42), (0.9, 0.035, 0.7), "dark", rotation=tilt @ Matrix.Rotation(side * 0.2, 4, "Y")))
+        # On the nose slope and inside its outline (the hull narrows toward the top).
+        parts.append(box((side * 0.34, 4.4, 0.47), (0.58, 0.05, 0.56), "glass", rotation=tilt @ Matrix.Rotation(side * 0.15, 4, "Y")))
+        parts.append(box((side * 0.34, 4.39, 0.47), (0.64, 0.035, 0.62), "dark", rotation=tilt @ Matrix.Rotation(side * 0.15, 4, "Y")))
         parts.append(box((side * 1.27, 3.75, 0.38), (0.05, 1.0, 0.52), "glass"))
         parts.append(box((side * 1.255, 3.75, 0.38), (0.04, 1.08, 0.6), "dark"))
         parts.append(box((side * 0.55, 4.66, -0.5), (0.48, 0.3, 0.05), "glass",
                          rotation=Matrix.Rotation(math.radians(55), 4, "X")))
-    parts.append(box((0, 4.52, 0.42), (0.08, 0.07, 0.7), "paint", rotation=tilt))
+    parts.append(box((0, 4.41, 0.47), (0.08, 0.07, 0.62), "paint", rotation=tilt))
     # Round windows down both sides, the crew doors forward, rivet lines.
     for side in (-1, 1):
         for k in range(7):

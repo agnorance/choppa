@@ -463,12 +463,13 @@ def build_mule():
     shell += cp.extinguisher(0.62, -0.6, -1.03, (0, 0, 1))
     shell += cp.wiring([(mid, 0.6, -0.48), (mid + 0.05, 0.45, -0.85), (mid, 0.0, -1.0)], 5)
     shell += cp.compass((mid, 0.66, 0.36))
-    # The windscreen: two flat panes, three posts, rails top and bottom; side windows.
-    top_y, top_z, low_y, low_z = 0.72, 0.38, 1.06, -0.34
-    for x in (co - 0.45, mid, 0.45):
+    # The windscreen: two flat panes, three posts, rails top and bottom (on the edges of
+    # the exterior's panes, so nothing pokes out of the nose); side windows.
+    top_y, top_z, low_y, low_z = 0.64, 0.2, 1.0, -0.19
+    for x in (co - 0.21, mid, 0.21):
         frame.append(tube([(x, low_y, low_z), (x, top_y, top_z)], 0.03 if x == mid else 0.026))
     for y, z in ((top_y, top_z), (low_y, low_z)):
-        frame.append(tube([(co - 0.46, y, z), (0.46, y, z)], 0.026))
+        frame.append(tube([(co - 0.22, y, z), (0.22, y, z)], 0.026))
     for x in (co - 0.71, 0.71):
         for y0, z0, y1, z1 in ((-0.3, -0.33, 0.7, -0.33), (-0.3, 0.2, 0.7, 0.2), (-0.3, -0.33, -0.3, 0.2),
                                (0.7, -0.33, 0.7, 0.2)):

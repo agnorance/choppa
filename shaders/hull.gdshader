@@ -20,6 +20,11 @@ uniform float paint_metal : hint_range(0.0, 1.0) = 0.15;
 uniform float paint_gloss : hint_range(0.0, 1.0) = 0.38;
 uniform vec3 seam_color : source_color = vec3(0.0);
 uniform float seam_glow = 0.0;
+// Where the nose is, in object space, for nose art (the shark mouth): the tip's z (the
+// nose points to -z), the height of the mouth's middle, the mouth's length.
+uniform float nose_tip = -2.4;
+uniform float nose_y = -0.3;
+uniform float nose_len = 1.3;
 
 varying vec3 obj_pos;
 varying vec3 obj_normal;
@@ -131,6 +136,52 @@ vec3 camo(vec3 p, vec3 base) {
 		vec3 col = hash(vec3(id, 3.0)) > 0.72 ? camo_b : base;
 		col = hash(vec3(id, 7.0)) > 0.93 ? camo_d : col;
 		return mix(col, camo_c, smoothstep(0.44, 0.47, d));
+	}
+	if (pattern == 11) {
+		// Shark mouth: a grin on both sides of the nose, red inside, white teeth along both
+		// lips, a black outline, and an eye above the corner. base is the body colour.
+		float t = (p.z - nose_tip) / nose_len;
+		float k = nose_len / 1.4;
+		vec3 col = base;
+		if (abs(p.x) > 0.12 && t > 0.0 && t < 1.15) {
+			float s = clamp(t / 0.85, 0.0, 1.0);
+			float upper = nose_y + (0.06 + 0.12 * s - 0.2 * s * s) * k;
+			float lower = nose_y - (0.42 * pow(sin(3.14159 * s), 0.8) * (1.0 - 0.25 * s) + 0.02) * k;
+			float y = p.y;
+			bool inside = t < 0.85 && y < upper && y > lower;
+			float u = abs(fract(t * nose_len / (0.075 * k)) * 2.0 - 1.0);  // 0 at a tooth tip.
+			float tooth = 0.07 * k * (1.0 - u);
+			if (inside) {
+				col = camo_b;
+				if (y > upper - tooth || y < lower + tooth * step(0.08, s) * step(s, 0.92)) {
+					col = camo_c;
+				}
+			} else if (t < 0.87 && y < upper + 0.025 * k && y > lower - 0.025 * k) {
+				col = camo_d;  // The lips' outline.
+			}
+			vec2 eye = vec2(nose_tip + nose_len * 0.98, nose_y + 0.3 * k);
+			float d = length(vec2(p.z, p.y) - eye);
+			col = mix(col, camo_c, step(d, 0.1 * k));
+			col = mix(col, camo_d, step(d, 0.075 * k));
+		}
+		return col;
+	}
+	if (pattern == 12) {
+		// Flecktarn: small dots in three colours scattered over the base, one per 14 cm cell.
+		vec3 cell = floor(q / 0.14);
+		vec3 centre = (cell + vec3(hash(cell), hash(cell + 1.7), hash(cell + 3.1)) * 0.6 + 0.2) * 0.14;
+		float r = (0.025 + hash(cell + 5.3) * 0.035);
+		float pick = hash(cell + 8.9);
+		vec3 col = mix(base, camo_b, step(0.55, fbm(q * 0.7)) * 0.5);
+		vec3 dot_col = pick < 0.4 ? camo_b : (pick < 0.75 ? camo_c : camo_d);
+		return mix(col, dot_col, step(distance(q, centre), r));
+	}
+	if (pattern == 13) {
+		// Carbon fibre: a fine twill weave, the tows alternating light and dark.
+		vec2 uv = vec2(q.z + q.x * 0.7, q.y + q.x * 0.3) / 0.035;
+		float weave = mod(floor(uv.x) + floor(uv.y * 0.5 + floor(uv.x) * 0.5), 2.0);
+		float sheen = 0.5 + 0.5 * sin(fract(weave > 0.5 ? uv.x : uv.y) * 3.14159);
+		return mix(base, camo_b, weave * 0.7) * (0.85 + 0.25 * sheen);
 	}
 	return base;
 }

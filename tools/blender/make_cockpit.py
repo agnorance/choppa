@@ -273,10 +273,11 @@ def build_scout():
 def build_gunship():
     eye = EYES["gunship"]
     c_pilot, r = Vector((0, 0.75, 0.68)) - eye, (0.36 - 0.03, 0.95 - 0.03, 0.42 - 0.03)
-    c_gunner = Vector((0, 1.75, 0.42)) - eye
+    c_gunner = Vector((0, 1.75, 0.3)) - eye
     shell, frame = [], []
-    # Instrument panel under the glare hood: two MFDs, standby gauges below.
-    panel = Panel((0.0, 0.46, -0.27), tilt=-30.0)
+    # Instrument panel under the glare hood: two MFDs, standby gauges below. Set low, so
+    # the view goes over it and over the gunner's head, Apache style.
+    panel = Panel((0.0, 0.46, -0.33), tilt=-30.0)
     shell += cp.subpanel(panel, 0, 0, 0.6, 0.36, -0.012)
     shell += kick_wall(panel, 0.3, 0.18, -1.05)
     shell += cp.hood(panel, 0, 0.19, 0.62, 0.12, 0.0)
@@ -295,10 +296,9 @@ def build_gunship():
     cp.empty("mount_hud", (0, 0.9, 0.0))  # The helmet symbology floats further out.
     # Ahead and below: the gunner's blast shield, his seat back and helmet rest.
     shell += cp.seat(0, 0.95, -0.98, 0.42, 0.62, armoured=True, harness=False)
-    # The gunner up front: the top of his helmet and its sight mount over the glare shield.
-    shell.append(ball((0, 0.98, -0.1), 0.14, "dark", scale=(1.0, 1.1, 0.85), segments=16, rings=8))
-    shell.append(box((0.1, 1.04, -0.07), (0.05, 0.08, 0.06), "metal", bevel_width=0.01))
-    shell.append(cyl((0.1, 1.08, -0.07), (0.1, 1.14, -0.1), 0.012, "dark", 8))
+    # The gunner up front, sitting lower: the top of his helmet shows below the sight line.
+    shell.append(ball((0, 1.0, -0.33), 0.14, "dark", scale=(1.0, 1.1, 0.85), segments=16, rings=8))
+    shell.append(box((0.1, 1.06, -0.3), (0.05, 0.08, 0.06), "metal", bevel_width=0.01))
     # Narrow tub: walls, consoles on both sides, floor, seat, pedals.
     for side in (-1, 1):
         shell += wall(side * 0.31, -0.55, 0.45, -1.05, -0.24, 5)
@@ -313,12 +313,11 @@ def build_gunship():
     shell += cp.seat(0, -0.08, -0.74, 0.44, 0.7, armoured=True)
     shell += cp.pedals(0, 0.42, -0.95, 0.12)
     shell += cp.extinguisher(-0.24, -0.45, -1.03, (0, 0, 1))
-    # The canopy: frame bars on the inside of the pilot's glass and the gunner's.
-    # A closed cabin: a solid roof strip, the windscreen corners and door bows running into
-    # its rail, a side rail at shoulder height, the gunner's sill ahead.
-    frame += cabin(c_pilot, r, 1.1, [-0.9, 0.9, -1.35, 1.35, -2.2, 2.2], sill=-0.18, sill_from=0.2, bar=0.011)
+    # A closed cabin, the same frame the outside shows (GUNSHIP_PILOT in make_airframes.py):
+    # a solid roof strip, the windscreen corners and door bows running into its rail, and
+    # nothing across the side view; the gunner's sill ahead and below.
+    frame += cabin(c_pilot, r, 1.25, [-0.9, 0.9, -1.35, 1.35, -2.2, 2.2], sill=-0.18, sill_from=0.2, bar=0.011)
     for side in (-1, 1):
-        frame.append(cp.frame_member(c_pilot, r, side * 0.9, 0.45, side * 2.6, 0.45, 0.01))  # Side rail.
         frame.append(cp.frame_member(c_gunner, r, side * 0.2, -0.1, side * 2.4, -0.1, 0.011))
     finish(shell, frame)
     cp.stick((0, 0.18, -1.0))

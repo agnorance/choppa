@@ -603,9 +603,12 @@ Apex are entitlements the server grants; offline they can only be previewed
 15. **Ranked, store and Apex** on the backend.
 16. Feel pass on the owner's PC throughout; more arenas and battle variants after.
 17. **Cockpit pass, one class at a time** (owner, 2026-10-17, after the cabin rework): a
-    debug session per helicopter. Known: in the Gunship the nose is in the way of the
-    sight, and in general you see too little from inside (sight lines, seat height,
-    frame and panel heights against the exterior).
+    debug session per helicopter, built the Little Bird's way (owner: "you did good with
+    the Little Bird"): one canopy shape for outside and inside, glass between a sill and a
+    roof, few posts and none in front of the sight, the panel low. Done so far: the Heavy
+    (framed canopies, no centre post, the windscreen on its own rail) and the Gunship
+    (the gunner sits low so the pilot sees over him, panel lower, framed tandem canopy).
+    Still to go: the Striker and the Mule, and how much you see from inside in general.
 
 Every step comes with tests (owner's rule: so we know where something broke).
 

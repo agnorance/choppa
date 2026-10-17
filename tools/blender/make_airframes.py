@@ -238,12 +238,11 @@ def build_gunship():
     ], "paint", count=40)
     base.HULL.append(body)
     parts = [body]
-    # Stepped tandem canopy: gunner in front, pilot behind and higher.
-    for y, z, length, height in ((1.75, 0.42, 0.95, 0.42), (0.75, 0.68, 0.95, 0.42)):
-        parts.append(ball((0, y, z), 1.0, "glass", scale=(0.36, length, height), segments=28, rings=14))
-        parts.append(ring((0, y - length * 0.55, z), (0, 1, 0), 0.33, 0.025, "paint", 24))
-    parts.append(tube([(0, 2.7, 0.1), (0, 2.2, 0.62), (0, 1.25, 0.84), (0, 0.2, 1.06), (0, -0.4, 1.02)], 0.035,
-                      "paint", 10))
+    # Stepped tandem canopy, framed panes like the Little Bird's cabin: the gunner low in
+    # front, the pilot behind and higher, looking over his head. The pilot's frame is the
+    # one the cockpit shows from inside (make_cockpit.py, build_gunship).
+    parts += framed_canopy((0, 1.75, 0.3), (0.36, 0.95, 0.42), -0.15, 1.15, 1.9, [-0.6, 0.6], [0.5], bar=0.018)
+    parts += framed_canopy((0, 0.75, 0.68), (0.36, 0.95, 0.42), -0.18, 1.25, 2.2, [-0.9, 0.9, -1.35, 1.35], bar=0.018)
     # Armour plates and rivet lines along the flanks.
     for side in (-1, 1):
         parts.append(box((side * 0.5, 0.9, -0.3), (0.04, 1.8, 0.5), "paint", bevel_width=0.015))
